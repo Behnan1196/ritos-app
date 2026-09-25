@@ -153,10 +153,12 @@ export default function RitosLab() {
 
   return (
     <div className="shell">
-      <div className="topbar">
-        <b>Ritos — yerleşim laboratuvarı</b>
-        <span className="w">{width}px · {isNarrow ? 'dar (iPhone tipi)' : 'geniş (iPad tipi)'}</span>
-      </div>
+      {!isNarrow && (
+        <div className="topbar">
+          <b>Ritos</b>
+          <span className="w">{width}px · geniş (iPad tipi)</span>
+        </div>
+      )}
 
       {isNarrow ? (
         <MobileShell
@@ -686,7 +688,7 @@ function MobileShell({
 
   return (
     <div className="mobile-app">
-      <div className="mobile-hd"><b>Rite</b></div>
+      <div className="mobile-hd"><b>Ritos</b></div>
       <div className="mobile-main">
         {tab === 'ajanda' && <AjandaPane />}
         {tab === 'home' && <MobileHome onOpenTool={onOpenTool} customBoardProps={customBoardProps} />}

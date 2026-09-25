@@ -225,7 +225,7 @@ function GelenDetay({ g, onKapat }: { g: GelenRow; onKapat: () => void }) {
       {p.tur === 'program' && p.program && (
         <>
           {p.program.amac && <p className="rt-metin"><b>Amaç:</b> {p.program.amac}</p>}
-          <ul className="rt-liste">{p.program.adimlar.map((a, i) => <li key={i}>{a.ad} <span className="rt-muted">· {a.sure_gun ? `${a.sure_gun} gün` : 'süregelen'}</span></li>)}</ul>
+          <ul className="rt-maddeler">{p.program.adimlar.map((a, i) => <li key={i}>{a.ad} <span className="rt-muted">· {a.sure_gun ? `${a.sure_gun} gün` : 'süregelen'}</span></li>)}</ul>
         </>
       )}
 
