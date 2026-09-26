@@ -12,7 +12,7 @@ import { db, type AjandaKartRow, type GelenRow, type ProgramAdimRow } from './db
 import { supabase } from './supabase';
 import { teslimAl } from './ajanda';
 import { adimEkle, programGuncelle } from './program';
-import { PAKET_SURUM, TAM_IZIN, gunFarki, tarihEkle, type Blok, type TemelTip } from './paket';
+import { PAKET_SURUM, TAM_IZIN, gunFarki, tarihEkle, type Blok, type PaketEk, type TemelTip } from './paket';
 
 type AdimTanim = Omit<ProgramAdimRow, 'id' | 'program_id' | 'sira' | 'guncellendi'>;
 
@@ -20,7 +20,7 @@ export interface PaylasimPaketi {
   surum: typeof PAKET_SURUM;
   tur: 'kart' | 'program';
   ad: string;
-  kart?: { tip: TemelTip; bloklar: Blok[]; gun_sayisi: number | null; gunler: number[] | null; saatler: string[] };
+  kart?: { tip: TemelTip; bloklar: Blok[]; gun_sayisi: number | null; gunler: number[] | null; saatler: string[]; ek?: PaketEk | null };
   program?: { amac: string; dikkat: string; kriterler: string[]; hedef: string; adimlar: AdimTanim[] };
 }
 
@@ -37,6 +37,7 @@ export function kartPaketi(k: AjandaKartRow): PaylasimPaketi {
       gun_sayisi: k.bitis === null ? null : gunFarki(k.baslangic, k.bitis) + 1,
       gunler: k.gunler,
       saatler: k.saatler,
+      ek: k.ek ?? null,
     },
   };
 }
@@ -51,7 +52,7 @@ export async function programPaketi(programId: string): Promise<PaylasimPaketi |
     ad: p.ad,
     program: {
       amac: p.amac, dikkat: p.dikkat, kriterler: p.kriterler, hedef: p.hedef,
-      adimlar: adimlar.map(({ tip, ad, bloklar, basla_gun, sure_gun, gunler, saatler }) => ({ tip, ad, bloklar, basla_gun, sure_gun, gunler, saatler })),
+      adimlar: adimlar.map(({ tip, ad, bloklar, basla_gun, sure_gun, gunler, saatler, ek }) => ({ tip, ad, bloklar, basla_gun, sure_gun, gunler, saatler, ek: ek ?? null })),
     },
   };
 }
@@ -129,7 +130,8 @@ export async function al(gelenId: string, baslangic: string): Promise<{ tamam: b
     await teslimAl([{
       surum: PAKET_SURUM,
       id: crypto.randomUUID(),
-      tip: p.kart.tip === 'kaydet' || p.kart.tip === 'uygula' ? 'yap' : p.kart.tip, // veri üreten kart yalnız programda yaşar
+      // veri üreten kart yalnız programda yaşar — paket kartı (sınav görevi) hariç: değeri kendi analizine gider
+      tip: (p.kart.tip === 'kaydet' || p.kart.tip === 'uygula') && !p.kart.ek ? 'yap' : p.kart.tip,
       ad: p.ad,
       bloklar: p.kart.bloklar,
       zamanlama: {
@@ -142,6 +144,7 @@ export async function al(gelenId: string, baslangic: string): Promise<{ tamam: b
       sahip: 'ben',
       izinler: TAM_IZIN,
       geri_bildirim: 'yok',
+      ek: p.kart.ek ?? null,
     }]);
     await db.gelen.update(gelenId, { alindi: Date.now() });
     return { tamam: true, mesaj: "Ajanda'ya eklendi" };

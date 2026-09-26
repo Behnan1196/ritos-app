@@ -24,6 +24,7 @@ function paketToRow(p: KartPaketi, sira: number): AjandaKartRow {
     sahip: p.sahip,
     izinler: p.izinler,
     geri_bildirim: p.geri_bildirim,
+    ek: p.ek ?? null,
     sira,
     guncellendi: Date.now(),
   };

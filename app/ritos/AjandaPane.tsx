@@ -9,6 +9,8 @@ import {
 } from '@/lib/paket';
 import { BlokGoster, Chips, Kap, Modal, OnayKutusu, degerMetni } from './ortak';
 import { PaylasDugmesi } from './Paylasim';
+import { DenemeGir, GorevFormu, gorevTeslim, useSinavOzeti } from './Sinav';
+import { sinavOzeti, type GorevTaslak } from '@/lib/sinavGorev';
 import { kartPaketi } from '@/lib/paylasim';
 
 // A1–A9 (ilk dilim). Ajanda yalnızca kart satırlarını bilir; kaynağın içini bilmez.
@@ -126,12 +128,15 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
         <button type="button" className="rt-kart-ad" onClick={kart.izinler.ac ? onAc : undefined}>
           <span className="t">{kart.ad}</span>
           {meta && <span className="m">{meta}</span>}
-          {(kart.tip === 'kaydet' || kart.tip === 'uygula') && kayit?.degerler && <span className="m">✓ {degerMetni(kayit.degerler)}</span>}
+          {(kart.tip === 'kaydet' || kart.tip === 'uygula') && kayit?.degerler && <span className="m">✓ {(kart.ek && sinavOzeti(kart.ek, kayit.degerler)) || degerMetni(kayit.degerler)}</span>}
         </button>
         {tutamac}
       </div>
       {uygulaAcik && <Uygula satir={satir} tarih={tarih} onKapat={() => setUygulaAcik(false)} />}
-      {degerAcik && kart.tip === 'kaydet' && (
+      {degerAcik && kart.tip === 'kaydet' && kart.ek?.tur === 'deneme' && kart.ek.deneme && (
+        <DenemeGir ek={kart.ek} ilk={kayit?.degerler ?? null} onKaydet={async (d) => { await degerKaydet(kart.id, tarih, d); setDegerAcik(false); }} />
+      )}
+      {degerAcik && kart.tip === 'kaydet' && kart.ek?.tur !== 'deneme' && (
         <DegerGir bloklar={kart.bloklar} ilk={kayit?.degerler ?? null} onKaydet={async (d) => { await degerKaydet(kart.id, tarih, d); setDegerAcik(false); }} />
       )}
     </div>
@@ -162,7 +167,9 @@ function DegerGir({ bloklar, ilk, onKaydet }: { bloklar: Blok[]; ilk: Record<str
 }
 
 function HizliEkle({ tarih, onKapat }: { tarih: string; onKapat: () => void }) {
-  const [tip, setTip] = useState<TemelTip>('yap');
+  const sinavKurulu = useSinavOzeti().kurulu;
+  const [tip, setTip] = useState<TemelTip | 'sinav'>('yap');
+  const [gorev, setGorev] = useState<GorevTaslak | null>(null);
   const [ad, setAd] = useState('');
   const [metin, setMetin] = useState('');
   const [url, setUrl] = useState('');
@@ -172,6 +179,13 @@ function HizliEkle({ tarih, onKapat }: { tarih: string; onKapat: () => void }) {
   const [sure, setSure] = useState('');
 
   async function ekle() {
+    if (tip === 'sinav') {
+      if (!gorev) return;
+      const n = Number(sure);
+      await gorevTeslim(gorev, tarih, saat, tekrar === 'tek' ? tarih : sure && n > 0 ? tarihEkle(tarih, n - 1) : null, tekrar === 'tekrar' && gunler.length ? gunler : null);
+      onKapat();
+      return;
+    }
     if (!ad.trim()) return;
     const bloklar: Blok[] = [];
     if (metin.trim()) bloklar.push({ tur: 'metin', metin: metin.trim() });
@@ -200,9 +214,13 @@ function HizliEkle({ tarih, onKapat }: { tarih: string; onKapat: () => void }) {
 
   return (
     <Modal baslik="Kart ekle" onKapat={onKapat}>
-      <Chips<TemelTip> secenekler={[['yap', 'Yap'], ['oku', 'Oku']]} deger={tip} onSec={setTip} />
-      <input className="rt-inp" placeholder="Ad" value={ad} onChange={(e) => setAd(e.target.value)} autoFocus />
-      <textarea className="rt-inp" placeholder={tip === 'oku' ? 'Metin' : 'Açıklama (isteğe bağlı)'} value={metin} onChange={(e) => setMetin(e.target.value)} rows={3} />
+      <Chips<TemelTip | 'sinav'> secenekler={[['yap', 'Yap'], ['oku', 'Oku'], ...(sinavKurulu ? [['sinav', '📚 Sınav görevi'] as ['sinav', string]] : [])]} deger={tip} onSec={setTip} />
+      {tip === 'sinav' ? <GorevFormu onChange={setGorev} /> : (
+        <>
+          <input className="rt-inp" placeholder="Ad" value={ad} onChange={(e) => setAd(e.target.value)} autoFocus />
+          <textarea className="rt-inp" placeholder={tip === 'oku' ? 'Metin' : 'Açıklama (isteğe bağlı)'} value={metin} onChange={(e) => setMetin(e.target.value)} rows={3} />
+        </>
+      )}
       {tip === 'oku' && <input className="rt-inp" placeholder="Video ya da bağlantı (isteğe bağlı)" value={url} onChange={(e) => setUrl(e.target.value)} />}
       <label className="rt-alan"><span>Saat (isteğe bağlı)</span><input className="rt-inp" type="time" value={saat} onChange={(e) => setSaat(e.target.value)} /></label>
       <Chips<'tek' | 'tekrar'> secenekler={[['tek', 'Yalnız bu gün'], ['tekrar', 'Tekrarla']]} deger={tekrar} onSec={setTekrar} />
@@ -216,7 +234,7 @@ function HizliEkle({ tarih, onKapat }: { tarih: string; onKapat: () => void }) {
           <input className="rt-inp" inputMode="numeric" placeholder="Süre (gün) — boş = süregelen" value={sure} onChange={(e) => setSure(e.target.value.replace(/\D/g, ''))} />
         </>
       )}
-      <button type="button" className="rt-btn primary" disabled={!ad.trim()} onClick={ekle}>Ekle</button>
+      <button type="button" className="rt-btn primary" disabled={tip === 'sinav' ? !gorev : !ad.trim()} onClick={ekle}>Ekle</button>
     </Modal>
   );
 }

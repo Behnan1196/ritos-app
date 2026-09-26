@@ -338,3 +338,30 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-sinav p.rt-muted{margin:0 0 8px;}
 .rt-sinav .rt-rozet{margin-left:6px;vertical-align:middle;}
 .rt-sinav .rt-uyari{margin-top:10px;}
+.rt-durum{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;flex:0 0 auto;border:1.5px solid #cfc6b4;background:transparent;}
+.rt-durum.calisiliyor{border-color:#c9a13b;background:#f3dfa6;}
+.rt-durum.tamam{border-color:var(--green);background:var(--green);}
+.rt-durum.tekrar{border-color:var(--red);background:#f4c9bf;}
+.rt-rozet.zayif{background:#f4c9bf;color:#8a2e1c;margin-left:6px;}
+.rt-artis{color:var(--green);}
+.rt-azalis{color:var(--red);}
+.rt-konu-bilgi{display:flex;flex-direction:column;gap:8px;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line);}
+.rt-konu-bilgi p{margin:0;}
+.rt-gorev-form{display:flex;flex-direction:column;gap:10px;}
+.rt-gorev-form p{margin:0;}
+.rt-konu-sec{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff;color:var(--ink);}
+.rt-deneme-tablo{width:100%;border-collapse:collapse;font-size:13px;}
+.rt-deneme-tablo th{font-size:11px;color:var(--muted);font-weight:600;text-align:left;padding:4px;}
+.rt-deneme-tablo td{padding:3px 4px;border-top:1px solid var(--line);}
+.rt-deneme-tablo td .rt-inp{padding:5px 6px;width:58px;text-align:center;}
+.rt-deneme-tablo td.net{font-weight:700;font-variant-numeric:tabular-nums;}
+.rt-deneme-tablo tfoot td{font-weight:700;}
+.rt-deneme-tablo.ozet td{font-variant-numeric:tabular-nums;}
+.rt-net-bas{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
+.rt-net-sayi{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;}
+.rt-net-grafik{width:100%;height:auto;display:block;margin:4px 0 10px;}
+.rt-net-grafik text{font-size:9px;fill:var(--muted);}
+.rt-net-grafik .izgara{stroke:var(--line);stroke-width:1;}
+.rt-net-grafik .cizgi{fill:none;stroke:var(--green);stroke-width:2;stroke-linejoin:round;}
+.rt-net-grafik .nokta{fill:var(--green);stroke:var(--bg);stroke-width:2;}
+.rt-net-grafik .hedef{fill:transparent;}

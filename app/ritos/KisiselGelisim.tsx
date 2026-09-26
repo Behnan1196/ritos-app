@@ -8,6 +8,8 @@ import { adimEkle, adimGuncelle, adimSil, aktifMi, baslat, durdur, ilerleme, pro
 import { DEGER_ETIKET, EN_FAZLA_SEVIYE, HAZIR_SETLER, alanEkle, alanMi, degerlendir, hazirSetKur, klasorEkle, klasorGuncelle, klasorSil, programTasi, seviye, sonDegerlendirmeler, yol } from '@/lib/alan';
 import { Chips, Kap, Modal, OnayKutusu, degerMetni } from './ortak';
 import { PaylasDugmesi } from './Paylasim';
+import { GorevFormu, gorevBaslangic, useSinavOzeti } from './Sinav';
+import type { GorevTaslak } from '@/lib/sinavGorev';
 import { programPaketi } from '@/lib/paylasim';
 
 // Kişisel Gelişim: yaşam alanları → (klasörler) → Bireysel Programlar.
@@ -314,7 +316,9 @@ function AdimForm({ programId, adim, yansir, onKapat }: { programId: string; adi
   const metin0 = adim?.bloklar.find((b): b is Extract<Blok, { tur: 'metin' }> => b.tur === 'metin')?.metin ?? '';
   const sayi0 = adim?.bloklar.find((b): b is Extract<Blok, { tur: 'sayi' }> => b.tur === 'sayi');
   const zaman0 = adim?.bloklar.find((b): b is Extract<Blok, { tur: 'zamanlayici' }> => b.tur === 'zamanlayici');
-  const [tip, setTip] = useState<TemelTip>(adim?.tip ?? 'yap');
+  const sinavKurulu = useSinavOzeti().kurulu;
+  const [tip, setTip] = useState<TemelTip | 'sinav'>(adim?.ek?.paket === 'sinav' ? 'sinav' : adim?.tip ?? 'yap');
+  const [gorev, setGorev] = useState<GorevTaslak | null>(null);
   const [ad, setAd] = useState(adim?.ad ?? '');
   const [metin, setMetin] = useState(metin0);
   const [etiket, setEtiket] = useState(sayi0?.etiket ?? '');
@@ -327,14 +331,13 @@ function AdimForm({ programId, adim, yansir, onKapat }: { programId: string; adi
   const [etkin, setEtkin] = useState<'bugun' | 'yarin'>('bugun');
 
   async function kaydet() {
+    if (tip === 'sinav' && !gorev) return;
     const bloklar: Blok[] = [];
     if (metin.trim()) bloklar.push({ tur: 'metin', metin: metin.trim() });
     if (tip === 'kaydet') bloklar.push({ tur: 'sayi', anahtar: 'deger', etiket: etiket.trim() || 'Değer', ...(birim.trim() ? { birim: birim.trim() } : {}) });
     if (tip === 'uygula' && Number(dakika) > 0) bloklar.push({ tur: 'zamanlayici', dakika: Number(dakika) });
     const veri = {
-      tip,
-      ad: ad.trim(),
-      bloklar,
+      ...(tip === 'sinav' ? { tip: gorev!.tip, ad: gorev!.ad, bloklar: gorev!.bloklar, ek: gorev!.ek } : { tip, ad: ad.trim(), bloklar, ek: null }),
       basla_gun: Math.max(0, (Number(basla) || 1) - 1),
       sure_gun: sure ? Number(sure) : null,
       gunler: gunler.length ? gunler : null,
@@ -347,9 +350,13 @@ function AdimForm({ programId, adim, yansir, onKapat }: { programId: string; adi
 
   return (
     <Modal baslik={adim ? 'Adımı düzenle' : 'Adım ekle'} onKapat={onKapat}>
-      <Chips<TemelTip> secenekler={[['yap', 'Yap'], ['oku', 'Oku'], ['kaydet', 'Kaydet'], ['uygula', 'Uygula']]} deger={tip} onSec={setTip} />
-      <input className="rt-inp" placeholder="Ad (örn. Sabah 10 dk yürüyüş)" value={ad} onChange={(e) => setAd(e.target.value)} autoFocus />
-      <textarea className="rt-inp" placeholder={tip === 'oku' ? 'Metin' : 'Açıklama (isteğe bağlı)'} rows={2} value={metin} onChange={(e) => setMetin(e.target.value)} />
+      <Chips<TemelTip | 'sinav'> secenekler={[['yap', 'Yap'], ['oku', 'Oku'], ['kaydet', 'Kaydet'], ['uygula', 'Uygula'], ...((sinavKurulu || tip === 'sinav') ? [['sinav', '📚 Sınav'] as ['sinav', string]] : [])]} deger={tip} onSec={setTip} />
+      {tip === 'sinav' ? <GorevFormu ilk={adim?.ek ? gorevBaslangic(adim.ek, adim.bloklar) : undefined} onChange={setGorev} /> : (
+        <>
+          <input className="rt-inp" placeholder="Ad (örn. Sabah 10 dk yürüyüş)" value={ad} onChange={(e) => setAd(e.target.value)} autoFocus />
+          <textarea className="rt-inp" placeholder={tip === 'oku' ? 'Metin' : 'Açıklama (isteğe bağlı)'} rows={2} value={metin} onChange={(e) => setMetin(e.target.value)} />
+        </>
+      )}
       {tip === 'kaydet' && (
         <div className="rt-satir">
           <input className="rt-inp" placeholder="Ne kaydedilecek (örn. Uyku)" value={etiket} onChange={(e) => setEtiket(e.target.value)} />
@@ -376,7 +383,7 @@ function AdimForm({ programId, adim, yansir, onKapat }: { programId: string; adi
         </>
       )}
       {!adim && yansir && <span className="rt-muted">Program çalışıyor — yeni adım bugünden itibaren Ajanda&apos;ya düşer.</span>}
-      <button type="button" className="rt-btn primary" disabled={!ad.trim()} onClick={kaydet}>{adim ? 'Kaydet' : 'Ekle'}</button>
+      <button type="button" className="rt-btn primary" disabled={tip === 'sinav' ? !gorev : !ad.trim()} onClick={kaydet}>{adim ? 'Kaydet' : 'Ekle'}</button>
       <p className="rt-muted" style={{ marginTop: 8 }}>Başlat&apos;a bastığın gün programın 1. günüdür.</p>
     </Modal>
   );

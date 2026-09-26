@@ -61,6 +61,21 @@ export interface Izinler {
 export const TAM_IZIN: Izinler = { ac: true, duzenle: true, sil: true, gun_degistir: true, sirala: true, duzeltme_gun: null };
 export const BAGLI_YEREL_IZIN: Izinler = { ac: true, duzenle: false, sil: false, gun_degistir: false, sirala: true, duzeltme_gun: null };
 
+// Alan paketinden gelen kartın ek bilgisi (26 eylül). Ajanda bunu bilmez, yalnız taşır;
+// paket kendi analizini (konu ilerlemesi, deneme netleri) buradan ve girilen değerlerden türetir.
+export type SinavGorevTur = 'calisma' | 'soru' | 'tekrar' | 'deneme' | 'seans';
+export interface SinavEk {
+  paket: 'sinav';
+  tur: SinavGorevTur;
+  sinav: string | null;                          // 'tyt' | 'ayt' | 'lgs' | 'ozel-…'; seansta null
+  ders: { id: string; ad: string } | null;
+  konular: { id: string; ad: string }[];         // ad da taşınır: katalog değişse de kart okunur kalır
+  kaynak: { id: string; ad: string } | null;
+  hedef_soru?: number | null;
+  deneme?: { tur: string; dersler: { id: string; ad: string }[]; yanlis_bolen: number } | null; // net = D − Y/bölen
+}
+export type PaketEk = SinavEk;
+
 export interface KartPaketi {
   surum: typeof PAKET_SURUM;
   id: string;                                   // UUID
@@ -72,6 +87,7 @@ export interface KartPaketi {
   sahip: 'ben' | string;                        // 'ben' ya da uzak sahibin kimliği
   izinler: Izinler;
   geri_bildirim: 'yok' | 'yerel' | 'uzak';      // bağımsız / bağlı-yerel / bağlı-uzak
+  ek?: PaketEk | null;                          // alan paketinin bilgisi (Sınav…)
 }
 
 export type GeriBildirimOlay = 'yapildi' | 'geri_alindi' | 'deger';

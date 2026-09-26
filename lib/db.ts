@@ -13,7 +13,7 @@
 // ————————————————————————————————————————————————————————————————
 
 import Dexie, { type EntityTable } from 'dexie';
-import type { Blok, GeriBildirimOlay, Izinler, KaynakModul, TemelTip } from './paket';
+import type { Blok, GeriBildirimOlay, Izinler, KaynakModul, PaketEk, TemelTip } from './paket';
 import { kilitKatmani } from './kilit';
 
 export type CustomWidgetType = 'pomodoro' | 'foto' | 'sayac';
@@ -61,6 +61,7 @@ export interface AjandaKartRow {
   izinler: Izinler;
   geri_bildirim: 'yok' | 'yerel' | 'uzak';
   sira: number;                  // gün listesindeki sıra — kart düzeyinde (A7)
+  ek?: PaketEk | null;           // alan paketi bilgisi (26 eylül) — indekssiz
   atla?: string[];               // tekrar eden kartın "yalnız bu gün" kaldırılan günleri (A7) — indekssiz, göç gerektirmez
   guncellendi: number;
 }
@@ -116,6 +117,7 @@ export interface ProgramAdimRow {
   sure_gun: number | null;       // null = süregelen
   gunler: number[] | null;
   saatler: string[];
+  ek?: PaketEk | null;           // alan paketi bilgisi (26 eylül)
   guncellendi: number;
 }
 
@@ -210,6 +212,14 @@ export interface KatalogDuzenRow {
   guncellendi: number;
 }
 
+// v7 — 26 eylül: konu durumu (P8) — kullanıcının elle verdiği durum; yoksa kartlardan türetilir.
+export type KonuDurum = 'baslanmadi' | 'calisiliyor' | 'tamam' | 'tekrar';
+export interface KonuDurumRow {
+  id: string;                    // konu kimliği
+  durum: KonuDurum;
+  guncellendi: number;
+}
+
 export type KaynakTur = 'kitap' | 'soru_bankasi' | 'deneme' | 'video' | 'dokuman';
 export interface KaynakRow {
   id: string;
@@ -238,6 +248,7 @@ export class RitosDB extends Dexie {
   paket_kurulum!: EntityTable<PaketKurulumRow, 'id'>;
   katalog_duzen!: EntityTable<KatalogDuzenRow, 'id'>;
   kaynak!: EntityTable<KaynakRow, 'id'>;
+  konu_durum!: EntityTable<KonuDurumRow, 'id'>;
 
   /** Sunucudan gelen değişiklik uygulanırken true — kancalar bunu yerel değişiklik saymaz. */
   uzaktan = false;
@@ -327,6 +338,26 @@ export class RitosDB extends Dexie {
       katalog_duzen: 'id, sinav',
       kaynak: 'id',
     });
+    // v7 — 26 eylül: konu durumu (P8).
+    this.version(7).stores({
+      home_widget: 'id, type',
+      ayar: 'anahtar',
+      ajanda_kart: 'id, kaynak_modul, kaynak_ref, baslangic',
+      ajanda_kayit: 'id, kart_id, tarih',
+      geri_bildirim: 'id, kart_id, kaynak_ref, zaman',
+      program: 'id, klasor_id',
+      program_adim: 'id, program_id',
+      klasor: 'id, ust_id',
+      gelen: 'id, gelis, alindi',
+      kisi: 'id, son',
+      bekleyen: 'anahtar, zaman',
+      alan_degerlendirme: 'id, alan_id, zaman',
+      katalog: 'kod, paket',
+      paket_kurulum: 'id',
+      katalog_duzen: 'id, sinav',
+      kaynak: 'id',
+      konu_durum: 'id',
+    });
 
     // Senkronlanan tablolardaki her yerel değişikliği "bekleyen"e işaretle.
     // Kanca transaction içinde çalışır; bekleyen'e yazmayı transaction dışına erteleriz.
@@ -371,7 +402,7 @@ export class RitosDB extends Dexie {
 // Hesapsız kullanımın verisi 'ritos' (misafir) veritabanında; her hesabın kendi veritabanı var.
 // Hangisinin açık olduğu cihazda küçük bir işarette tutulur; değişince sayfa yeniden yüklenir.
 
-export const SENKRON_TABLOLARI = ['home_widget', 'ajanda_kart', 'ajanda_kayit', 'geri_bildirim', 'program', 'program_adim', 'klasor', 'gelen', 'kisi', 'alan_degerlendirme', 'paket_kurulum', 'katalog_duzen', 'kaynak'] as const;
+export const SENKRON_TABLOLARI = ['home_widget', 'ajanda_kart', 'ajanda_kayit', 'geri_bildirim', 'program', 'program_adim', 'klasor', 'gelen', 'kisi', 'alan_degerlendirme', 'paket_kurulum', 'katalog_duzen', 'kaynak', 'konu_durum'] as const;
 export type SenkronTablo = (typeof SENKRON_TABLOLARI)[number];
 
 export const MISAFIR_DB = 'ritos';

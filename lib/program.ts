@@ -66,6 +66,7 @@ function adimPaketi(p: ProgramRow, a: ProgramAdimRow, baslangic: string): KartPa
     sahip: 'ben',
     izinler: BAGLI_YEREL_IZIN,
     geri_bildirim: 'yerel',
+    ek: a.ek ?? null,
   };
 }
 
