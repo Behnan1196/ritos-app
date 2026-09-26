@@ -7,7 +7,7 @@ import AjandaPane from './ritos/AjandaPane';
 import KisiselGelisim from './ritos/KisiselGelisim';
 import { AyarlarPane, GelenlerTool, SenkronIsareti, useGelenSenkron, useGelenOzeti } from './ritos/Paylasim';
 import { useHesapBaslat } from '@/lib/hesap';
-import { KilitKapisi } from './ritos/Kilit';
+import { KilitDugmesi, KilitKapisi } from './ritos/Kilit';
 
 // ————————————————————————————————————————————————————————————————
 // Ritos yerleşim laboratuvarı — rite-app'ten AYRI, veri modeline bağlı değil.
@@ -164,6 +164,7 @@ function RitosUygulama() {
         <div className="topbar">
           <b>Ritos</b>
           <SenkronIsareti />
+          <KilitDugmesi />
           <span className="w">{width}px · geniş (iPad tipi)</span>
         </div>
       )}
@@ -696,7 +697,7 @@ function MobileShell({
 
   return (
     <div className="mobile-app">
-      <div className="mobile-hd"><b>Ritos</b><SenkronIsareti /></div>
+      <div className="mobile-hd"><b>Ritos</b><SenkronIsareti /><KilitDugmesi /></div>
       <div className="mobile-main">
         {tab === 'ajanda' && <AjandaPane />}
         {tab === 'home' && <MobileHome onOpenTool={onOpenTool} customBoardProps={customBoardProps} />}

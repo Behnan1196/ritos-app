@@ -28,6 +28,19 @@ function geciciAyarla(uid: string | null) { try { if (uid) localStorage.setItem(
 
 // Bilerek yapılan hesap geçişinden hemen sonraki yeniden yüklemede PIN'i tekrar sorma (bir kez).
 export const KILIT_GECIS = 'ritos-kilit-gecis';
+// Kilit ekranından "başka biri kendi hesabıyla girecek": sahibin oturumu (varsa) bir kenara
+// konur; misafir hesaptan çıkınca geri yüklenir, böylece sahibin yeniden şifre girmesi gerekmez.
+const ONCEKI = 'ritos-onceki-oturum';
+export async function baskasiIcinHazirla() {
+  const sb = supabase();
+  const aktif = aktifHesap();
+  if (!sb || !aktif) return;
+  const { data } = await sb.auth.getSession();
+  if (data.session?.user.id !== aktif) return;
+  try { localStorage.setItem(ONCEKI, JSON.stringify({ uid: aktif, access_token: data.session.access_token, refresh_token: data.session.refresh_token })); } catch { /* yoksay */ }
+}
+export function baskasiIcinVazgec() { try { localStorage.removeItem(ONCEKI); } catch { /* yoksay */ } }
+
 function kilitGecisiVer(uid: string) { try { sessionStorage.setItem(KILIT_GECIS, uid); } catch { /* yoksay */ } }
 
 export interface Oturum {
@@ -215,11 +228,12 @@ export async function girisiTamamla(uid: string, misafiriEkle: boolean) {
 
 export async function cikisYap(buCihazdanSil: boolean) {
   const uid = aktifHesap();
-  if (uid && geciciHesap() === uid) buCihazdanSil = true;
+  const gecici = !!uid && geciciHesap() === uid;
+  if (gecici) buCihazdanSil = true;
   geciciAyarla(null);
   try { await senkronla(); } catch { /* çevrimdışıysa bekleyenler cihazda kalır */ }
   senkronDurdur();
-  await supabase()?.auth.signOut();
+  await supabase()?.auth.signOut({ scope: 'local' });
   if (uid) {
     await dekSil(uid);
     if (buCihazdanSil) {
@@ -227,7 +241,19 @@ export async function cikisYap(buCihazdanSil: boolean) {
       await Dexie.delete(dbAdi(uid));
     }
   }
-  aktifHesapAyarla(null);
+  // Misafir hesap çıktı: sahibin kenara konmuş oturumu varsa geri yükle (PIN yine sorulur).
+  let sonraki: string | null = null;
+  if (gecici) {
+    try {
+      const o = JSON.parse(localStorage.getItem(ONCEKI) ?? 'null') as { uid: string; access_token: string; refresh_token: string } | null;
+      if (o) {
+        const r = await supabase()?.auth.setSession({ access_token: o.access_token, refresh_token: o.refresh_token });
+        if (r && !r.error && r.data.session?.user.id === o.uid) sonraki = o.uid;
+      }
+    } catch { /* geri yüklenemezse sahip yeniden giriş yapar */ }
+  }
+  baskasiIcinVazgec();
+  aktifHesapAyarla(sonraki);
   location.reload();
 }
 

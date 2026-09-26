@@ -16,7 +16,7 @@ import { BlokGoster, Chips, Kap, Modal } from './ortak';
 
 // ———————————————— Hesap ————————————————
 
-export function HesapModal({ onKapat, neden }: { onKapat: () => void; onTamam?: () => void; neden?: string }) {
+export function HesapModal({ onKapat, neden, baskasi }: { onKapat: () => void; onTamam?: () => void; neden?: string; baskasi?: boolean }) {
   const [kip, setKip] = useState<'giris' | 'kayit'>('giris');
   const [ad, setAd] = useState('');
   const [eposta, setEposta] = useState('');
@@ -28,7 +28,7 @@ export function HesapModal({ onKapat, neden }: { onKapat: () => void; onTamam?: 
   const [misafirSor, setMisafirSor] = useState<string | null>(null);
   const misafirDolu = useCanli(() => misafirDoluMu(), [], false);
   const [tasi, setTasi] = useState<'tasi' | 'ayri' | null>(null);
-  const [gecici, setGecici] = useState(false);
+  const [gecici, setGecici] = useState(!!baskasi);
   const [pinOnay, setPinOnay] = useState(false); // özel alanı hesaba taşımak için PIN doğrulandı mı
   const kilitli = pinVar();
 
@@ -70,7 +70,9 @@ export function HesapModal({ onKapat, neden }: { onKapat: () => void; onTamam?: 
   return (
     <Modal baslik={kip === 'giris' ? 'Giriş yap' : 'Hesap oluştur'} onKapat={onKapat}>
       {neden && <p className="rt-muted">{neden}</p>}
-      <Chips secenekler={[['giris', 'Giriş'], ['kayit', 'Hesap oluştur']]} deger={kip} onSec={(k) => { setKip(k); setHata(null); }} />
+      {baskasi
+        ? <p className="rt-metin">Kendi Ritos hesabınla giriş yap. Çıkış yaptığında verin bu cihazdan silinir; telefon sahibinin verisini görmezsin.</p>
+        : <Chips secenekler={[['giris', 'Giriş'], ['kayit', 'Hesap oluştur']]} deger={kip} onSec={(k) => { setKip(k); setHata(null); }} />}
       {kip === 'kayit' && <input className="rt-inp" placeholder="Görünen ad" value={ad} onChange={(e) => setAd(e.target.value)} />}
       <input className="rt-inp" type="email" placeholder="E-posta" autoComplete="email" value={eposta} onChange={(e) => setEposta(e.target.value)} />
       <input className="rt-inp" type="password" placeholder={`Şifre (en az ${SIFRE_EN_AZ})`} autoComplete={kip === 'giris' ? 'current-password' : 'new-password'} value={sifre}
@@ -85,7 +87,7 @@ export function HesapModal({ onKapat, neden }: { onKapat: () => void; onTamam?: 
           {tasi === 'tasi' && kilitli && !pinOnay && <PinGir etiket="Taşımak için cihaz PIN'ini gir" onGirildi={async (p) => { const r = await pinDogrula(p); if (r.tamam) setPinOnay(true); return r.tamam ? null : r.hata; }} />}
         </div>
       )}
-      {kip === 'giris' && (
+      {kip === 'giris' && !baskasi && (
         <label className="rt-onay"><input type="checkbox" checked={gecici} onChange={(e) => setGecici(e.target.checked)} /> Bu cihaz benim değil — çıkışta verim bu cihazdan silinsin</label>
       )}
       {kip === 'giris' && !gecici && misafirDolu && !kilitli && (

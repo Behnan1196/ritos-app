@@ -302,3 +302,7 @@ body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--bg)
 .rt-pin-tuslar{display:grid;grid-template-columns:repeat(3,64px);gap:10px;justify-content:center;}
 .rt-pin-tus{height:56px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:22px;font-weight:600;color:var(--ink);cursor:pointer;}
 .rt-pin-tus:active{background:var(--green2);}
+.rt-kilit-dugme{border:0;background:none;font-size:16px;cursor:pointer;padding:2px 4px;}
+.rt-senkron + .rt-kilit-dugme{margin-left:4px !important;}
+.mobile-hd .rt-kilit-dugme:first-of-type{margin-left:auto;}
+.rt-baskasi{margin-top:6px;font-size:12.5px;}

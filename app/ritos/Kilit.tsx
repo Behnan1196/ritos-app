@@ -4,7 +4,8 @@
 
 import React, { useEffect, useState, type ReactNode } from 'react';
 import { aktifHesap } from '@/lib/db';
-import { KILIT_GECIS, geciciHesap, hesapSifresiDogru } from '@/lib/hesap';
+import { KILIT_GECIS, baskasiIcinHazirla, baskasiIcinVazgec, geciciHesap, hesapSifresiDogru } from '@/lib/hesap';
+import { HesapModal } from './Paylasim';
 import { PIN_UZUNLUK, kilitAcik, kilitDegisince, kilitDurumuYukle, kilitle, pinDogrula, pinVar } from '@/lib/kilit';
 import { pinDegistir, pinKaldir, pinKoy, pinUnuttumOzelAlaniSil } from '@/lib/ozelAlan';
 import { Kap, Modal } from './ortak';
@@ -51,6 +52,7 @@ export function KilitKapisi({ children }: { children: ReactNode }) {
 
 function KilitEkrani({ onAcildi }: { onAcildi: () => void }) {
   const [unuttum, setUnuttum] = useState(false);
+  const [baskasi, setBaskasi] = useState(false);
   return (
     <div className="rt-kilit">
       <div className="rt-kilit-kutu">
@@ -58,8 +60,10 @@ function KilitEkrani({ onAcildi }: { onAcildi: () => void }) {
         <p className="rt-muted">Devam etmek için PIN&apos;ini gir.</p>
         <PinGir onGirildi={async (pin) => { const r = await pinDogrula(pin); if (r.tamam) onAcildi(); return r.tamam ? null : r.hata; }} />
         <button type="button" className="rt-linkbtn" onClick={() => setUnuttum(true)}>PIN&apos;i unuttum</button>
+        <button type="button" className="rt-btn rt-baskasi" onClick={async () => { await baskasiIcinHazirla(); setBaskasi(true); }}>Başka biri kendi hesabıyla girecek</button>
       </div>
       {unuttum && <PinUnuttum onKapat={() => setUnuttum(false)} onAcildi={onAcildi} />}
+      {baskasi && <HesapModal baskasi onKapat={() => { baskasiIcinVazgec(); setBaskasi(false); }} />}
     </div>
   );
 }
@@ -156,7 +160,7 @@ export function KilitAyarlari() {
     <Kap baslik="Cihaz kilidi">
       <p className="rt-muted">
         {var_
-          ? 'Ritos açılırken ve 5 dakikadan uzun arka planda kaldıktan sonra PIN sorulur. Cihazdaki özel alan (hesapsız veri) bu PIN\'le şifreli.'
+          ? 'Ritos açılırken ve 5 dakikadan uzun arka planda kaldıktan sonra PIN sorulur. Cihazdaki özel alan (hesapsız veri) bu PIN\'le şifreli. Telefonu başkasına vereceksen üstteki 🔒 ile kilitle; kilit ekranındaki "Başka biri kendi hesabıyla girecek" ile o kişi kendi hesabına girer, çıkınca her şey kilitli haline döner.'
           : 'PIN koyarsan Ritos açılırken sorulur ve cihazdaki özel alan (hesapsız veri) bu PIN\'le şifrelenir. Telefonunu başkasına verdiğinde verin görünmez.'}
       </p>
       <div className="rt-satir">
@@ -190,4 +194,12 @@ export function KilitAyarlari() {
       )}
     </Kap>
   );
+}
+
+/** Başlıkta: PIN varsa tek dokunuşla kilitle (telefonu başkasına vermeden önce). */
+export function KilitDugmesi() {
+  const [var_, setVar] = useState(false);
+  useEffect(() => { setVar(pinVar() && kilitUygulanir()); return kilitDegisince(() => setVar(pinVar() && kilitUygulanir())); }, []);
+  if (!var_) return null;
+  return <button type="button" className="rt-kilit-dugme" aria-label="Kilitle" title="Kilitle" onClick={() => kilitle()}>🔒</button>;
 }
