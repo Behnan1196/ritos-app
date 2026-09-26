@@ -62,3 +62,16 @@ export function BlokGoster({ bloklar }: { bloklar: Blok[] }) {
 export function degerMetni(d: Record<string, unknown>): string {
   return Object.entries(d).map(([k, v]) => (k === 'sure_dk' ? `${v} dk` : String(v))).join(' · ');
 }
+
+// Tarayıcının onay kutusu yerine sayfa içi onay (PWA'da confirm() güvenilmez; formlar da modalda).
+export function OnayKutusu({ metin, evet, onEvet, onVazgec }: { metin: string; evet: string; onEvet: () => void; onVazgec: () => void }) {
+  return (
+    <div className="rt-onay-kutu">
+      <span>{metin}</span>
+      <div className="rt-satir">
+        <button type="button" className="rt-btn" onClick={onVazgec}>Vazgeç</button>
+        <button type="button" className="rt-btn tehlike" onClick={onEvet}>{evet}</button>
+      </div>
+    </div>
+  );
+}

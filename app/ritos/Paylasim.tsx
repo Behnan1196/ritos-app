@@ -12,7 +12,7 @@ import { pinDogrula, pinVar } from '@/lib/kilit';
 import { KilitAyarlari, PinGir } from './Kilit';
 import { sonYedek, yedegiYukle, yedekAl, yedekOku } from '@/lib/yedek';
 import { al, engelKaldir, engelle, engellenenler, gelenSil, gelenleriCek, gonder, kisiBul, type PaylasimPaketi } from '@/lib/paylasim';
-import { BlokGoster, Chips, Kap, Modal } from './ortak';
+import { BlokGoster, Chips, Kap, Modal, OnayKutusu } from './ortak';
 
 // ———————————————— Hesap ————————————————
 
@@ -278,6 +278,7 @@ function GelenDetay({ g, onKapat }: { g: GelenRow; onKapat: () => void }) {
   const [tarih, setTarih] = useState(bugun());
   const [mesaj, setMesaj] = useState<string | null>(null);
   const [engelSor, setEngelSor] = useState(false);
+  const [silSor, setSilSor] = useState(false);
 
   return (
     <Modal baslik={p.ad} onKapat={onKapat}>
@@ -306,9 +307,10 @@ function GelenDetay({ g, onKapat }: { g: GelenRow; onKapat: () => void }) {
         </>
       )}
 
+      {silSor && <OnayKutusu metin="Gelenlerden silinsin mi?" evet="Sil" onVazgec={() => setSilSor(false)} onEvet={async () => { await gelenSil([g.id]); onKapat(); }} />}
       {!engelSor ? (
         <div className="rt-satir">
-          <button type="button" className="rt-btn tehlike" onClick={async () => { if (confirm('Gelenlerden silinsin mi?')) { await gelenSil([g.id]); onKapat(); } }}>Sil</button>
+          <button type="button" className="rt-btn tehlike" onClick={() => setSilSor(true)}>Sil</button>
           <button type="button" className="rt-btn" onClick={() => setEngelSor(true)}>Göndereni engelle</button>
         </div>
       ) : (

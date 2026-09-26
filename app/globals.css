@@ -313,3 +313,4 @@ body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--bg)
 .rt-klasor-ad{flex:1;text-align:left;background:none;border:0;padding:6px 2px;font:inherit;font-size:13.5px;font-weight:600;color:var(--ink);cursor:pointer;}
 .rt-klasor-ic{padding-left:14px;border-left:2px solid var(--line);margin-left:6px;}
 .rt-bos-alan{display:flex;flex-direction:column;gap:8px;}
+.rt-onay-kutu{display:flex;flex-direction:column;gap:8px;background:#fbf1dc;border-radius:10px;padding:10px;font-size:13px;color:#5a4410;}

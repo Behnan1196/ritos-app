@@ -6,7 +6,7 @@ import { useCanli } from '@/lib/canli';
 import { GUN_KISA, TIP_ETIKET, bugun, tarihEkle, type Blok, type TemelTip } from '@/lib/paket';
 import { adimEkle, adimGuncelle, adimSil, aktifMi, baslat, durdur, ilerleme, programGuncelle, programOlustur, type ProgramIlerleme } from '@/lib/program';
 import { DEGER_ETIKET, EN_FAZLA_SEVIYE, HAZIR_SETLER, alanEkle, alanMi, degerlendir, hazirSetKur, klasorEkle, klasorGuncelle, klasorSil, programTasi, seviye, sonDegerlendirmeler, yol } from '@/lib/alan';
-import { Chips, Kap, Modal, degerMetni } from './ortak';
+import { Chips, Kap, Modal, OnayKutusu, degerMetni } from './ortak';
 import { PaylasDugmesi } from './Paylasim';
 import { programPaketi } from '@/lib/paylasim';
 
@@ -17,6 +17,7 @@ export default function KisiselGelisim() {
   const klasorler = useCanli(() => db.klasor.toArray(), [], [] as KlasorRow[]);
   const degerler = useCanli(() => sonDegerlendirmeler(), [], {} as Record<string, AlanDegerlendirmeRow>);
   const [secili, setSecili] = useState<string | null>(null);
+  const [basaDon, setBasaDon] = useState(false);
   const [modal, setModal] = useState<null | { tur: 'program'; yer: string | null } | { tur: 'alan' } | { tur: 'klasor'; k: KlasorRow } | { tur: 'yeniKlasor'; ust: KlasorRow }>(null);
 
   const p = programlar.find((x) => x.id === secili);
@@ -43,7 +44,22 @@ export default function KisiselGelisim() {
               <button type="button" className="rt-btn" onClick={() => setModal({ tur: 'alan' })}>Kendi alanım</button>
             </div>
           </div>
-        ) : <p className="rt-muted">Bir alana dokunup kendini değerlendirebilir, klasör ekleyebilirsin.</p>}
+        ) : (
+          <>
+            <p className="rt-muted">Bir alanın ⋯ düğmesiyle kendini değerlendirebilir, klasör ekleyebilir ya da alanı silebilirsin.</p>
+            {!basaDon
+              ? <button type="button" className="rt-linkbtn" onClick={() => setBasaDon(true)}>Alanları kaldırıp baştan başla</button>
+              : (
+                <div className="rt-onay-kutu">
+                  <span>Tüm yaşam alanları, klasörler ve alan değerlendirmeleri silinir. Programların silinmez, Alansız&apos;a taşınır.</span>
+                  <div className="rt-satir">
+                    <button type="button" className="rt-btn" onClick={() => setBasaDon(false)}>Vazgeç</button>
+                    <button type="button" className="rt-btn tehlike" onClick={async () => { for (const a of alanlar) await klasorSil(a.id); setBasaDon(false); }}>Hepsini kaldır</button>
+                  </div>
+                </div>
+              )}
+          </>
+        )}
       </Kap>
 
       {alanlar.map((a) => (
@@ -51,7 +67,10 @@ export default function KisiselGelisim() {
           baslik={<button type="button" className="rt-alan-bas" onClick={() => setModal({ tur: 'klasor', k: a })}>
             {a.ad} {degerler[a.id] ? <Pil deger={degerler[a.id].deger} /> : <span className="rt-muted">· değerlendirilmedi</span>}
           </button>}
-          eylemler={<button type="button" className="rt-ikon" onClick={() => setModal({ tur: 'program', yer: a.id })} aria-label={`${a.ad} alanına program ekle`}>＋</button>}>
+          eylemler={<>
+            <button type="button" className="rt-ikon" onClick={() => setModal({ tur: 'klasor', k: a })} aria-label={`${a.ad} alanı seçenekleri`}>⋯</button>
+            <button type="button" className="rt-ikon" onClick={() => setModal({ tur: 'program', yer: a.id })} aria-label={`${a.ad} alanına program ekle`}>＋</button>
+          </>}>
           {altKlasorler(a.id).map((k) => <KlasorDugumu key={k.id} k={k} ag={ag} />)}
           {programlarIn(a.id).map((x) => <ProgramSatiri key={x.id} x={x} ag={ag} />)}
           {!altKlasorler(a.id).length && !programlarIn(a.id).length && <p className="rt-muted">Henüz program yok.</p>}
@@ -177,6 +196,7 @@ function KlasorDetay({ k, klasorler, deger, onKapat, onAltKlasor }: { k: KlasorR
   const [ad, setAd] = useState(k.ad);
   const [kriterler, setKriterler] = useState((k.kriterler ?? []).join('\n'));
   const altEklenebilir = seviye(k, klasorler) < EN_FAZLA_SEVIYE;
+  const [silSor, setSilSor] = useState(false);
   const kaydet = async () => {
     const patch: Partial<KlasorRow> = {};
     if (ad.trim() && ad.trim() !== k.ad) patch.ad = ad.trim();
@@ -203,13 +223,15 @@ function KlasorDetay({ k, klasorler, deger, onKapat, onAltKlasor }: { k: KlasorR
           {deger && <span className="rt-muted">Son değerlendirme: {new Date(deger.zaman).toLocaleDateString('tr-TR')}</span>}
         </>
       )}
-      <div className="rt-satir">
-        {altEklenebilir && <button type="button" className="rt-btn" onClick={async () => { await kaydet(); onAltKlasor(); }}>＋ Klasör</button>}
-        <button type="button" className="rt-btn tehlike" onClick={async () => {
-          const soru = alan ? `"${k.ad}" alanı silinsin mi? İçindeki programlar Alansız'a taşınır, silinmez.` : `"${k.ad}" klasörü silinsin mi? İçindekiler bir üste taşınır.`;
-          if (confirm(soru)) { await klasorSil(k.id); onKapat(); }
-        }}>Sil</button>
-      </div>
+      {!silSor ? (
+        <div className="rt-satir">
+          {altEklenebilir && <button type="button" className="rt-btn" onClick={async () => { await kaydet(); onAltKlasor(); }}>＋ Klasör</button>}
+          <button type="button" className="rt-btn tehlike" onClick={() => setSilSor(true)}>{alan ? 'Alanı sil' : 'Klasörü sil'}</button>
+        </div>
+      ) : (
+        <OnayKutusu metin={alan ? `"${k.ad}" alanı silinsin mi? İçindeki programlar Alansız'a taşınır, silinmez.` : `"${k.ad}" klasörü silinsin mi? İçindekiler bir üste taşınır.`}
+          evet="Sil" onVazgec={() => setSilSor(false)} onEvet={async () => { await klasorSil(k.id); onKapat(); }} />
+      )}
     </Modal>
   );
 }
@@ -219,6 +241,7 @@ function ProgramDetay({ p, klasorler, onGeri }: { p: ProgramRow; klasorler: Klas
   const il = useCanli(() => ilerleme(p.id), [p.id], null as ProgramIlerleme | null);
   const [adimAcik, setAdimAcik] = useState(false);
   const [duzenle, setDuzenle] = useState<ProgramAdimRow | null>(null);
+  const [durdurSor, setDurdurSor] = useState(false);
   const aktif = aktifMi(p);
   const yansir = aktif && p.calisma_bitis !== bugun();
 
@@ -232,10 +255,11 @@ function ProgramDetay({ p, klasorler, onGeri }: { p: ProgramRow; klasorler: Klas
           {aktif && p.calisma_bitis === bugun()
           ? <span className="rt-muted">bugün son gün</span>
           : aktif
-          ? <button type="button" className="rt-btn" onClick={() => { if (confirm('Program durdurulsun mu? Geçmiş kayıtlar korunur.')) durdur(p.id); }}>Durdur</button>
+          ? <button type="button" className="rt-btn" onClick={() => setDurdurSor(true)}>Durdur</button>
           : <button type="button" className="rt-btn primary" disabled={!il?.adimlar.length} onClick={() => baslat(p.id)}>Başlat</button>}
         </>}
       >
+        {durdurSor && <OnayKutusu metin="Program durdurulsun mu? Geçmiş kayıtlar korunur; bugün son gün olur." evet="Durdur" onVazgec={() => setDurdurSor(false)} onEvet={async () => { await durdur(p.id); setDurdurSor(false); }} />}
         {aktif && il?.gunN != null && <p className="rt-gun">Gün {il.gunN}{il.gunM ? `/${il.gunM}` : ' · süregelen'}</p>}
 
         <Alan etiket="Amaç" deger={p.amac} onKaydet={(v) => programGuncelle(p.id, { amac: v })} />

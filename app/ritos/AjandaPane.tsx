@@ -7,7 +7,7 @@ import {
   GUN_KISA, PAKET_SURUM, TAM_IZIN, bugun, degerBloklari, tarihEkle, tarihEtiket, tarihParse, tarihStr,
   type Blok, type KartPaketi, type TemelTip,
 } from '@/lib/paket';
-import { BlokGoster, Chips, Kap, Modal, degerMetni } from './ortak';
+import { BlokGoster, Chips, Kap, Modal, OnayKutusu, degerMetni } from './ortak';
 import { PaylasDugmesi } from './Paylasim';
 import { kartPaketi } from '@/lib/paylasim';
 
@@ -228,17 +228,19 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
   const [tasiAcik, setTasiAcik] = useState(false);
   const [yeniTarih, setYeniTarih] = useState(tarihEkle(tarih, 1));
   const [silAcik, setSilAcik] = useState(false);
+  const [tekSil, setTekSil] = useState(false);
 
   return (
     <Modal baslik={kart.ad} onKapat={onKapat}>
       <BlokGoster bloklar={kart.bloklar} />
       {bagli && <p className="rt-muted">Bu kart <b>{kart.kaynak_etiket}</b> programından geliyor; içeriği ve günü programdan yönetilir.</p>}
 
-      {!bagli && !tasiAcik && !silAcik && (
+      {tekSil && <OnayKutusu metin="Kart silinsin mi?" evet="Sil" onVazgec={() => setTekSil(false)} onEvet={() => kartKaldir(kart.id, tarih, 'tamamen').then(onKapat)} />}
+      {!bagli && !tasiAcik && !silAcik && !tekSil && (
         <div className="rt-satir">
           {kart.izinler.gun_degistir && <button type="button" className="rt-btn" onClick={() => setTasiAcik(true)}>Taşı</button>}
           <PaylasDugmesi paketUret={() => kartPaketi(kart)} />
-          {kart.izinler.sil && <button type="button" className="rt-btn tehlike" onClick={() => (tekrarli ? setSilAcik(true) : confirm('Kart silinsin mi?') && kartKaldir(kart.id, tarih, 'tamamen').then(onKapat))}>Kaldır</button>}
+          {kart.izinler.sil && <button type="button" className="rt-btn tehlike" onClick={() => (tekrarli ? setSilAcik(true) : setTekSil(true))}>Kaldır</button>}
         </div>
       )}
 
