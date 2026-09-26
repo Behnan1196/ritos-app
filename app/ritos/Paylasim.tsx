@@ -6,7 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { db, type GelenRow } from '@/lib/db';
 import { useCanli } from '@/lib/canli';
 import { bugun } from '@/lib/paket';
-import { SIFRE_EN_AZ, cikisYap, girisYap, girisiTamamla, gorunenAdDegistir, kayitOl, kurtarmaGoster, sifreDegistir, useOturum } from '@/lib/hesap';
+import { SIFRE_EN_AZ, misafirDoluMu, cikisYap, girisYap, girisiTamamla, gorunenAdDegistir, kayitOl, kurtarmaGoster, sifreDegistir, useOturum } from '@/lib/hesap';
 import { senkronla, useSenkronDurum } from '@/lib/senkron';
 import { sonYedek, yedegiYukle, yedekAl, yedekOku } from '@/lib/yedek';
 import { al, engelKaldir, engelle, engellenenler, gelenSil, gelenleriCek, gonder, kisiBul, type PaylasimPaketi } from '@/lib/paylasim';
@@ -24,15 +24,17 @@ export function HesapModal({ onKapat, neden }: { onKapat: () => void; onTamam?: 
   const [bekle, setBekle] = useState(false);
   const [kurtarma, setKurtarma] = useState<string[] | null>(null);
   const [misafirSor, setMisafirSor] = useState<string | null>(null);
+  const misafirDolu = useCanli(() => misafirDoluMu(), [], false);
+  const [tasi, setTasi] = useState<'tasi' | 'ayri' | null>(null);
 
   const gecerli = /\S+@\S+\.\S+/.test(eposta) && sifre.length >= SIFRE_EN_AZ
-    && (kip === 'giris' || (ad.trim().length > 0 && sifre === sifre2));
+    && (kip === 'giris' || (ad.trim().length > 0 && sifre === sifre2 && (!misafirDolu || tasi !== null)));
 
   async function gonderForm() {
     setBekle(true); setHata(null);
     try {
       if (kip === 'kayit') {
-        const r = await kayitOl(ad, eposta, sifre);
+        const r = await kayitOl(ad, eposta, sifre, misafirDolu && tasi === 'tasi');
         if (!r.tamam) { setHata(r.hata); return; }
         setKurtarma(r.kurtarma);
       } else {
@@ -55,7 +57,7 @@ export function HesapModal({ onKapat, neden }: { onKapat: () => void; onTamam?: 
         <button type="button" className="rt-btn primary" onClick={() => girisiTamamla(misafirSor, true)}>Hesabıma ekle</button>
         <button type="button" className="rt-btn" onClick={() => girisiTamamla(misafirSor, false)}>Ayrı tut</button>
       </div>
-      <p className="rt-muted">&quot;Ayrı tut&quot; dersen o veriler bu cihazda, çıkış yaptığında görünür halde kalır.</p>
+      <p className="rt-muted">&quot;Ayrı tut&quot; dersen onlar yalnız bu cihazda, hesaptan çıktığında görünen özel alanında kalır; sunucuya gitmez.</p>
     </Modal>
   );
 
@@ -69,12 +71,19 @@ export function HesapModal({ onKapat, neden }: { onKapat: () => void; onTamam?: 
         onChange={(e) => setSifre(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && gecerli && !bekle) gonderForm(); }} />
       {kip === 'kayit' && <input className="rt-inp" type="password" placeholder="Şifre tekrar" autoComplete="new-password" value={sifre2} onChange={(e) => setSifre2(e.target.value)} />}
       {kip === 'kayit' && sifre2 && sifre !== sifre2 && <p className="rt-hata">Şifreler aynı değil.</p>}
+      {kip === 'kayit' && misafirDolu && (
+        <div className="rt-secim">
+          <span>Bu cihazda hesapsız oluşturduğun kartlar ve programlar var:</span>
+          <Chips secenekler={[['tasi', 'Hesabıma taşı'], ['ayri', 'Cihazda ayrı kalsın']]} deger={tasi ?? ('' as 'tasi')} onSec={setTasi} />
+          {tasi === 'ayri' && <span className="rt-muted">Onlar yalnız bu cihazda, hesaptan çıktığında görünen özel alanında kalır; sunucuya gitmez.</span>}
+        </div>
+      )}
       {hata && <p className="rt-hata">{hata}</p>}
       <div className="rt-satir">
         <button type="button" className="rt-btn primary" disabled={!gecerli || bekle} onClick={gonderForm}>{bekle ? 'Anahtarlar hazırlanıyor…' : kip === 'giris' ? 'Giriş yap' : 'Hesap oluştur'}</button>
       </div>
       {kip === 'kayit'
-        ? <p className="rt-muted">Verilerin cihazında şifrelenir; Ritos içeriği okuyamaz. Bu yüzden şifreni ve birazdan göreceğin kurtarma anahtarını ikisini birden kaybedersen verin geri gelmez. Bu cihazdaki mevcut kartların hesabına taşınır.</p>
+        ? <p className="rt-muted">Verilerin cihazında şifrelenir; Ritos içeriği okuyamaz. Bu yüzden şifreni ve birazdan göreceğin kurtarma anahtarını ikisini birden kaybedersen verin geri gelmez. </p>
         : <p className="rt-muted">Giriş yapınca kartların ve programların diğer cihazlarınla şifreli olarak eşitlenir.</p>}
     </Modal>
   );

@@ -120,7 +120,7 @@ async function misafiriHesabaTasi(uid: string) {
 
 export type KayitSonuc = { tamam: true; kurtarma: string[] } | { tamam: false; hata: string };
 
-export async function kayitOl(gorunenAd: string, eposta: string, sifre: string): Promise<KayitSonuc> {
+export async function kayitOl(gorunenAd: string, eposta: string, sifre: string, misafiriTasi: boolean): Promise<KayitSonuc> {
   const sb = supabase();
   if (!sb) return { tamam: false, hata: 'Sunucu ayarı yok' };
   if (!navigator.onLine) return { tamam: false, hata: 'İnternet yok' };
@@ -152,7 +152,8 @@ export async function kayitOl(gorunenAd: string, eposta: string, sifre: string):
   if (a.error) return { tamam: false, hata: `Anahtar kaydedilemedi: ${a.error.message}` };
 
   await dekSakla(uid, dek);
-  await misafiriHesabaTasi(uid);
+  // Cihazdaki hesapsız veri: kullanıcı seçer — hesaba taşınır ya da cihazda ayrı (özel) kalır.
+  if (misafiriTasi) await misafiriHesabaTasi(uid);
   aktifHesapAyarla(uid);
   return { tamam: true, kurtarma };
 }
