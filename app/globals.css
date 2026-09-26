@@ -314,3 +314,27 @@ body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--bg)
 .rt-klasor-ic{padding-left:14px;border-left:2px solid var(--line);margin-left:6px;}
 .rt-bos-alan{display:flex;flex-direction:column;gap:8px;}
 .rt-onay-kutu{display:flex;flex-direction:column;gap:8px;background:#fbf1dc;border-radius:10px;padding:10px;font-size:13px;color:#5a4410;}
+/* sınav hazırlığı paketi (26 eylül) */
+.rt-paket{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px;display:flex;flex-direction:column;gap:6px;}
+.rt-paket.pasif{opacity:.6;}
+.rt-paket-bas{display:flex;align-items:center;gap:8px;}
+.rt-paket p{margin:0;}
+.rt-secenekler{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+.rt-unite{display:flex;align-items:center;gap:6px;background:none;border:0;padding:8px 2px 2px;font:inherit;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.02em;cursor:pointer;text-align:left;}
+.rt-konular{display:flex;flex-direction:column;}
+.rt-konu{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:7px 2px;font:inherit;font-size:13.5px;color:var(--ink);cursor:pointer;}
+.rt-konu span:first-child{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.rt-konu .rt-muted{font-size:11.5px;}
+.rt-gizli{opacity:.5;}
+.rt-yapi{background:var(--green2);border-radius:10px;padding:8px 10px;font-size:12.5px;display:flex;flex-direction:column;gap:6px;margin:6px 0 10px;}
+.rt-belgeler{margin-top:16px;font-size:12px;color:var(--muted);}
+.rt-belgeler summary{cursor:pointer;}
+.rt-belgeler .rt-maddeler{font-size:12px;margin-top:6px;}
+.rt-kaynak{display:flex;align-items:center;gap:8px;}
+.rt-kaynak .rt-konu{flex:1;}
+.rt-ders-sec{display:flex;flex-direction:column;gap:4px;margin-top:4px;color:var(--ink);}
+textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12px;}
+.rt-sinav .rt-linkbtn{font-size:12.5px;}
+.rt-sinav p.rt-muted{margin:0 0 8px;}
+.rt-sinav .rt-rozet{margin-left:6px;vertical-align:middle;}
+.rt-sinav .rt-uyari{margin-top:10px;}

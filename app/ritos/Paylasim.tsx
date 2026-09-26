@@ -10,6 +10,7 @@ import { SIFRE_EN_AZ, misafirDoluMu, cikisYap, girisYap, girisiTamamla, gorunenA
 import { senkronla, useSenkronDurum } from '@/lib/senkron';
 import { pinDogrula, pinVar } from '@/lib/kilit';
 import { KilitAyarlari, PinGir } from './Kilit';
+import { PaketlerKap } from './Sinav';
 import { sonYedek, yedegiYukle, yedekAl, yedekOku } from '@/lib/yedek';
 import { al, engelKaldir, engelle, engellenenler, gelenSil, gelenleriCek, gonder, kisiBul, type PaylasimPaketi } from '@/lib/paylasim';
 import { BlokGoster, Chips, Kap, Modal, OnayKutusu } from './ortak';
@@ -387,6 +388,8 @@ export function AyarlarPane() {
           </>
         )}
       </Kap>
+
+      <PaketlerKap />
 
       <KilitAyarlari />
 

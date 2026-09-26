@@ -5,6 +5,7 @@ import type { CustomWidget, CustomWidgetType } from '@/lib/db';
 import { useHomeWidgets } from '@/lib/useHomeWidgets';
 import AjandaPane from './ritos/AjandaPane';
 import KisiselGelisim from './ritos/KisiselGelisim';
+import { SinavTool, useSinavOzeti } from './ritos/Sinav';
 import { AyarlarPane, GelenlerTool, SenkronIsareti, useGelenSenkron, useGelenOzeti } from './ritos/Paylasim';
 import { useHesapBaslat } from '@/lib/hesap';
 import { KilitDugmesi, KilitKapisi } from './ritos/Kilit';
@@ -32,7 +33,7 @@ import { KilitDugmesi, KilitKapisi } from './ritos/Kilit';
 
 const NARROW_BREAKPOINT = 760;
 
-type ToolId = 'notlar' | 'gelenler' | 'danismanlik';
+type ToolId = 'notlar' | 'gelenler' | 'danismanlik' | 'sinav';
 type OpenMode = 'A' | 'B' | 'C';
 type RightTab = 'home' | 'gelisim' | 'sohbet' | 'ayarlar';
 
@@ -40,6 +41,7 @@ const TOOL_META: Record<ToolId, { icon: string; title: string }> = {
   notlar: { icon: '📝', title: 'Notlar' },
   gelenler: { icon: '📥', title: 'Gelenler' },
   danismanlik: { icon: '🤝', title: 'Danışmanlık' },
+  sinav: { icon: '📚', title: 'Sınav hazırlığı' },
 };
 
 // Behnan (24 eylül): "şimdilik A diyorum" — genel varsayılan A, ama
@@ -51,6 +53,7 @@ const OPEN_MODE: Record<ToolId, OpenMode> = {
   notlar: 'A',
   gelenler: 'A',
   danismanlik: 'C',
+  sinav: 'C',
 };
 
 const DANISANLAR = [
@@ -300,6 +303,7 @@ function PlaceholderPane({ baslik, satirlar, not }: { baslik: string; satirlar: 
 
 function FixedWidgets({ onOpenTool }: { onOpenTool: (t: ToolId) => void }) {
   const gelen = useGelenOzeti();
+  const sinav = useSinavOzeti();
   const [odakAcik, setOdakAcik] = useState(true);
 
   return (
@@ -333,6 +337,14 @@ function FixedWidgets({ onOpenTool }: { onOpenTool: (t: ToolId) => void }) {
           <span className={`s${gelen.yeni ? ' yeni' : ''}`}>{gelen.yeni ? `${gelen.yeni} yeni` : gelen.toplam ? `${gelen.toplam} öğe` : 'boş'}</span>
         </button>
       </div>
+
+      {sinav.kurulu && (
+        <button type="button" className="wrow tool" onClick={() => onOpenTool('sinav')}>
+          <span className="ic">📚</span>
+          <span className="tx"><span className="t">Sınav hazırlığı</span><span className="s">{sinav.ozet}</span></span>
+          <span className="chev">›</span>
+        </button>
+      )}
 
       <button type="button" className="wrow tool" onClick={() => onOpenTool('danismanlik')}>
         <span className="ic">🤝</span>
@@ -592,6 +604,7 @@ function SayacWidget() {
 function ToolDetail({ tool, onBack, compact, nested }: { tool: ToolId; onBack: () => void; compact?: boolean; nested?: boolean }) {
   if (tool === 'notlar') return <NotlarPane compact={compact} onBack={onBack} />;
   if (tool === 'gelenler') return <GelenlerTool compact={compact} onBack={onBack} />;
+  if (tool === 'sinav') return <SinavTool />;
   return <Danismanlik compact={compact} nested={nested} onBack={onBack} />;
 }
 

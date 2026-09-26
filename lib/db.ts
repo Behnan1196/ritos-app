@@ -170,6 +170,57 @@ export interface KisiRow {
   son: number;                   // son etkileşim
 }
 
+
+// ———————————————————————————————— v6 — 26 eylül: alan paketleri (Sınav hazırlığı) ————————————————————————————————
+// Katalog sunucuda herkese açık (cat_paket); cihaz son sürümü indirir → `katalog` (senkronsuz, her cihaz kendi indirir).
+// Kullanıcının kurulumu, katalog düzenlemeleri ve kaynakları kişisel veridir → senkronlanır (şifreli).
+
+export interface KatalogRow {
+  kod: string;                   // 'tyt' | 'ayt' | 'lgs' | 'ornek-kaynaklar'
+  paket: string;                 // 'sinav'
+  surum: number;
+  onayli: boolean;
+  veri: unknown;                 // sınav: { kod, ad, testler, dersler, notlar, belgeler } (JSON)
+  indirildi: number;
+  fark?: KatalogFark | null;     // bir önceki indirilen sürüme göre değişiklik özeti (P5)
+}
+
+export interface KatalogFark { eski: number; yeni: number; eklenen: string[]; adiDegisen: string[]; cikan: string[] }
+
+// Paket kurulumu — id = paket adı ('sinav').
+export interface PaketKurulumRow {
+  id: string;
+  secim: string[];               // kurulu sınav kodları: ['tyt','ayt'] ya da kendi listeleri ('ozel-…')
+  ozel: { kod: string; ad: string }[]; // kullanıcının kendi (boş başlayan) katalogları (P4)
+  gorulen: Record<string, number>; // kullanıcının gördüğü son katalog sürümü — güncelleme bildirimi için
+  guncellendi: number;
+}
+
+// Kullanıcının katalog üzerindeki düzenlemesi — katalogdaki öğenin üstüne yazılır (P3/P4).
+// id = öğe kimliği (katalogdaki öğe için aynısı; eklenen öğe için yeni kimlik).
+export interface KatalogDuzenRow {
+  id: string;
+  sinav: string;
+  tur: 'ders' | 'unite' | 'konu';
+  ek: boolean;                   // kullanıcı ekledi (katalogda yok)
+  ust_id: string | null;         // ders için null
+  ad: string | null;             // null = katalogdaki ad
+  sira: number | null;           // null = katalogdaki sıra
+  gizli: boolean;
+  guncellendi: number;
+}
+
+export type KaynakTur = 'kitap' | 'soru_bankasi' | 'deneme' | 'video' | 'dokuman';
+export interface KaynakRow {
+  id: string;
+  ad: string;
+  tur: KaynakTur;
+  dersler: string[];             // ders kimlikleri (JSON)
+  url: string;
+  not: string;
+  guncellendi: number;
+}
+
 export class RitosDB extends Dexie {
   home_widget!: EntityTable<HomeWidgetRow, 'id'>;
   ayar!: EntityTable<AyarRow, 'anahtar'>;
@@ -183,6 +234,10 @@ export class RitosDB extends Dexie {
   kisi!: EntityTable<KisiRow, 'id'>;
   bekleyen!: EntityTable<BekleyenRow, 'anahtar'>;
   alan_degerlendirme!: EntityTable<AlanDegerlendirmeRow, 'id'>;
+  katalog!: EntityTable<KatalogRow, 'kod'>;
+  paket_kurulum!: EntityTable<PaketKurulumRow, 'id'>;
+  katalog_duzen!: EntityTable<KatalogDuzenRow, 'id'>;
+  kaynak!: EntityTable<KaynakRow, 'id'>;
 
   /** Sunucudan gelen değişiklik uygulanırken true — kancalar bunu yerel değişiklik saymaz. */
   uzaktan = false;
@@ -253,6 +308,26 @@ export class RitosDB extends Dexie {
       alan_degerlendirme: 'id, alan_id, zaman',
     });
 
+    // v6 — 26 eylül: alan paketleri — indirilen katalog, kurulum, katalog düzenleri, kaynaklar.
+    this.version(6).stores({
+      home_widget: 'id, type',
+      ayar: 'anahtar',
+      ajanda_kart: 'id, kaynak_modul, kaynak_ref, baslangic',
+      ajanda_kayit: 'id, kart_id, tarih',
+      geri_bildirim: 'id, kart_id, kaynak_ref, zaman',
+      program: 'id, klasor_id',
+      program_adim: 'id, program_id',
+      klasor: 'id, ust_id',
+      gelen: 'id, gelis, alindi',
+      kisi: 'id, son',
+      bekleyen: 'anahtar, zaman',
+      alan_degerlendirme: 'id, alan_id, zaman',
+      katalog: 'kod, paket',
+      paket_kurulum: 'id',
+      katalog_duzen: 'id, sinav',
+      kaynak: 'id',
+    });
+
     // Senkronlanan tablolardaki her yerel değişikliği "bekleyen"e işaretle.
     // Kanca transaction içinde çalışır; bekleyen'e yazmayı transaction dışına erteleriz.
     for (const tablo of SENKRON_TABLOLARI) {
@@ -296,7 +371,7 @@ export class RitosDB extends Dexie {
 // Hesapsız kullanımın verisi 'ritos' (misafir) veritabanında; her hesabın kendi veritabanı var.
 // Hangisinin açık olduğu cihazda küçük bir işarette tutulur; değişince sayfa yeniden yüklenir.
 
-export const SENKRON_TABLOLARI = ['home_widget', 'ajanda_kart', 'ajanda_kayit', 'geri_bildirim', 'program', 'program_adim', 'klasor', 'gelen', 'kisi', 'alan_degerlendirme'] as const;
+export const SENKRON_TABLOLARI = ['home_widget', 'ajanda_kart', 'ajanda_kayit', 'geri_bildirim', 'program', 'program_adim', 'klasor', 'gelen', 'kisi', 'alan_degerlendirme', 'paket_kurulum', 'katalog_duzen', 'kaynak'] as const;
 export type SenkronTablo = (typeof SENKRON_TABLOLARI)[number];
 
 export const MISAFIR_DB = 'ritos';

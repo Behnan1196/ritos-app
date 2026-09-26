@@ -1,0 +1,215 @@
+{
+ "surum": 1,
+ "guncellendi": "2026-09-26",
+ "kaynaklar": [
+  {
+   "id": "ornek-01",
+   "ad": "Eyüp B. — AYT Matematik",
+   "tur": "video",
+   "url": "https://www.youtube.com/watch?v=s0fuBOCTfcE&list=PLyiXTl2rW_wrZGIFdO99RnVKVUjhrtPyK",
+   "dersler": [
+    "ayt-matematik"
+   ]
+  },
+  {
+   "id": "ornek-02",
+   "ad": "Eyüp B. — TYT Matematik",
+   "tur": "video",
+   "url": "https://www.youtube.com/watch?v=TODJ2sKLpnc&list=PLyiXTl2rW_wrvZYVh9-A5pHeVhF4xdeO4",
+   "dersler": [
+    "tyt-matematik"
+   ]
+  },
+  {
+   "id": "ornek-03",
+   "ad": "Mert Hoca — TYT Matematik",
+   "tur": "video",
+   "url": "https://www.youtube.com/playlist?list=PLxSXQclq3muC6NwB2ZUjgLUFgzTaG_d6Q",
+   "dersler": [
+    "tyt-matematik"
+   ]
+  },
+  {
+   "id": "ornek-04",
+   "ad": "Rehber Matematik — TYT",
+   "tur": "video",
+   "url": "https://www.youtube.com/watch?v=x2Fw0X9dXXI&list=PLVoSZ0D0CB3o2skEXLO-FY5ZJvYJn6rhr",
+   "dersler": [
+    "tyt-matematik"
+   ]
+  },
+  {
+   "id": "ornek-05",
+   "ad": "Nagihan Hoca — Matematik",
+   "tur": "video",
+   "url": "https://www.youtube.com/watch?v=OeAsT-4xg98&list=PL5kIOunpmSBNzQRwRmuWr6Aa35JaVe6qE",
+   "dersler": [
+    "tyt-matematik"
+   ]
+  },
+  {
+   "id": "ornek-06",
+   "ad": "Tonguç — Fonksiyonlar",
+   "tur": "video",
+   "url": "https://www.youtube.com/watch?v=XkOaj66W4Vg&list=PLVoSZ0D0CB3rPf66hRf52yba7f-n4XBbE",
+   "dersler": [
+    "tyt-matematik",
+    "ayt-matematik"
+   ]
+  },
+  {
+   "id": "ornek-07",
+   "ad": "Mert Hoca — Fonksiyonlar",
+   "tur": "video",
+   "url": "https://www.youtube.com/watch?v=bAisadeAerA",
+   "dersler": [
+    "ayt-matematik"
+   ]
+  },
+  {
+   "id": "ornek-08",
+   "ad": "Kenan Kara — Sıfırdan Geometri",
+   "tur": "video",
+   "url": "https://www.youtube.com/playlist?list=PLHOH0vOSZTZOvHE8flJNixknTctKZM_Wz",
+   "dersler": [
+    "tyt-geometri"
+   ]
+  },
+  {
+   "id": "ornek-09",
+   "ad": "Kenan Kara — TYT-AYT Geometri",
+   "tur": "video",
+   "url": "https://www.youtube.com/watch?v=OlEwYNsWRE8&list=PLHOH0vOSZTZPP_GPOcAPdjSL0Z4PoRstw",
+   "dersler": [
+    "tyt-geometri",
+    "ayt-geometri"
+   ]
+  },
+  {
+   "id": "ornek-10",
+   "ad": "Deniz Hoca — TYT Türkçe",
+   "tur": "video",
+   "url": "https://www.youtube.com/watch?v=qPupCpLMD98&list=PL8_9wYRykg9LuJI1Dop6Tll0s8ifm5EEI",
+   "dersler": [
+    "tyt-turkce"
+   ]
+  },
+  {
+   "id": "ornek-11",
+   "ad": "Sıfırdan Paragraf",
+   "tur": "video",
+   "url": "https://www.youtube.com/playlist?list=PLL4Uzg_MGO2I8IftHUMEADsh4zorKv-U7",
+   "dersler": [
+    "tyt-turkce"
+   ]
+  },
+  {
+   "id": "ornek-12",
+   "ad": "Benim Hocam — Edebiyat",
+   "tur": "video",
+   "url": "https://www.youtube.com/watch?v=-dyp8OIuktw&list=PL5kIOunpmSBOjFERCAiSgtse7fYj-joTP",
+   "dersler": [
+    "ayt-turk-dili-ve-edebiyati"
+   ]
+  },
+  {
+   "id": "ornek-13",
+   "ad": "Özcan Aykın — 9. sınıf Fizik",
+   "tur": "video",
+   "url": "https://www.youtube.com/playlist?list=PLhhV4F6NB0-v1eM-h6_rj5Z9or4rlPUTm",
+   "dersler": [
+    "tyt-fizik"
+   ]
+  },
+  {
+   "id": "ornek-14",
+   "ad": "Özcan Aykın — 55 günde TYT Fizik",
+   "tur": "video",
+   "url": "https://www.youtube.com/playlist?list=PLhhV4F6NB0-uEPdZncMf_qb0tSKyBM-Lf",
+   "dersler": [
+    "tyt-fizik"
+   ]
+  },
+  {
+   "id": "ornek-15",
+   "ad": "Özcan Aykın — AYT Fizik",
+   "tur": "video",
+   "url": "https://www.youtube.com/watch?v=ELBhcQsghjE&list=PLhhV4F6NB0-tU__PwCFhnaK-Gg_I3JG_4",
+   "dersler": [
+    "ayt-fizik"
+   ]
+  },
+  {
+   "id": "ornek-16",
+   "ad": "Görkem Şahin — TYT Kimya",
+   "tur": "video",
+   "url": "https://www.youtube.com/watch?v=evym_wruH5s&list=PL5kIOunpmSBNBWMQWLo0vjOZcNx5I_L7p",
+   "dersler": [
+    "tyt-kimya"
+   ]
+  },
+  {
+   "id": "ornek-17",
+   "ad": "Görkem Şahin — AYT Kimya",
+   "tur": "video",
+   "url": "https://www.youtube.com/watch?v=QWFXRuEABZo&list=PL5kIOunpmSBPeeFXlNTSsXgq0euBdC3XJ",
+   "dersler": [
+    "ayt-kimya"
+   ]
+  },
+  {
+   "id": "ornek-18",
+   "ad": "Ferrum — AYT Kimya",
+   "tur": "video",
+   "url": "https://www.youtube.com/watch?v=d--3Tb5pBcM&list=PLB0hn7Hw33ss5-gD7SwIcCaN8iyIEk2oK",
+   "dersler": [
+    "ayt-kimya"
+   ]
+  },
+  {
+   "id": "ornek-19",
+   "ad": "Biyolojiye giriş",
+   "tur": "video",
+   "url": "https://www.youtube.com/watch?v=F1wmTMvlvNU",
+   "dersler": [
+    "tyt-biyoloji"
+   ]
+  },
+  {
+   "id": "ornek-20",
+   "ad": "Biyosem — TYT Biyoloji Kampı",
+   "tur": "video",
+   "url": "https://www.youtube.com/watch?v=YmcetpRN8T0&list=PLqLwBmByktJXkJwFkoefNX2K_nTMfl158",
+   "dersler": [
+    "tyt-biyoloji"
+   ]
+  },
+  {
+   "id": "ornek-21",
+   "ad": "Gökhan Öz — TYT Tarih",
+   "tur": "video",
+   "url": "https://www.youtube.com/watch?v=s1SRlzmIGXs&list=PL5kIOunpmSBOLwwdcjJ6DTE6nqL3J0pIY",
+   "dersler": [
+    "tyt-tarih"
+   ]
+  },
+  {
+   "id": "ornek-22",
+   "ad": "Soner Ardıç — TYT Tarih",
+   "tur": "video",
+   "url": "https://www.youtube.com/watch?v=pNmjo8vaWjA&list=PLRbyTgiOSh9nqSw97n5L-ywijENKVkvgs",
+   "dersler": [
+    "tyt-tarih"
+   ]
+  },
+  {
+   "id": "ornek-23",
+   "ad": "Partikül Matematik (LGS)",
+   "tur": "video",
+   "url": "https://www.youtube.com/channel/UCRnT96PJOr4KeMEjhizEMfg",
+   "dersler": [
+    "lgs-matematik"
+   ]
+  }
+ ]
+}
