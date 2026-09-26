@@ -140,13 +140,21 @@ export interface GelenRow {
 }
 
 // Kişiler (P2): daha önce paylaştığım ya da benden paylaşım almış kişiler.
+// v4 — 26 eylül: senkronu bekleyen yerel değişiklikler (hesaplı kullanımda).
+export interface BekleyenRow {
+  anahtar: string;        // `${tablo}|${id}` — aynı satırın ardışık değişiklikleri tek kayda iner
+  tablo: SenkronTablo;
+  id: string;
+  zaman: number;          // son değişiklik (epoch ms) — son yazan kazanır
+}
+
 export interface KisiRow {
   id: string;                    // kullanıcı id'si
   gorunen_ad: string;
   son: number;                   // son etkileşim
 }
 
-class RitosDB extends Dexie {
+export class RitosDB extends Dexie {
   home_widget!: EntityTable<HomeWidgetRow, 'id'>;
   ayar!: EntityTable<AyarRow, 'anahtar'>;
   ajanda_kart!: EntityTable<AjandaKartRow, 'id'>;
@@ -157,9 +165,15 @@ class RitosDB extends Dexie {
   klasor!: EntityTable<KlasorRow, 'id'>;
   gelen!: EntityTable<GelenRow, 'id'>;
   kisi!: EntityTable<KisiRow, 'id'>;
+  bekleyen!: EntityTable<BekleyenRow, 'anahtar'>;
 
-  constructor() {
-    super('ritos');
+  /** Sunucudan gelen değişiklik uygulanırken true — kancalar bunu yerel değişiklik saymaz. */
+  uzaktan = false;
+  readonly hesapli: boolean;
+
+  constructor(ad: string) {
+    super(ad);
+    this.hesapli = ad !== MISAFIR_DB;
     // v1 — 25 eylül: Home "Senin alanın" düzeni + ayarlar.
     // Dexie söz dizimi: ilk alan birincil anahtar, sonrakiler indeks.
     this.version(1).stores({
@@ -190,9 +204,85 @@ class RitosDB extends Dexie {
       gelen: 'id, gelis, alindi',
       kisi: 'id, son',
     });
+    // v4 — 26 eylül: uçtan uca şifreli senkron için bekleyen değişiklikler.
+    this.version(4).stores({
+      home_widget: 'id, type',
+      ayar: 'anahtar',
+      ajanda_kart: 'id, kaynak_modul, kaynak_ref, baslangic',
+      ajanda_kayit: 'id, kart_id, tarih',
+      geri_bildirim: 'id, kart_id, kaynak_ref, zaman',
+      program: 'id, klasor_id',
+      program_adim: 'id, program_id',
+      klasor: 'id, ust_id',
+      gelen: 'id, gelis, alindi',
+      kisi: 'id, son',
+      bekleyen: 'anahtar, zaman',
+    });
+
+    // Senkronlanan tablolardaki her yerel değişikliği "bekleyen"e işaretle.
+    // Kanca transaction içinde çalışır; bekleyen'e yazmayı transaction dışına erteleriz.
+    for (const tablo of SENKRON_TABLOLARI) {
+      const t = this.table(tablo);
+      t.hook('creating', (pk, obj) => { this.isaretle(tablo, (pk ?? (obj as { id: string }).id) as string); });
+      t.hook('updating', (_m, pk) => { this.isaretle(tablo, pk as string); });
+      t.hook('deleting', (pk) => { this.isaretle(tablo, pk as string); });
+    }
+  }
+
+  private kuyruk = new Map<string, BekleyenRow>();
+  private zamanlayici: ReturnType<typeof setTimeout> | null = null;
+
+  isaretle(tablo: SenkronTablo, id: string, zaman = Date.now()) {
+    if (!this.hesapli || this.uzaktan || id == null) return;
+    const anahtar = `${tablo}|${id}`;
+    this.kuyruk.set(anahtar, { anahtar, tablo, id: String(id), zaman });
+    if (this.zamanlayici) return;
+    this.zamanlayici = setTimeout(() => {
+      this.zamanlayici = null;
+      const satirlar = Array.from(this.kuyruk.values());
+      this.kuyruk.clear();
+      Dexie.ignoreTransaction(() => this.bekleyen.bulkPut(satirlar)).then(() => degisiklikDinleyicisi?.()).catch(() => {});
+    }, 0);
+  }
+
+  /** Hesaba geçişte tüm yerel satırları yüklenecek diye işaretle (S2). */
+  async hepsiniIsaretle() {
+    const zaman = Date.now();
+    const satirlar: BekleyenRow[] = [];
+    for (const tablo of SENKRON_TABLOLARI) {
+      const idler = (await this.table(tablo).toCollection().primaryKeys()) as string[];
+      for (const id of idler) satirlar.push({ anahtar: `${tablo}|${id}`, tablo, id: String(id), zaman });
+    }
+    await this.bekleyen.bulkPut(satirlar);
+    degisiklikDinleyicisi?.();
   }
 }
 
+// ———————————————— hangi veritabanı açık (S5) ————————————————
+// Hesapsız kullanımın verisi 'ritos' (misafir) veritabanında; her hesabın kendi veritabanı var.
+// Hangisinin açık olduğu cihazda küçük bir işarette tutulur; değişince sayfa yeniden yüklenir.
+
+export const SENKRON_TABLOLARI = ['home_widget', 'ajanda_kart', 'ajanda_kayit', 'geri_bildirim', 'program', 'program_adim', 'klasor', 'gelen', 'kisi'] as const;
+export type SenkronTablo = (typeof SENKRON_TABLOLARI)[number];
+
+export const MISAFIR_DB = 'ritos';
+const AKTIF_HESAP = 'ritos-aktif-hesap';
+
+export function dbAdi(uid: string | null) {
+  return uid ? `ritos-u-${uid}` : MISAFIR_DB;
+}
+
+export function aktifHesap(): string | null {
+  try { return typeof window === 'undefined' ? null : localStorage.getItem(AKTIF_HESAP); } catch { return null; }
+}
+
+export function aktifHesapAyarla(uid: string | null) {
+  try { if (uid) localStorage.setItem(AKTIF_HESAP, uid); else localStorage.removeItem(AKTIF_HESAP); } catch { /* yoksay */ }
+}
+
+let degisiklikDinleyicisi: (() => void) | null = null;
+export function degisiklikDinle(f: (() => void) | null) { degisiklikDinleyicisi = f; }
+
 // Sunucu tarafında (SSR) modül yüklenirse sorun yok: Dexie IndexedDB'ye
 // ancak ilk sorguda dokunur, sorgular da yalnızca useEffect içinde çalışır.
-export const db = new RitosDB();
+export const db = new RitosDB(dbAdi(aktifHesap()));

@@ -5,7 +5,8 @@ import type { CustomWidget, CustomWidgetType } from '@/lib/db';
 import { useHomeWidgets } from '@/lib/useHomeWidgets';
 import AjandaPane from './ritos/AjandaPane';
 import KisiselGelisim from './ritos/KisiselGelisim';
-import { AyarlarPane, GelenlerTool, useGelenSenkron, useGelenOzeti } from './ritos/Paylasim';
+import { AyarlarPane, GelenlerTool, SenkronIsareti, useGelenSenkron, useGelenOzeti } from './ritos/Paylasim';
+import { useHesapBaslat } from '@/lib/hesap';
 
 // ————————————————————————————————————————————————————————————————
 // Ritos yerleşim laboratuvarı — rite-app'ten AYRI, veri modeline bağlı değil.
@@ -97,6 +98,7 @@ function findFreeSlot(existing: CustomWidget[], size: { w: number; h: number }) 
 }
 
 export default function RitosLab() {
+  useHesapBaslat();
   useGelenSenkron();
   const [isNarrow, setIsNarrow] = useState(false);
   const [width, setWidth] = useState(0);
@@ -156,6 +158,7 @@ export default function RitosLab() {
       {!isNarrow && (
         <div className="topbar">
           <b>Ritos</b>
+          <SenkronIsareti />
           <span className="w">{width}px · geniş (iPad tipi)</span>
         </div>
       )}
@@ -688,7 +691,7 @@ function MobileShell({
 
   return (
     <div className="mobile-app">
-      <div className="mobile-hd"><b>Ritos</b></div>
+      <div className="mobile-hd"><b>Ritos</b><SenkronIsareti /></div>
       <div className="mobile-main">
         {tab === 'ajanda' && <AjandaPane />}
         {tab === 'home' && <MobileHome onOpenTool={onOpenTool} customBoardProps={customBoardProps} />}

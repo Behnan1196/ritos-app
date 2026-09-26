@@ -6,44 +6,56 @@ import React, { useEffect, useState } from 'react';
 import { db, type GelenRow } from '@/lib/db';
 import { useCanli } from '@/lib/canli';
 import { bugun } from '@/lib/paket';
-import { cikisYap, girisYap, gorunenAdDegistir, kayitOl, kullaniciOnayla, useOturum } from '@/lib/hesap';
+import { SIFRE_EN_AZ, cikisYap, girisYap, girisiTamamla, gorunenAdDegistir, kayitOl, kurtarmaGoster, sifreDegistir, useOturum } from '@/lib/hesap';
+import { senkronla, useSenkronDurum } from '@/lib/senkron';
+import { sonYedek, yedegiYukle, yedekAl, yedekOku } from '@/lib/yedek';
 import { al, engelKaldir, engelle, engellenenler, gelenSil, gelenleriCek, gonder, kisiBul, type PaylasimPaketi } from '@/lib/paylasim';
-import { supabase } from '@/lib/supabase';
 import { BlokGoster, Chips, Kap, Modal } from './ortak';
 
 // ———————————————— Hesap ————————————————
 
-export function HesapModal({ onKapat, onTamam, neden }: { onKapat: () => void; onTamam?: () => void; neden?: string }) {
+export function HesapModal({ onKapat, neden }: { onKapat: () => void; onTamam?: () => void; neden?: string }) {
   const [kip, setKip] = useState<'giris' | 'kayit'>('giris');
   const [ad, setAd] = useState('');
   const [eposta, setEposta] = useState('');
   const [sifre, setSifre] = useState('');
+  const [sifre2, setSifre2] = useState('');
   const [hata, setHata] = useState<string | null>(null);
   const [bekle, setBekle] = useState(false);
-  const [uyari, setUyari] = useState(false);
+  const [kurtarma, setKurtarma] = useState<string[] | null>(null);
+  const [misafirSor, setMisafirSor] = useState<string | null>(null);
 
-  const gecerli = /\S+@\S+\.\S+/.test(eposta) && sifre.length >= 6 && (kip === 'giris' || ad.trim().length > 0);
+  const gecerli = /\S+@\S+\.\S+/.test(eposta) && sifre.length >= SIFRE_EN_AZ
+    && (kip === 'giris' || (ad.trim().length > 0 && sifre === sifre2));
 
   async function gonderForm() {
     setBekle(true); setHata(null);
-    const r = kip === 'giris' ? await girisYap(eposta, sifre) : await kayitOl(ad, eposta, sifre);
-    setBekle(false);
-    if (!r.tamam) { setHata(r.hata); return; }
-    if (r.baskaKullanici) { setUyari(true); return; }
-    onTamam?.(); onKapat();
+    try {
+      if (kip === 'kayit') {
+        const r = await kayitOl(ad, eposta, sifre);
+        if (!r.tamam) { setHata(r.hata); return; }
+        setKurtarma(r.kurtarma);
+      } else {
+        const r = await girisYap(eposta, sifre);
+        if (!r.tamam) { setHata(r.hata); return; }
+        if (r.misafirVar) setMisafirSor(r.uid);
+        else await girisiTamamla(r.uid, false);
+      }
+    } finally {
+      setBekle(false);
+    }
   }
 
-  if (uyari) return (
-    <Modal baslik="Bu cihazda başka bir hesap kullanılmıştı" onKapat={onKapat}>
-      <p className="rt-metin">Ritos&apos;taki kartlar, programlar ve Gelenler bu cihazda durur ve hesaba bağlı değildir. Bu hesapla devam edersen önceki hesabın yerel verisini de görürsün.</p>
+  if (kurtarma) return <KurtarmaGoster kelimeler={kurtarma} onTamam={() => location.reload()} ilk />;
+
+  if (misafirSor) return (
+    <Modal baslik="Bu cihazda hesapsız girdiğin veriler var" onKapat={() => {}}>
+      <p className="rt-metin">Hesabına giriş yapmadan önce bu cihazda kartlar ya da programlar oluşturmuşsun. Ne yapalım?</p>
       <div className="rt-satir">
-        <button type="button" className="rt-btn" onClick={async () => { await cikisYap(); onKapat(); }}>Çıkış yap</button>
-        <button type="button" className="rt-btn primary" onClick={async () => {
-          const { data } = await supabase()!.auth.getSession();
-          if (data.session) await kullaniciOnayla(data.session.user.id);
-          onTamam?.(); onKapat();
-        }}>Devam et</button>
+        <button type="button" className="rt-btn primary" onClick={() => girisiTamamla(misafirSor, true)}>Hesabıma ekle</button>
+        <button type="button" className="rt-btn" onClick={() => girisiTamamla(misafirSor, false)}>Ayrı tut</button>
       </div>
+      <p className="rt-muted">&quot;Ayrı tut&quot; dersen o veriler bu cihazda, çıkış yaptığında görünür halde kalır.</p>
     </Modal>
   );
 
@@ -53,15 +65,44 @@ export function HesapModal({ onKapat, onTamam, neden }: { onKapat: () => void; o
       <Chips secenekler={[['giris', 'Giriş'], ['kayit', 'Hesap oluştur']]} deger={kip} onSec={(k) => { setKip(k); setHata(null); }} />
       {kip === 'kayit' && <input className="rt-inp" placeholder="Görünen ad" value={ad} onChange={(e) => setAd(e.target.value)} />}
       <input className="rt-inp" type="email" placeholder="E-posta" autoComplete="email" value={eposta} onChange={(e) => setEposta(e.target.value)} />
-      <input className="rt-inp" type="password" placeholder="Şifre (en az 6)" autoComplete={kip === 'giris' ? 'current-password' : 'new-password'} value={sifre}
+      <input className="rt-inp" type="password" placeholder={`Şifre (en az ${SIFRE_EN_AZ})`} autoComplete={kip === 'giris' ? 'current-password' : 'new-password'} value={sifre}
         onChange={(e) => setSifre(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && gecerli && !bekle) gonderForm(); }} />
+      {kip === 'kayit' && <input className="rt-inp" type="password" placeholder="Şifre tekrar" autoComplete="new-password" value={sifre2} onChange={(e) => setSifre2(e.target.value)} />}
+      {kip === 'kayit' && sifre2 && sifre !== sifre2 && <p className="rt-hata">Şifreler aynı değil.</p>}
       {hata && <p className="rt-hata">{hata}</p>}
       <div className="rt-satir">
-        <button type="button" className="rt-btn primary" disabled={!gecerli || bekle} onClick={gonderForm}>{bekle ? '…' : kip === 'giris' ? 'Giriş yap' : 'Hesap oluştur'}</button>
+        <button type="button" className="rt-btn primary" disabled={!gecerli || bekle} onClick={gonderForm}>{bekle ? 'Anahtarlar hazırlanıyor…' : kip === 'giris' ? 'Giriş yap' : 'Hesap oluştur'}</button>
       </div>
-      <p className="rt-muted">Hesap yalnızca paylaşmak için gerekir. Kartların ve programların bu cihazda kalır.</p>
+      {kip === 'kayit'
+        ? <p className="rt-muted">Verilerin cihazında şifrelenir; Ritos içeriği okuyamaz. Bu yüzden şifreni ve birazdan göreceğin kurtarma anahtarını ikisini birden kaybedersen verin geri gelmez. Bu cihazdaki mevcut kartların hesabına taşınır.</p>
+        : <p className="rt-muted">Giriş yapınca kartların ve programların diğer cihazlarınla şifreli olarak eşitlenir.</p>}
     </Modal>
   );
+}
+
+function KurtarmaGoster({ kelimeler, onTamam, ilk }: { kelimeler: string[]; onTamam: () => void; ilk?: boolean }) {
+  const [tamam, setTamam] = useState(!ilk);
+  const [kopyalandi, setKopyalandi] = useState(false);
+  return (
+    <Modal baslik="Kurtarma anahtarın" onKapat={ilk ? () => {} : onTamam}>
+      <p className="rt-metin">Şifreni unutursan verine yalnızca bu 12 kelimeyle ulaşabilirsin. Kâğıda yaz ya da bir şifre yöneticisinde sakla; kimseyle paylaşma.</p>
+      <ol className="rt-kurtarma">{kelimeler.map((k, i) => <li key={i}>{k}</li>)}</ol>
+      <div className="rt-satir">
+        <button type="button" className="rt-btn" onClick={async () => { try { await navigator.clipboard.writeText(kelimeler.join(' ')); setKopyalandi(true); } catch { /* izin yok */ } }}>{kopyalandi ? 'Kopyalandı' : 'Kopyala'}</button>
+        <button type="button" className="rt-btn" onClick={() => window.print()}>Yazdır</button>
+      </div>
+      {ilk && <label className="rt-onay"><input type="checkbox" checked={tamam} onChange={(e) => setTamam(e.target.checked)} /> Bir yere kaydettim</label>}
+      <div className="rt-satir"><button type="button" className="rt-btn primary" disabled={!tamam} onClick={onTamam}>{ilk ? 'Devam' : 'Kapat'}</button></div>
+    </Modal>
+  );
+}
+
+// Başlıktaki küçük senkron göstergesi (S7): yalnız hesaplıyken ve bir sorun varsa belirgin.
+export function SenkronIsareti() {
+  const d = useSenkronDurum();
+  if (!d.etkin) return null;
+  const metin = d.hata ? 'Senkron sorunu' : d.ilkIndirme ? 'Verilerin getiriliyor…' : d.calisiyor ? 'Eşitleniyor…' : null;
+  return <span className={`rt-senkron${d.hata ? ' hata' : ''}`} title={d.hata ?? 'Eşitlendi'}>{d.hata ? '⚠' : '●'}{metin ? ` ${metin}` : ''}</span>;
 }
 
 // ———————————————— Paylaş ————————————————
@@ -79,7 +120,7 @@ export function PaylasDugmesi({ paketUret }: { paketUret: () => Promise<Paylasim
 function PaylasAkisi({ paketUret, onKapat }: { paketUret: () => Promise<PaylasimPaketi | null> | PaylasimPaketi; onKapat: () => void }) {
   const o = useOturum();
   if (!o.hazir) return null;
-  if (!o.session) return <HesapModal onKapat={onKapat} neden="Paylaşmak için bir hesap gerekiyor." onTamam={() => {}} />;
+  if (!o.session || o.kilitli) return <HesapModal onKapat={onKapat} neden="Paylaşmak için bir hesap gerekiyor." />;
   return <PaylasModal paketUret={paketUret} onKapat={onKapat} benId={o.session.user.id} />;
 }
 
@@ -259,25 +300,45 @@ function GelenDetay({ g, onKapat }: { g: GelenRow; onKapat: () => void }) {
 
 // ———————————————— Ayarlar ————————————————
 
+function zamanFarki(ms: number) {
+  const dk = Math.round((Date.now() - ms) / 60000);
+  if (dk < 1) return 'az önce';
+  if (dk < 60) return `${dk} dk önce`;
+  const sa = Math.round(dk / 60);
+  if (sa < 24) return `${sa} saat önce`;
+  return `${Math.round(sa / 24)} gün önce`;
+}
+
 export function AyarlarPane() {
   const o = useOturum();
-  const [hesap, setHesap] = useState(false);
+  const d = useSenkronDurum();
+  const [modal, setModal] = useState<null | 'hesap' | 'cikis' | 'sifre' | 'kurtarma' | 'yedekAl' | 'yedekYukle'>(null);
   const [adDuzenle, setAdDuzenle] = useState<string | null>(null);
   const [engeller, setEngeller] = useState<{ engellenen: string; gorunen_ad: string | null }[]>([]);
+  const sonYedekZamani = useCanli(() => sonYedek(), [], null as number | null);
   const uid = o.session?.user.id;
 
-  useEffect(() => { if (uid) engellenenler().then(setEngeller); else setEngeller([]); }, [uid]);
+  useEffect(() => { if (uid && !o.kilitli) engellenenler().then(setEngeller); else setEngeller([]); }, [uid, o.kilitli]);
+  const yedekEski = !sonYedekZamani || Date.now() - sonYedekZamani > 30 * 86400000;
 
   return (
     <div className="side-content" style={{ height: '100%', overflowY: 'auto' }}>
       <h4>⚙️ Ayarlar</h4>
       <Kap baslik="Hesap">
-        {!o.hazir ? null : !o.session ? (
+        {!o.hazir ? null : !o.hesapli ? (
           <>
-            <p className="rt-muted">Giriş yapmadın. Ritos hesapsız çalışır; paylaşmak ve almak için hesap gerekir.</p>
-            <div className="rt-satir"><button type="button" className="rt-btn primary" onClick={() => setHesap(true)}>Giriş yap / Hesap oluştur</button></div>
+            <p className="rt-muted">Giriş yapmadın. Ritos hesapsız çalışır ve bu durumda hiçbir verin sunucuya gitmez. Başka cihazlarla eşitlemek ve paylaşmak için hesap gerekir.</p>
+            <div className="rt-satir"><button type="button" className="rt-btn primary" onClick={() => setModal('hesap')}>Giriş yap / Hesap oluştur</button></div>
           </>
-        ) : (
+        ) : o.kilitli ? (
+          <>
+            <p className="rt-metin">Oturumun kapanmış. Verin bu cihazda duruyor; eşitlemeye devam etmek için yeniden giriş yap.</p>
+            <div className="rt-satir">
+              <button type="button" className="rt-btn primary" onClick={() => setModal('hesap')}>Yeniden giriş yap</button>
+              <button type="button" className="rt-btn" onClick={() => setModal('cikis')}>Çıkış yap</button>
+            </div>
+          </>
+        ) : o.session && (
           <>
             {adDuzenle === null ? (
               <p className="rt-metin"><b>{o.gorunenAd ?? '—'}</b> <button type="button" className="rt-linkbtn" onClick={() => setAdDuzenle(o.gorunenAd ?? '')}>değiştir</button><br /><span className="rt-muted">{o.session.user.email}</span></p>
@@ -287,11 +348,33 @@ export function AyarlarPane() {
                 <button type="button" className="rt-btn primary" disabled={!adDuzenle.trim()} onClick={async () => { await gorunenAdDegistir(o.session!.user.id, adDuzenle); setAdDuzenle(null); location.reload(); }}>Kaydet</button>
               </div>
             )}
-            <div className="rt-satir"><button type="button" className="rt-btn" onClick={() => { if (confirm('Çıkış yapılsın mı? Bu cihazdaki kartların ve programların silinmez.')) cikisYap(); }}>Çıkış yap</button></div>
+            <p className="rt-muted">
+              {d.hata ? <span className="rt-hata">⚠ {d.hata}</span> : d.son ? `Son eşitleme: ${zamanFarki(d.son)}` : 'Henüz eşitlenmedi'}
+              {d.bekleyen > 0 && ` · ${d.bekleyen} değişiklik bekliyor`}
+            </p>
+            <div className="rt-satir">
+              <button type="button" className="rt-btn" disabled={d.calisiyor} onClick={() => senkronla()}>{d.calisiyor ? 'Eşitleniyor…' : 'Şimdi eşitle'}</button>
+              <button type="button" className="rt-btn" onClick={() => setModal('kurtarma')}>Kurtarma anahtarı</button>
+              <button type="button" className="rt-btn" onClick={() => setModal('sifre')}>Şifre değiştir</button>
+              <button type="button" className="rt-btn" onClick={() => setModal('cikis')}>Çıkış yap</button>
+            </div>
           </>
         )}
       </Kap>
-      {o.session && (
+
+      <Kap baslik="Yedek">
+        <p className="rt-muted">
+          {sonYedekZamani ? `Son yedek: ${new Date(sonYedekZamani).toLocaleDateString('tr-TR')}` : 'Henüz yedek alınmadı.'}
+          {' '}Yedek dosyası senin belirlediğin bir parolayla şifrelenir; onu kendi iCloud ya da Drive'ına koyabilirsin.
+        </p>
+        {!o.hesapli && yedekEski && <p className="rt-uyari">Hesabın olmadığı için verin yalnız bu cihazda. Telefon kaybolursa yedek dosyası tek kurtarma yolun.</p>}
+        <div className="rt-satir">
+          <button type="button" className="rt-btn" onClick={() => setModal('yedekAl')}>Yedek dosyası al</button>
+          <button type="button" className="rt-btn" onClick={() => setModal('yedekYukle')}>Yedekten geri yükle</button>
+        </div>
+      </Kap>
+
+      {o.session && !o.kilitli && (
         <Kap baslik="Engellenenler">
           {engeller.length === 0 ? <p className="rt-muted">Kimse engellenmedi.</p> : engeller.map((e) => (
             <div key={e.engellenen} className="rt-satir" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
@@ -301,7 +384,139 @@ export function AyarlarPane() {
           ))}
         </Kap>
       )}
-      {hesap && <HesapModal onKapat={() => setHesap(false)} />}
+
+      {modal === 'hesap' && <HesapModal onKapat={() => setModal(null)} />}
+      {modal === 'cikis' && <CikisModal onKapat={() => setModal(null)} bekleyen={d.bekleyen} />}
+      {modal === 'sifre' && <SifreModal onKapat={() => setModal(null)} />}
+      {modal === 'kurtarma' && <KurtarmaIste onKapat={() => setModal(null)} />}
+      {modal === 'yedekAl' && <YedekAlModal onKapat={() => setModal(null)} />}
+      {modal === 'yedekYukle' && <YedekYukleModal onKapat={() => setModal(null)} hesapli={o.hesapli} />}
     </div>
+  );
+}
+
+function CikisModal({ onKapat, bekleyen }: { onKapat: () => void; bekleyen: number }) {
+  const [sil, setSil] = useState(false);
+  const [bekle, setBekle] = useState(false);
+  return (
+    <Modal baslik="Çıkış yap" onKapat={onKapat}>
+      <p className="rt-metin">Çıkış yapınca bu hesabın verisi ekrandan kalkar; hesapsız kullanımın verisi görünür.</p>
+      {bekleyen > 0 && <p className="rt-uyari">{bekleyen} değişiklik henüz eşitlenmedi. İnternet varsa çıkıştan önce gönderilir.</p>}
+      <label className="rt-onay"><input type="checkbox" checked={sil} onChange={(e) => setSil(e.target.checked)} /> Bu hesabın verisini bu cihazdan da sil</label>
+      <p className="rt-muted">{sil ? 'Veri diğer cihazlarında ve şifreli kopyada kalır; bu cihaza yeniden giriş yapınca tekrar iner.' : 'Veri bu cihazda kalır; yeniden giriş hızlı olur. Uygulama kilidi (G10) korur.'}</p>
+      <div className="rt-satir">
+        <button type="button" className="rt-btn" onClick={onKapat}>Vazgeç</button>
+        <button type="button" className="rt-btn primary" disabled={bekle} onClick={async () => { setBekle(true); await cikisYap(sil); }}>{bekle ? 'Çıkılıyor…' : 'Çıkış yap'}</button>
+      </div>
+    </Modal>
+  );
+}
+
+function SifreModal({ onKapat }: { onKapat: () => void }) {
+  const [eski, setEski] = useState('');
+  const [yeni, setYeni] = useState('');
+  const [yeni2, setYeni2] = useState('');
+  const [hata, setHata] = useState<string | null>(null);
+  const [bekle, setBekle] = useState(false);
+  const [tamam, setTamam] = useState(false);
+  if (tamam) return (
+    <Modal baslik="Şifre değişti" onKapat={onKapat}>
+      <p className="rt-metin">Yeni şifren diğer cihazlarda da geçerli. Verin yeniden şifrelenmedi; yalnız anahtarın yeni şifreyle korunuyor.</p>
+      <div className="rt-satir"><button type="button" className="rt-btn primary" onClick={onKapat}>Tamam</button></div>
+    </Modal>
+  );
+  return (
+    <Modal baslik="Şifre değiştir" onKapat={onKapat}>
+      <input className="rt-inp" type="password" placeholder="Mevcut şifre" autoComplete="current-password" value={eski} onChange={(e) => setEski(e.target.value)} />
+      <input className="rt-inp" type="password" placeholder={`Yeni şifre (en az ${SIFRE_EN_AZ})`} autoComplete="new-password" value={yeni} onChange={(e) => setYeni(e.target.value)} />
+      <input className="rt-inp" type="password" placeholder="Yeni şifre tekrar" autoComplete="new-password" value={yeni2} onChange={(e) => setYeni2(e.target.value)} />
+      {hata && <p className="rt-hata">{hata}</p>}
+      <div className="rt-satir">
+        <button type="button" className="rt-btn primary" disabled={bekle || !eski || yeni.length < SIFRE_EN_AZ || yeni !== yeni2}
+          onClick={async () => { setBekle(true); setHata(null); try { await sifreDegistir(eski, yeni); setTamam(true); } catch (e) { setHata((e as Error).message); } finally { setBekle(false); } }}>
+          {bekle ? 'Değiştiriliyor…' : 'Değiştir'}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function KurtarmaIste({ onKapat }: { onKapat: () => void }) {
+  const [sifre, setSifre] = useState('');
+  const [kelimeler, setKelimeler] = useState<string[] | null>(null);
+  const [hata, setHata] = useState<string | null>(null);
+  const [bekle, setBekle] = useState(false);
+  if (kelimeler) return <KurtarmaGoster kelimeler={kelimeler} onTamam={onKapat} />;
+  return (
+    <Modal baslik="Kurtarma anahtarını göster" onKapat={onKapat}>
+      <p className="rt-muted">Göstermeden önce şifreni soruyoruz.</p>
+      <input className="rt-inp" type="password" placeholder="Şifre" autoComplete="current-password" value={sifre} onChange={(e) => setSifre(e.target.value)} />
+      {hata && <p className="rt-hata">{hata}</p>}
+      <div className="rt-satir">
+        <button type="button" className="rt-btn primary" disabled={!sifre || bekle}
+          onClick={async () => { setBekle(true); setHata(null); try { setKelimeler(await kurtarmaGoster(sifre)); } catch (e) { setHata((e as Error).message); } finally { setBekle(false); } }}>
+          {bekle ? '…' : 'Göster'}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function YedekAlModal({ onKapat }: { onKapat: () => void }) {
+  const [p1, setP1] = useState('');
+  const [p2, setP2] = useState('');
+  const [bekle, setBekle] = useState(false);
+  const [tamam, setTamam] = useState(false);
+  return (
+    <Modal baslik="Yedek dosyası al" onKapat={onKapat}>
+      {tamam ? (
+        <>
+          <p className="rt-metin">Dosya indirildi. Onu kendi bulutuna (iCloud, Drive) koy; parolasını da ayrı bir yerde sakla.</p>
+          <div className="rt-satir"><button type="button" className="rt-btn primary" onClick={onKapat}>Tamam</button></div>
+        </>
+      ) : (
+        <>
+          <p className="rt-muted">Bu parola dosyayı açmak için gerekir. Unutursan yedek açılmaz.</p>
+          <input className="rt-inp" type="password" placeholder={`Yedek parolası (en az ${SIFRE_EN_AZ})`} autoComplete="new-password" value={p1} onChange={(e) => setP1(e.target.value)} />
+          <input className="rt-inp" type="password" placeholder="Parola tekrar" autoComplete="new-password" value={p2} onChange={(e) => setP2(e.target.value)} />
+          <div className="rt-satir">
+            <button type="button" className="rt-btn primary" disabled={bekle || p1.length < SIFRE_EN_AZ || p1 !== p2}
+              onClick={async () => { setBekle(true); try { await yedekAl(p1); setTamam(true); } finally { setBekle(false); } }}>{bekle ? 'Hazırlanıyor…' : 'İndir'}</button>
+          </div>
+        </>
+      )}
+    </Modal>
+  );
+}
+
+function YedekYukleModal({ onKapat, hesapli }: { onKapat: () => void; hesapli: boolean }) {
+  const [dosya, setDosya] = useState<File | null>(null);
+  const [parola, setParola] = useState('');
+  const [hata, setHata] = useState<string | null>(null);
+  const [bekle, setBekle] = useState(false);
+  const [okunan, setOkunan] = useState<Awaited<ReturnType<typeof yedekOku>> | null>(null);
+  return (
+    <Modal baslik="Yedekten geri yükle" onKapat={onKapat}>
+      {!okunan ? (
+        <>
+          <input className="rt-inp" type="file" accept=".ritos,application/octet-stream" onChange={(e) => setDosya(e.target.files?.[0] ?? null)} />
+          <input className="rt-inp" type="password" placeholder="Yedek parolası" value={parola} onChange={(e) => setParola(e.target.value)} />
+          {hata && <p className="rt-hata">{hata}</p>}
+          <div className="rt-satir">
+            <button type="button" className="rt-btn primary" disabled={!dosya || !parola || bekle}
+              onClick={async () => { setBekle(true); setHata(null); try { setOkunan(await yedekOku(dosya!, parola)); } catch (e) { setHata((e as Error).message); } finally { setBekle(false); } }}>{bekle ? 'Açılıyor…' : 'Aç'}</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="rt-metin">{okunan.ozet}</p>
+          <p className="rt-uyari">Bu cihazdaki mevcut veri yedekteki halle değiştirilecek{hesapli ? ' ve diğer cihazlarına da eşitlenecek' : ''}.</p>
+          <div className="rt-satir">
+            <button type="button" className="rt-btn" onClick={onKapat}>Vazgeç</button>
+            <button type="button" className="rt-btn tehlike" disabled={bekle} onClick={async () => { setBekle(true); await yedegiYukle(okunan.icerik); location.reload(); }}>Geri yükle</button>
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }
