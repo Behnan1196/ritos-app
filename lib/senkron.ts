@@ -47,20 +47,28 @@ let gecikme: ReturnType<typeof setTimeout> | null = null;
 let tur: Promise<void> | null = null;
 let tekrar = false;
 
+// Geliştirmede React (StrictMode) efektleri iki kez çalıştırır: başlat → durdur → başlat.
+// Bu yüzden başlatma yeniden girilebilir olmalı: her başlatmanın bir nesil numarası var,
+// eski nesil yarıda kalırsa kendini iptal eder; kanal adı her seferinde benzersiz.
+let nesil = 0;
+const odak = () => zamanla(0);
+
 export async function senkronBaslat(kullanici: string, anahtar: CryptoKey) {
+  senkronDurdur();
+  const benim = ++nesil;
   uid = kullanici;
   dek = anahtar;
   const son = (await db.ayar.get(SON))?.deger as number | undefined;
   const sira = (await db.ayar.get(SIRA))?.deger as number | undefined;
+  if (benim !== nesil) return; // bu arada durduruldu
   guncelle({ etkin: true, son: son ?? null, ilkIndirme: !sira });
   degisiklikDinle(() => zamanla(1500));
   const sb = supabase();
   if (sb) {
-    kanal = sb.channel(`kayit-${kullanici}`)
+    kanal = sb.channel(`kayit-${kullanici}-${Math.random().toString(36).slice(2, 8)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cat_kayit', filter: `sahip=eq.${kullanici}` }, () => zamanla(300))
       .subscribe();
   }
-  const odak = () => zamanla(0);
   window.addEventListener('focus', odak);
   window.addEventListener('online', odak);
   aralik = setInterval(() => { if (document.visibilityState === 'visible') zamanla(0); }, 30_000);
@@ -68,11 +76,18 @@ export async function senkronBaslat(kullanici: string, anahtar: CryptoKey) {
 }
 
 export function senkronDurdur() {
+  nesil++;
   degisiklikDinle(null);
   if (kanal) supabase()?.removeChannel(kanal);
   kanal = null;
   if (aralik) clearInterval(aralik);
   aralik = null;
+  if (gecikme) clearTimeout(gecikme);
+  gecikme = null;
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('focus', odak);
+    window.removeEventListener('online', odak);
+  }
   uid = null;
   dek = null;
   guncelle({ etkin: false });
