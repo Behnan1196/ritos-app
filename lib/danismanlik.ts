@@ -57,6 +57,8 @@ export interface Tasima {
   sonlandir(iliskiId: string): Promise<void>;
   mesajGonder(iliski: string, alici: string, veri: string): Promise<void>;
   mesajCek(sonra: number): Promise<UzakMesaj[]>;
+  kisiBul(eposta: string): Promise<{ id: string; gorunen_ad: string } | null>;
+  davetGonder(alici: string, paket: unknown): Promise<void>;
 }
 
 function hata(e: { message: string } | null) { if (e) throw new Error(e.message); }
@@ -128,6 +130,14 @@ function supabaseTasima(uid: string): Tasima {
       const r = await sb.from('cat_mesaj').select('sira, iliski, gonderen, veri').eq('alici', uid).gt('sira', sonra).order('sira').limit(200);
       hata(r.error);
       return (r.data ?? []) as UzakMesaj[];
+    },
+    async kisiBul(eposta) {
+      const r = await sb.rpc('cat_kisi_bul', { p_eposta: eposta });
+      hata(r.error);
+      return (r.data as { id: string; gorunen_ad: string }[] | null)?.[0] ?? null;
+    },
+    async davetGonder(alici, paket) {
+      hata((await sb.rpc('cat_gonder', { p_alici: alici, p_kaynak: 'dogrudan', p_paket: paket })).error);
     },
   };
 }
@@ -425,6 +435,17 @@ export async function davetOlustur(disiplin: string): Promise<{ kod: string; bag
   return { kod, baglanti: `${location.origin}/?davet=${kod}` };
 }
 
+/** D2 — e-postayla davet: davet kodu kişinin Gelenler'ine düşer (kişi Ritos'ta en az bir kez giriş yapmış olmalı). */
+export async function ePostaDaveti(eposta: string, disiplin: string): Promise<string> {
+  const tt = tasimaVar();
+  const kisi = await tt.kisiBul(eposta.trim());
+  if (!kisi) throw new Error("Bu e-postayla Ritos kullanan biri bulunamadı. Kişinin en az bir kez giriş yapmış olması gerekir; ya da bağlantıyı gönder.");
+  if (kisi.id === uid) throw new Error('Kendini davet edemezsin.');
+  const { kod } = await davetOlustur(disiplin);
+  await tt.davetGonder(kisi.id, { surum: 1, tur: 'davet', ad: 'Danışmanlık daveti', davet: { kod, koc_ad: durum.profil?.ad ?? 'Koç', disiplin } });
+  return kisi.gorunen_ad;
+}
+
 export const davetler = () => tasimaVar().davetler();
 export const davetSil = (kod: string) => tasimaVar().davetSil(kod);
 export const davetBak = (kod: string) => tasimaVar().davetBak(kod);
@@ -442,9 +463,28 @@ export async function sonlandir(iliskiId: string) {
   await iliskileriCek();
 }
 
+// ———————————————— danışan başına kart izinleri (D9) ————————————————
+
+export async function danisanIzinleri(il: IliskiRow): Promise<Izinler> {
+  return (await db.iliski_ayar.get(il.id))?.izinler ?? varsayilanIzin(il.disiplin);
+}
+
+/** İzinleri kaydet; istenirse bu danışanın gönderilmiş programlarına da uygula (bugünden itibaren). */
+export async function danisanIzinKaydet(il: IliskiRow, izinler: Izinler, mevcutlara: boolean): Promise<number> {
+  await db.iliski_ayar.put({ id: il.id, izinler, guncellendi: Date.now() });
+  if (!mevcutlara) return 0;
+  const ps = (await db.program.toArray()).filter((p) => p.uzak?.iliski_id === il.id && p.uzak.rol === 'koc' && p.uzak.durum !== 'ret' && p.uzak.durum !== 'ayrildi');
+  for (const p of ps) {
+    await db.program.update(p.id, { uzak: { ...p.uzak!, izinler }, guncellendi: Date.now() });
+    if (p.uzak!.durum !== 'taslak') await programGonder(p.id);
+  }
+  return ps.length;
+}
+
 /** D5 — atama: şablondan (ya da boş) danışana özel bağımsız kopya; koç düzenleyip gönderir. */
 export async function programAta(il: IliskiRow, kaynakId: string | null, ad: string, baslangic: string): Promise<string> {
   const id = crypto.randomUUID();
+  const izinler = await danisanIzinleri(il);
   const k = kaynakId ? await db.program.get(kaynakId) : null;
   const adimlar = kaynakId ? await db.program_adim.where('program_id').equals(kaynakId).sortBy('sira') : [];
   const simdi = Date.now();
@@ -453,7 +493,7 @@ export async function programAta(il: IliskiRow, kaynakId: string | null, ad: str
       id, ad: ad.trim() || k?.ad || 'Program', amac: k?.amac ?? '', dikkat: k?.dikkat ?? '', kriterler: k?.kriterler ?? [], hedef: k?.hedef ?? '',
       klasor_id: null, home_goster: false, degerlendirme_acik: false, degerlendirme: null, calisma_baslangic: null, calisma_bitis: null,
       sablon: false,
-      uzak: { iliski_id: il.id, rol: 'koc', karsi_id: il.danisan, karsi_ad: il.danisan_ad, disiplin: il.disiplin, durum: 'taslak', baslangic, izinler: varsayilanIzin(il.disiplin), surum: 0 },
+      uzak: { iliski_id: il.id, rol: 'koc', karsi_id: il.danisan, karsi_ad: il.danisan_ad, disiplin: il.disiplin, durum: 'taslak', baslangic, izinler, surum: 0 },
       guncellendi: simdi,
     });
     await db.program_adim.bulkAdd(adimlar.map((a) => ({ ...a, id: crypto.randomUUID(), program_id: id, guncellendi: simdi })));
@@ -462,7 +502,7 @@ export async function programAta(il: IliskiRow, kaynakId: string | null, ad: str
 }
 
 /** D4 — şablon olarak kaydet (kendi programından ya da danışana atanmış olandan). */
-export async function sablonKaydet(programId: string): Promise<string> {
+export async function sablonKaydet(programId: string, disiplin: string | null = null): Promise<string> {
   const p = await db.program.get(programId);
   if (!p) throw new Error('Bulunamadı');
   const adimlar = await db.program_adim.where('program_id').equals(programId).sortBy('sira');
@@ -471,7 +511,7 @@ export async function sablonKaydet(programId: string): Promise<string> {
   await db.transaction('rw', db.program, db.program_adim, async () => {
     await db.program.add({
       ...p, id, klasor_id: null, calisma_baslangic: null, calisma_bitis: null, degerlendirme: null, home_goster: false,
-      sablon: true, uzak: null, guncellendi: simdi,
+      sablon: true, sablon_disiplin: p.uzak?.disiplin ?? disiplin ?? p.sablon_disiplin ?? null, uzak: null, guncellendi: simdi,
     });
     await db.program_adim.bulkAdd(adimlar.map((a) => ({ ...a, id: crypto.randomUUID(), program_id: id, guncellendi: simdi })));
   });

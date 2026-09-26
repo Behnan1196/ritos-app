@@ -11,7 +11,7 @@ import { senkronla, useSenkronDurum } from '@/lib/senkron';
 import { pinDogrula, pinVar } from '@/lib/kilit';
 import { KilitAyarlari, PinGir } from './Kilit';
 import { PaketlerKap } from './Sinav';
-import { DanismanlikAyarlari, KocGelenDetay, kocGelenAdi } from './Danismanlik';
+import { DanismanlikAyarlari, DavetGelenDetay, KocGelenDetay, kocGelenAdi, type DavetPaketi } from './Danismanlik';
 import { sonYedek, yedegiYukle, yedekAl, yedekOku } from '@/lib/yedek';
 import { al, engelKaldir, engelle, engellenenler, gelenSil, gelenleriCek, gonder, kisiBul, type PaylasimPaketi } from '@/lib/paylasim';
 import { BlokGoster, Chips, Kap, Modal, OnayKutusu } from './ortak';
@@ -259,18 +259,21 @@ export function GelenlerTool({ compact, onBack }: { compact?: boolean; onBack: (
         {gelenler.map((g) => {
           const p = g.paket as PaylasimPaketi;
           const koc = g.kaynak === 'koc';
+          const davet = (g.paket as { tur?: string }).tur === 'davet';
           return (
             <button key={g.id} type="button" className={`rt-gelen${g.alindi ? ' alindi' : ''}`} onClick={() => setAcik(g)}>
-              <span className="ic">{koc ? '🤝' : p.tur === 'program' ? '🌱' : '🗂️'}</span>
+              <span className="ic">{koc || davet ? '🤝' : p.tur === 'program' ? '🌱' : '🗂️'}</span>
               <span className="tx">
-                <span className="t">{koc ? kocGelenAdi(g) : p.ad}</span>
+                <span className="t">{koc ? kocGelenAdi(g) : davet ? `Danışmanlık daveti · ${(g.paket as DavetPaketi).davet.koc_ad}` : p.ad}</span>
                 <span className="s">{g.gonderen_ad}{koc ? ' · koçun' : g.kaynak === 'sohbet' ? ' · sohbetten' : ''} · {zamanMetni(g.gelis)}{g.alindi ? ' · alındı' : ''}</span>
               </span>
             </button>
           );
         })}
       </Kap>
-      {acik && (acik.kaynak === 'koc' ? <KocGelenDetay g={acik} onKapat={() => setAcik(null)} /> : <GelenDetay g={acik} onKapat={() => setAcik(null)} />)}
+      {acik && (acik.kaynak === 'koc' ? <KocGelenDetay g={acik} onKapat={() => setAcik(null)} />
+        : (acik.paket as { tur?: string }).tur === 'davet' ? <DavetGelenDetay g={acik} onKapat={() => setAcik(null)} />
+        : <GelenDetay g={acik} onKapat={() => setAcik(null)} />)}
       {hesap && <HesapModal onKapat={() => setHesap(false)} />}
     </div>
   );

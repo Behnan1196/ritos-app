@@ -2,14 +2,16 @@
 
 // Danışmanlık arayüzü (D1–D10, P10). Motor: lib/danismanlik.ts.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import qrcode from 'qrcode-generator';
 import { db, type GelenRow, type IliskiRow, type KlasorRow, type ProgramRow } from '@/lib/db';
+import type { Izinler } from '@/lib/paket';
 import { useCanli } from '@/lib/canli';
 import { useOturum } from '@/lib/hesap';
 import { bugun, gunFarki, tarihEkle, tarihEtiket } from '@/lib/paket';
 import { adimEkle, aktifMi, ilerleme } from '@/lib/program';
 import {
-  DISIPLINLER, KOC_DENEME_GUN, davetBak, davetOlustur, davetSil, davetYanit, davetler, disiplinAdi, kendimeAl, kocDenemeKalan,
+  DISIPLINLER, KOC_DENEME_GUN, danisanIzinKaydet, danisanIzinleri, ePostaDaveti, davetBak, davetOlustur, davetSil, davetYanit, davetler, disiplinAdi, kendimeAl, kocDenemeKalan,
   kocKapat, kocOl, kocProgramiAl, kocProgramiReddet, programAta, programGonder, programiSil, sablonKaydet, sonlandir,
   useDanismanlik, type DavetSatir, type KocPaketi,
 } from '@/lib/danismanlik';
@@ -143,7 +145,23 @@ export function useDanismanlikOzeti(): { goster: boolean; ozet: string } {
   const d = useDanismanlik();
   const danisanlar = useDanisanlar().filter((x) => x.durum === 'aktif');
   if (!d.etkin || !d.profil?.koc) return { goster: false, ozet: '' };
-  return { goster: true, ozet: danisanlar.length ? `${danisanlar.length} aktif danışan` : 'Danışan davet et' };
+  const kalan = kocDenemeKalan(d.profil);
+  const uyari = kalan !== null && kalan <= 7 ? (kalan === 0 ? ' · deneme bitti' : ` · deneme ${kalan} gün`) : '';
+  return { goster: true, ozet: (danisanlar.length ? `${danisanlar.length} aktif danışan` : 'Danışan davet et') + uyari };
+}
+
+/** D1 — deneme bitişinden önce uygulama içi uyarı (son 7 gün). Ödeme adımı henüz yok. */
+export function KocDenemeUyarisi() {
+  const d = useDanismanlik();
+  const kalan = kocDenemeKalan(d.profil);
+  if (kalan === null || kalan > 7) return null;
+  return (
+    <p className="rt-uyari" style={{ marginBottom: 10 }}>
+      {kalan === 0
+        ? 'Koç deneme süren bitti. Ödeme adımı henüz hazır değil; araçlar şimdilik açık kalıyor.'
+        : `Koç deneme süren ${kalan} gün sonra bitiyor. İptal etmezsen ücretlendirme başlayacak (ödeme adımı henüz hazır değil). Koçluğu kapatmak için Ayarlar › Danışmanlık.`}
+    </p>
+  );
 }
 
 export function DanismanlikTool() {
@@ -166,6 +184,7 @@ export function DanismanlikTool() {
   );
   return (
     <div className="side-content" style={{ height: '100%', overflowY: 'auto' }}>
+      <KocDenemeUyarisi />
       <Kap baslik="Danışanlar" eylemler={<button type="button" className="rt-btn primary" onClick={() => setDavet(true)}>＋ Davet et</button>}>
         {danisanlar.length === 0 && <p className="rt-muted">Henüz danışanın yok. Davet bağlantısı oluşturup danışanına gönder; açınca kabul eder ve bağlanırsınız.</p>}
         {danisanlar.map((x) => <DanisanSatiri key={x.id} il={x} onAc={() => setSecili(x.id)} />)}
@@ -201,26 +220,52 @@ function DanisanSatiri({ il, onAc }: { il: IliskiRow; onAc: () => void }) {
 function DavetModal({ onKapat }: { onKapat: () => void }) {
   const d = useDanismanlik();
   const [disiplin, setDisiplin] = useState(d.profil?.disiplinler[0] ?? 'sinav');
+  const [yol, setYol] = useState<'baglanti' | 'eposta'>('baglanti');
+  const [eposta, setEposta] = useState('');
   const [sonuc, setSonuc] = useState<string | null>(null);
+  const [gonderildi, setGonderildi] = useState<string | null>(null);
   const [kopyalandi, setKopyalandi] = useState(false);
+  const [calisiyor, setCalisiyor] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
   const secenekler = DISIPLINLER.filter(([k]) => !d.profil?.disiplinler.length || d.profil.disiplinler.includes(k));
+  if (gonderildi) return (
+    <Modal baslik="Danışan davet et" onKapat={onKapat}>
+      <p className="rt-tamam">Davet {gonderildi} adlı kişinin Gelenler&apos;ine gönderildi. Kabul edince danışanların arasında görünür.</p>
+      <div className="rt-satir"><button type="button" className="rt-btn" onClick={onKapat}>Kapat</button></div>
+    </Modal>
+  );
   return (
     <Modal baslik="Danışan davet et" onKapat={onKapat}>
       {!sonuc ? (
         <>
           <p className="rt-metin">Hangi alanda çalışacaksınız?</p>
           <Chips secenekler={secenekler} deger={disiplin} onSec={setDisiplin} />
-          <p className="rt-muted" style={{ marginTop: 10 }}>Bağlantı tek kullanımlık, 7 gün geçerli. Danışanın açınca hesabına giriş yapar (yoksa ücretsiz oluşturur) ve kabul eder.</p>
+          <div style={{ marginTop: 12 }}><Chips<'baglanti' | 'eposta'> secenekler={[['baglanti', 'Bağlantı / QR'], ['eposta', 'E-postayla']]} deger={yol} onSec={setYol} /></div>
+          {yol === 'baglanti'
+            ? <p className="rt-muted" style={{ marginTop: 10 }}>Bağlantı tek kullanımlık, 7 gün geçerli. Danışanın açınca hesabına giriş yapar (yoksa ücretsiz oluşturur) ve kabul eder. Yüz yüzeysen QR kodu okutabilir.</p>
+            : (
+              <>
+                <p className="rt-muted" style={{ marginTop: 10 }}>Danışanın Ritos hesabı varsa davet Gelenler&apos;ine düşer.</p>
+                <input className="rt-inp" type="email" placeholder="Danışanın e-postası" value={eposta} onChange={(e) => setEposta(e.target.value)} />
+              </>
+            )}
           {hata && <p className="rt-hata">{hata}</p>}
           <div className="rt-satir" style={{ marginTop: 10 }}>
             <button type="button" className="rt-btn" onClick={onKapat}>Vazgeç</button>
-            <button type="button" className="rt-btn primary" onClick={async () => { try { setSonuc((await davetOlustur(disiplin)).baglanti); } catch (e) { setHata(e instanceof Error ? e.message : String(e)); } }}>Bağlantı oluştur</button>
+            <button type="button" className="rt-btn primary" disabled={calisiyor || (yol === 'eposta' && !eposta.includes('@'))} onClick={async () => {
+              setCalisiyor(true); setHata(null);
+              try {
+                if (yol === 'baglanti') setSonuc((await davetOlustur(disiplin)).baglanti);
+                else setGonderildi(await ePostaDaveti(eposta, disiplin));
+              } catch (e) { setHata(e instanceof Error ? e.message : String(e)); }
+              setCalisiyor(false);
+            }}>{yol === 'baglanti' ? 'Bağlantı oluştur' : 'Daveti gönder'}</button>
           </div>
         </>
       ) : (
         <>
-          <p className="rt-metin">Bu bağlantıyı danışanına gönder:</p>
+          <QrKod metin={sonuc} />
+          <p className="rt-metin">QR kodu okut ya da bağlantıyı gönder:</p>
           <input className="rt-inp" readOnly value={sonuc} onFocus={(e) => e.target.select()} />
           <div className="rt-satir" style={{ marginTop: 10 }}>
             <button type="button" className="rt-btn primary" onClick={async () => { try { await navigator.clipboard.writeText(sonuc); setKopyalandi(true); } catch { /* yoksay */ } }}>{kopyalandi ? 'Kopyalandı ✓' : 'Kopyala'}</button>
@@ -233,6 +278,16 @@ function DavetModal({ onKapat }: { onKapat: () => void }) {
       )}
     </Modal>
   );
+}
+
+function QrKod({ metin }: { metin: string }) {
+  const svg = useMemo(() => {
+    const q = qrcode(0, 'M');
+    q.addData(metin);
+    q.make();
+    return q.createSvgTag({ cellSize: 5, margin: 3, scalable: true });
+  }, [metin]);
+  return <div className="rt-qr" aria-label="Davet QR kodu" dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
 function Davetler() {
@@ -260,10 +315,17 @@ function Sablonlar({ onProgram }: { onProgram: (id: string) => void }) {
   return (
     <Kap baslik="Şablonlar">
       {sablonlar.length === 0 && <p className="rt-muted">Sık kullandığın programı bir kez hazırla: kendi programında ya da danışana atadığında &quot;Şablon olarak kaydet&quot;.</p>}
-      {sablonlar.sort((a, b) => a.ad.localeCompare(b.ad, 'tr')).map((p) => (
-        <button key={p.id} type="button" className="rt-prog" onClick={() => onProgram(p.id)}>
-          <span className="t">{p.ad}</span><span className="m">şablon</span>
-        </button>
+      {Array.from(new Set(sablonlar.map((p) => p.sablon_disiplin ?? ''))).sort().map((grup) => (
+        <div key={grup || 'genel'} className="rt-klasor">
+          <div className="rt-unite">📁 {grup ? disiplinAdi(grup) : 'Disiplinsiz'}</div>
+          <div className="rt-klasor-ic">
+            {sablonlar.filter((p) => (p.sablon_disiplin ?? '') === grup).sort((a, b) => a.ad.localeCompare(b.ad, 'tr')).map((p) => (
+              <button key={p.id} type="button" className="rt-prog" onClick={() => onProgram(p.id)}>
+                <span className="t">{p.ad}</span><span className="m">şablon</span>
+              </button>
+            ))}
+          </div>
+        </div>
       ))}
     </Kap>
   );
@@ -295,10 +357,42 @@ export function DanisanDosyasi({ il, onProgram }: { il: IliskiRow; onProgram: (i
           ))}
         </Kap>
       )}
+      {aktif && sekme === 'program' && <DanisanIzinleri il={il} />}
       {aktif && <button type="button" className="rt-linkbtn" style={{ marginTop: 8 }} onClick={() => setBitir(true)}>Danışmanlığı sonlandır</button>}
       {ata && <ProgramAtaModal il={il} onKapat={() => setAta(false)} onOlustu={(id) => { setAta(false); onProgram(id); }} />}
       {bitir && <SonlandirModal il={il} onKapat={() => setBitir(false)} />}
     </div>
+  );
+}
+
+/** D9 — bu danışanın kartlarında neye izin var (yeni atamaların varsayılanı). */
+function DanisanIzinleri({ il }: { il: IliskiRow }) {
+  const kayitli = useCanli(() => danisanIzinleri(il), [il.id], null as Izinler | null);
+  const [iz, setIz] = useState<Izinler | null>(null);
+  const [mesaj, setMesaj] = useState<string | null>(null);
+  useEffect(() => { if (kayitli && !iz) setIz(kayitli); }, [kayitli, iz]);
+  if (!iz || !kayitli) return null;
+  const degisti = JSON.stringify(iz) !== JSON.stringify(kayitli);
+  return (
+    <Kap baslik={<span className="rt-muted">Kart izinleri</span>}>
+      <label className="rt-onay"><input type="checkbox" checked={iz.gun_degistir} onChange={(e) => setIz({ ...iz, gun_degistir: e.target.checked })} /><span>Kartların gününü değiştirebilir</span></label>
+      <label className="rt-alan" style={{ marginTop: 8 }}>Girdiği değeri düzeltebilir
+        <select value={iz.duzeltme_gun === null ? 'her' : String(iz.duzeltme_gun)} onChange={(e) => setIz({ ...iz, duzeltme_gun: e.target.value === 'her' ? null : Number(e.target.value) })}>
+          <option value="her">Her zaman</option>
+          <option value="0">Yalnız aynı gün</option>
+          <option value="1">Ertesi güne kadar</option>
+          <option value="3">3 gün içinde</option>
+        </select>
+      </label>
+      <p className="rt-muted">Kartı silmek ve içeriğini değiştirmek danışana kapalıdır; gün içinde sıralayabilir.</p>
+      {mesaj && <p className="rt-tamam">{mesaj}</p>}
+      {degisti && (
+        <div className="rt-satir">
+          <button type="button" className="rt-btn" onClick={async () => { await danisanIzinKaydet(il, iz, false); setMesaj('Yeni atamalarda kullanılacak.'); }}>Yeni atamalar için kaydet</button>
+          <button type="button" className="rt-btn primary" onClick={async () => { const n = await danisanIzinKaydet(il, iz, true); setMesaj(`Kaydedildi; ${n} programa bugünden itibaren uygulandı.`); }}>Mevcut programlara da uygula</button>
+        </div>
+      )}
+    </Kap>
   );
 }
 
@@ -363,6 +457,12 @@ export function ProgramDanismanlik({ p, adimVar }: { p: ProgramRow; adimVar: boo
   if (p.sablon) return (
     <div className="rt-uzak-bilgi">
       <span><b>Şablon</b> — başlatılmaz, danışana atanır.</span>
+      <label className="rt-alan">Disiplin (şablon klasörü)
+        <select value={p.sablon_disiplin ?? ''} onChange={(e) => db.program.update(p.id, { sablon_disiplin: e.target.value || null, guncellendi: Date.now() })}>
+          <option value="">Disiplinsiz</option>
+          {DISIPLINLER.map(([k, ad]) => <option key={k} value={k}>{ad}</option>)}
+        </select>
+      </label>
       {d.profil?.koc && <div className="rt-satir"><button type="button" className="rt-btn primary" onClick={() => setAta(true)}>Danışana ata</button></div>}
       {ata && <ProgramAtaModal sablonId={p.id} onKapat={() => setAta(false)} onOlustu={() => { setAta(false); setMesaj('Atandı — danışanın dosyasından düzenleyip gönder.'); }} />}
       {mesaj && <p className="rt-tamam">{mesaj}</p>}
@@ -371,7 +471,7 @@ export function ProgramDanismanlik({ p, adimVar }: { p: ProgramRow; adimVar: boo
 
   if (!u) return d.profil?.koc ? (
     <div className="rt-satir" style={{ marginBottom: 8 }}>
-      <button type="button" className="rt-btn" onClick={async () => { await sablonKaydet(p.id); setMesaj('Şablonlara kaydedildi.'); }}>Şablon olarak kaydet</button>
+      <button type="button" className="rt-btn" onClick={async () => { await sablonKaydet(p.id, d.profil?.disiplinler[0] ?? null); setMesaj('Şablonlara kaydedildi.'); }}>Şablon olarak kaydet</button>
       {mesaj && <span className="rt-tamam">{mesaj}</span>}
     </div>
   ) : null;
@@ -380,7 +480,7 @@ export function ProgramDanismanlik({ p, adimVar }: { p: ProgramRow; adimVar: boo
     <div className="rt-uzak-bilgi">
       <span>🤝 <b>{u.karsi_ad}</b> · {disiplinAdi(u.disiplin)} — {u.durum === 'ayrildi'
         ? 'danışmanlık sonlandı. Geçmiş kayıtların duruyor.'
-        : `bu program koçunun. Bu programdaki işaretlerin ve değerlerin yalnız ${u.karsi_ad}'e gider; başka hiçbir verin gitmez.`}</span>
+        : 'bu program koçunun. Bu programdaki işaretlerin ve değerlerin yalnız koçuna gider; başka hiçbir verin gitmez.'}</span>
       {u.durum === 'ayrildi' && (sil
         ? <OnayKutusu metin="Program ve görev planı silinir; Ajanda'daki geçmiş işaretlerin kalır." evet="Sil" onVazgec={() => setSil(false)} onEvet={() => programiSil(p.id)} />
         : (
@@ -404,7 +504,7 @@ export function ProgramDanismanlik({ p, adimVar }: { p: ProgramRow; adimVar: boo
           </div>
         </>
       )}
-      {(u.durum === 'gonderildi' || u.durum === 'kabul') && <span className="rt-muted">Değişikliklerin {u.karsi_ad}&apos;e kendiliğinden gider; geçmiş günler değişmez.</span>}
+      {(u.durum === 'gonderildi' || u.durum === 'kabul') && <span className="rt-muted">Değişikliklerin danışana kendiliğinden gider; geçmiş günler değişmez.</span>}
       {u.durum !== 'ayrildi' && u.durum !== 'ret' && (
         <label className="rt-onay">
           <input type="checkbox" checked={u.izinler.gun_degistir} onChange={async (e) => {
@@ -606,7 +706,7 @@ export function KocGelenDetay({ g, onKapat }: { g: GelenRow; onKapat: () => void
       <ul className="rt-maddeler">{s.adimlar.slice().sort((a, b) => a.sira - b.sira).map((a) => <li key={a.id}>{a.ad} <span className="rt-muted">· {a.basla_gun ? `${a.basla_gun + 1}. günden` : 'ilk günden'} · {a.sure_gun ? `${a.sure_gun} gün` : 'süregelen'}</span></li>)}</ul>
       {mesaj ? <p className="rt-tamam">{mesaj}</p> : g.alindi ? <p className="rt-muted">Alındı.</p> : !acik ? <p className="rt-muted">Bu danışmanlık sonlanmış.</p> : (
         <>
-          <p className="rt-muted">Kartlar Ajanda&apos;na koçunun kartı olarak düşer; işaretlerin ve değerlerin yalnız {pk.koc_ad}&apos;e gider.</p>
+          <p className="rt-muted">Kartlar Ajanda&apos;na koçunun kartı olarak düşer; işaretlerin ve değerlerin yalnız koçuna gider.</p>
           {alanlar.length > 0 && (
             <label className="rt-alan">Hangi yaşam alanına
               <select value={yer} onChange={(e) => setYer(e.target.value)}>
@@ -630,3 +730,37 @@ export function KocGelenDetay({ g, onKapat }: { g: GelenRow; onKapat: () => void
 }
 
 export const kocGelenAdi = (g: GelenRow) => (g.paket as KocPaketi).program.ad;
+
+// ———————————————— Gelenler: e-postayla gelen davet (D2) ————————————————
+
+export interface DavetPaketi { tur: 'davet'; ad: string; davet: { kod: string; koc_ad: string; disiplin: string } }
+
+export function DavetGelenDetay({ g, onKapat }: { g: GelenRow; onKapat: () => void }) {
+  const d = useDanismanlik();
+  const p = g.paket as DavetPaketi;
+  const [sonuc, setSonuc] = useState<string | null>(null);
+  const [hata, setHata] = useState<string | null>(null);
+  const yanit = async (kabul: boolean) => {
+    try {
+      await davetYanit(p.davet.kod, kabul);
+      await db.gelen.update(g.id, { alindi: Date.now() });
+      if (kabul) setSonuc(`${p.davet.koc_ad} ile bağlandınız. Gönderdiği programlar Gelenler'ine düşecek.`); else onKapat();
+    } catch (e) { setHata(e instanceof Error ? e.message : String(e)); }
+  };
+  return (
+    <Modal baslik="Danışmanlık daveti" onKapat={onKapat}>
+      <p className="rt-metin"><b>{p.davet.koc_ad}</b> ({disiplinAdi(p.davet.disiplin)}) seni danışanı olarak eklemek istiyor.</p>
+      <ul className="rt-maddeler">
+        <li>Koçuna yalnız onun programlarındaki işaretlerin ve değerlerin gider.</li>
+        <li>İstediğin zaman Ayarlar › Danışmanlık&apos;tan sonlandırabilirsin.</li>
+      </ul>
+      {sonuc ? <p className="rt-tamam">{sonuc}</p> : g.alindi ? <p className="rt-muted">Yanıtlandı.</p> : !d.etkin ? <p className="rt-muted">Yanıtlamak için giriş yap.</p> : (
+        <div className="rt-satir" style={{ marginTop: 10 }}>
+          <button type="button" className="rt-btn" onClick={() => yanit(false)}>Reddet</button>
+          <button type="button" className="rt-btn primary" onClick={() => yanit(true)}>Kabul et</button>
+        </div>
+      )}
+      {hata && <p className="rt-hata">{hata}</p>}
+    </Modal>
+  );
+}

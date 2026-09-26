@@ -382,3 +382,5 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-uyum.geride{background:#f4c9bf;color:#8a2e1c;}
 .rt-gelen .ic{flex:0 0 auto;}
 .rt-rozet.guncel{background:#dce8f7;color:#284a7a;margin-left:6px;}
+.rt-qr{display:flex;justify-content:center;margin:0 auto 10px;width:220px;max-width:70%;background:#fff;border-radius:12px;padding:6px;}
+.rt-qr svg{width:100%;height:auto;display:block;}

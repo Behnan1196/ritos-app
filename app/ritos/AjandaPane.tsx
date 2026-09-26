@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ayOzeti, degerKaydet, gununKartlari, kartKaldir, kartTasi, siraDegistir, teslimAl, yapildiAyarla, type GunSatiri } from '@/lib/ajanda';
 import { useCanli } from '@/lib/canli';
 import {
-  GUN_KISA, PAKET_SURUM, TAM_IZIN, bugun, degerBloklari, tarihEkle, tarihEtiket, tarihParse, tarihStr,
+  GUN_KISA, PAKET_SURUM, TAM_IZIN, bugun, degerBloklari, gunFarki, tarihEkle, tarihEtiket, tarihParse, tarihStr,
   type Blok, type KartPaketi, type TemelTip,
 } from '@/lib/paket';
 import { BlokGoster, Chips, Kap, Modal, OnayKutusu, degerMetni } from './ortak';
@@ -114,6 +114,8 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
   const uzak = kart.geri_bildirim === 'uzak';
   const meta = [kart.saatler.join(' · '), bagli && kart.kaynak_etiket ? `${uzak ? '🤝' : '🌱'} ${kart.kaynak_etiket}` : ''].filter(Boolean).join(' · ');
   const yeniGuncel = !!kart.isaret && Date.now() - kart.isaret < 3 * 86400000;
+  // A9 — değer düzeltme süresi (koçun izni): süre geçtiyse yapılmış kart değiştirilemez.
+  const kilitli = !!kayit?.yapildi && kart.izinler.duzeltme_gun !== null && gunFarki(tarih, bugun()) > kart.izinler.duzeltme_gun;
 
   return (
     <div className={`rt-kart${bagli ? ' bagli' : ''}${yapildi ? ' yapildi' : ''}`}>
@@ -121,11 +123,11 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
         {kart.tip === 'oku' ? (
           <span className="rt-tipik" title="Oku">📖</span>
         ) : kart.tip === 'uygula' ? (
-          <button type="button" className={`rt-chk${yapildi ? ' on' : ''}`} onClick={() => setUygulaAcik(true)} aria-label="Başlat">{yapildi ? '✓' : '▶'}</button>
+          <button type="button" className={`rt-chk${yapildi ? ' on' : ''}`} disabled={kilitli} title={kilitli ? 'Düzeltme süresi geçti' : undefined} onClick={() => setUygulaAcik(true)} aria-label="Başlat">{yapildi ? '✓' : '▶'}</button>
         ) : kart.tip === 'kaydet' ? (
-          <button type="button" className={`rt-chk${yapildi ? ' on' : ''}`} onClick={() => setDegerAcik((v) => !v)} aria-label="Değer gir">{yapildi ? '✓' : '✎'}</button>
+          <button type="button" className={`rt-chk${yapildi ? ' on' : ''}`} disabled={kilitli} title={kilitli ? 'Düzeltme süresi geçti' : undefined} onClick={() => setDegerAcik((v) => !v)} aria-label="Değer gir">{yapildi ? '✓' : '✎'}</button>
         ) : (
-          <button type="button" className={`rt-chk${yapildi ? ' on' : ''}`} onClick={() => yapildiAyarla(kart.id, tarih, !yapildi)} aria-label="Yapıldı">{yapildi ? '✓' : ''}</button>
+          <button type="button" className={`rt-chk${yapildi ? ' on' : ''}`} disabled={kilitli} title={kilitli ? 'Düzeltme süresi geçti' : undefined} onClick={() => yapildiAyarla(kart.id, tarih, !yapildi)} aria-label="Yapıldı">{yapildi ? '✓' : ''}</button>
         )}
         <button type="button" className="rt-kart-ad" onClick={kart.izinler.ac ? onAc : undefined}>
           <span className="t">{kart.ad}{yeniGuncel && <span className="rt-rozet guncel">güncellendi</span>}</span>
@@ -254,7 +256,7 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
     <Modal baslik={kart.ad} onKapat={onKapat}>
       <BlokGoster bloklar={kart.bloklar} />
       {bagli && (kart.geri_bildirim === 'uzak'
-        ? <p className="rt-muted">🤝 Bu kart koçun <b>{kart.kaynak_etiket}</b>&apos;in programından. İşaretin ve girdiğin değerler yalnız ona gider.</p>
+        ? <p className="rt-muted">🤝 Koçunun kartı · <b>{kart.kaynak_etiket}</b>. İşaretin ve girdiğin değerler yalnız koçuna gider.</p>
         : <p className="rt-muted">Bu kart <b>{kart.kaynak_etiket}</b> programından geliyor; içeriği ve günü programdan yönetilir.</p>)}
 
       {tekSil && <OnayKutusu metin="Kart silinsin mi?" evet="Sil" onVazgec={() => setTekSil(false)} onEvet={() => kartKaldir(kart.id, tarih, 'tamamen').then(onKapat)} />}
