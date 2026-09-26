@@ -1,40 +1,107 @@
 'use client';
 
 import React, { useState } from 'react';
-import { db, type ProgramAdimRow, type ProgramRow } from '@/lib/db';
+import { db, type AlanDegerlendirmeRow, type KlasorRow, type ProgramAdimRow, type ProgramRow } from '@/lib/db';
 import { useCanli } from '@/lib/canli';
 import { GUN_KISA, TIP_ETIKET, bugun, tarihEkle, type Blok, type TemelTip } from '@/lib/paket';
 import { adimEkle, adimGuncelle, adimSil, aktifMi, baslat, durdur, ilerleme, programGuncelle, programOlustur, type ProgramIlerleme } from '@/lib/program';
+import { DEGER_ETIKET, EN_FAZLA_SEVIYE, HAZIR_SETLER, alanEkle, alanMi, degerlendir, hazirSetKur, klasorEkle, klasorGuncelle, klasorSil, programTasi, seviye, sonDegerlendirmeler, yol } from '@/lib/alan';
 import { Chips, Kap, Modal, degerMetni } from './ortak';
 import { PaylasDugmesi } from './Paylasim';
 import { programPaketi } from '@/lib/paylasim';
 
-// K1–K9 (ilk dilim): program listesi, oluşturma, çekirdek, değerlendirme, görev planı,
-// başlatma, ilerleme (geri bildirimden), durdurma.
+// Kişisel Gelişim: yaşam alanları → (klasörler) → Bireysel Programlar.
+// Alanlar kullanıcının; kriterler ve öz değerlendirme alanda (26 eylül).
 export default function KisiselGelisim() {
   const programlar = useCanli(() => db.program.toArray(), [], [] as ProgramRow[]);
+  const klasorler = useCanli(() => db.klasor.toArray(), [], [] as KlasorRow[]);
+  const degerler = useCanli(() => sonDegerlendirmeler(), [], {} as Record<string, AlanDegerlendirmeRow>);
   const [secili, setSecili] = useState<string | null>(null);
-  const [yeniAcik, setYeniAcik] = useState(false);
+  const [modal, setModal] = useState<null | { tur: 'program'; yer: string | null } | { tur: 'alan' } | { tur: 'klasor'; k: KlasorRow } | { tur: 'yeniKlasor'; ust: KlasorRow }>(null);
 
   const p = programlar.find((x) => x.id === secili);
-  if (p) return <ProgramDetay p={p} onGeri={() => setSecili(null)} />;
+  if (p) return <ProgramDetay p={p} klasorler={klasorler} onGeri={() => setSecili(null)} />;
 
-  const sirali = [...programlar].sort((a, b) => Number(aktifMi(b)) - Number(aktifMi(a)) || a.ad.localeCompare(b.ad, 'tr'));
+  const alanlar = klasorler.filter(alanMi).sort((a, b) => (a.sira ?? 0) - (b.sira ?? 0) || a.ad.localeCompare(b.ad, 'tr'));
+  const alansiz = programlar.filter((x) => !x.klasor_id || !klasorler.some((k) => k.id === x.klasor_id));
+  const ag: Agac = { programlar, klasorler, onProgram: setSecili, onKlasor: (k) => setModal({ tur: 'klasor', k }) };
+  const programlarIn = (id: string) => icindekiProgramlar(ag, id);
+  const altKlasorler = (id: string) => icindekiKlasorler(ag, id);
+
   return (
     <div>
-      <Kap baslik="🌱 Kişisel Gelişim" eylemler={<button type="button" className="rt-ikon" onClick={() => setYeniAcik(true)} aria-label="Yeni program">＋</button>}>
-        {sirali.length === 0 && <p className="rt-muted">Henüz program yok. ＋ ile ilk Bireysel Program&apos;ını oluştur.</p>}
-        {sirali.map((x) => (
-          <button key={x.id} type="button" className="rt-prog" onClick={() => setSecili(x.id)}>
-            <span className="t">{x.ad}</span>
-            <span className="m">
-              {aktifMi(x) ? <span className="rt-aktif">aktif</span> : 'aktif değil'}
-              {x.degerlendirme_acik && x.degerlendirme !== null && <> · <Pil deger={x.degerlendirme} /></>}
-            </span>
-          </button>
-        ))}
+      <Kap baslik="🌱 Kişisel Gelişim" eylemler={<>
+        <button type="button" className="rt-btn" onClick={() => setModal({ tur: 'alan' })}>＋ Alan</button>
+        <button type="button" className="rt-ikon" onClick={() => setModal({ tur: 'program', yer: null })} aria-label="Yeni program">＋</button>
+      </>}>
+        {alanlar.length === 0 ? (
+          <div className="rt-bos-alan">
+            <p className="rt-metin">Programlarını <b>yaşam alanlarına</b> göre düzenleyebilirsin. Her alanı kendi kriterlerinle değerlendirirsin; alanların birlikte görünümü dengeni gösterir.</p>
+            <p className="rt-muted">Hazır bir setle başla ya da kendi alanlarını ekle:</p>
+            <div className="rt-satir">
+              {HAZIR_SETLER.map((s) => <button key={s.ad} type="button" className="rt-btn" title={s.aciklama} onClick={() => hazirSetKur(s)}>{s.ad}</button>)}
+              <button type="button" className="rt-btn" onClick={() => setModal({ tur: 'alan' })}>Kendi alanım</button>
+            </div>
+          </div>
+        ) : <p className="rt-muted">Bir alana dokunup kendini değerlendirebilir, klasör ekleyebilirsin.</p>}
       </Kap>
-      {yeniAcik && <YeniProgram onKapat={() => setYeniAcik(false)} onOlustu={(id) => { setYeniAcik(false); setSecili(id); }} />}
+
+      {alanlar.map((a) => (
+        <Kap key={a.id}
+          baslik={<button type="button" className="rt-alan-bas" onClick={() => setModal({ tur: 'klasor', k: a })}>
+            {a.ad} {degerler[a.id] ? <Pil deger={degerler[a.id].deger} /> : <span className="rt-muted">· değerlendirilmedi</span>}
+          </button>}
+          eylemler={<button type="button" className="rt-ikon" onClick={() => setModal({ tur: 'program', yer: a.id })} aria-label={`${a.ad} alanına program ekle`}>＋</button>}>
+          {altKlasorler(a.id).map((k) => <KlasorDugumu key={k.id} k={k} ag={ag} />)}
+          {programlarIn(a.id).map((x) => <ProgramSatiri key={x.id} x={x} ag={ag} />)}
+          {!altKlasorler(a.id).length && !programlarIn(a.id).length && <p className="rt-muted">Henüz program yok.</p>}
+        </Kap>
+      ))}
+
+      {alansiz.length > 0 && (
+        <Kap baslik={<span className="rt-muted">Alansız</span>}>
+          {alansiz.map((x) => <ProgramSatiri key={x.id} x={x} ag={ag} />)}
+        </Kap>
+      )}
+
+      {modal?.tur === 'program' && <YeniProgram yer={modal.yer} klasorler={klasorler} onKapat={() => setModal(null)} onOlustu={(id) => { setModal(null); setSecili(id); }} />}
+      {modal?.tur === 'alan' && <AlanFormu onKapat={() => setModal(null)} />}
+      {modal?.tur === 'klasor' && <KlasorDetay k={modal.k} klasorler={klasorler} deger={degerler[modal.k.id]} onKapat={() => setModal(null)} onAltKlasor={() => setModal({ tur: 'yeniKlasor', ust: modal.k })} />}
+      {modal?.tur === 'yeniKlasor' && <KlasorFormu ust={modal.ust} onKapat={() => setModal(null)} />}
+    </div>
+  );
+}
+
+interface Agac { programlar: ProgramRow[]; klasorler: KlasorRow[]; onProgram: (id: string) => void; onKlasor: (k: KlasorRow) => void }
+const icindekiProgramlar = (ag: Agac, id: string) => ag.programlar.filter((x) => x.klasor_id === id).sort((a, b) => Number(aktifMi(b)) - Number(aktifMi(a)) || a.ad.localeCompare(b.ad, 'tr'));
+const icindekiKlasorler = (ag: Agac, id: string) => ag.klasorler.filter((k) => k.ust_id === id).sort((a, b) => (a.sira ?? 0) - (b.sira ?? 0));
+
+function ProgramSatiri({ x, ag }: { x: ProgramRow; ag: Agac }) {
+  return (
+    <button type="button" className="rt-prog" onClick={() => ag.onProgram(x.id)}>
+      <span className="t">{x.ad}</span>
+      <span className="m">{aktifMi(x) ? <span className="rt-aktif">aktif</span> : 'aktif değil'}</span>
+    </button>
+  );
+}
+
+function KlasorDugumu({ k, ag }: { k: KlasorRow; ag: Agac }) {
+  const [acik, setAcik] = useState(true);
+  const altlar = icindekiKlasorler(ag, k.id);
+  const progs = icindekiProgramlar(ag, k.id);
+  return (
+    <div className="rt-klasor">
+      <div className="rt-klasor-bas">
+        <button type="button" className="rt-klasor-ad" onClick={() => setAcik(!acik)}>{acik ? '▾' : '▸'} 📁 {k.ad} <span className="rt-muted">{altlar.length + progs.length}</span></button>
+        <button type="button" className="rt-ikon" aria-label="Klasör seçenekleri" onClick={() => ag.onKlasor(k)}>⋯</button>
+      </div>
+      {acik && (
+        <div className="rt-klasor-ic">
+          {altlar.map((a) => <KlasorDugumu key={a.id} k={a} ag={ag} />)}
+          {progs.map((x) => <ProgramSatiri key={x.id} x={x} ag={ag} />)}
+          {!altlar.length && !progs.length && <p className="rt-muted">Boş klasör.</p>}
+        </div>
+      )}
     </div>
   );
 }
@@ -43,19 +110,112 @@ function Pil({ deger }: { deger: number }) {
   return <span className="rt-pil" aria-label={`Değerlendirme ${deger}/4`}>{[1, 2, 3, 4].map((i) => <i key={i} className={i <= deger ? 'on' : ''} />)}</span>;
 }
 
-function YeniProgram({ onKapat, onOlustu }: { onKapat: () => void; onOlustu: (id: string) => void }) {
+/** Programın yeri: alanlar ve klasörler, tam yoluyla. */
+function YerSecici({ deger, klasorler, onSec }: { deger: string | null; klasorler: KlasorRow[]; onSec: (id: string | null) => void }) {
+  const secenekler = klasorler.map((k) => ({ id: k.id, ad: yol(k.id, klasorler) })).sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
+  return (
+    <label className="rt-alan">
+      <span>Yeri</span>
+      <select value={deger ?? ''} onChange={(e) => onSec(e.target.value || null)}>
+        <option value="">Alansız</option>
+        {secenekler.map((s) => <option key={s.id} value={s.id}>{s.ad}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function YeniProgram({ yer, klasorler, onKapat, onOlustu }: { yer: string | null; klasorler: KlasorRow[]; onKapat: () => void; onOlustu: (id: string) => void }) {
   const [ad, setAd] = useState('');
   const [amac, setAmac] = useState('');
+  const [klasor, setKlasor] = useState<string | null>(yer);
   return (
     <Modal baslik="Yeni Bireysel Program" onKapat={onKapat}>
       <input className="rt-inp" placeholder="Ad (örn. Sabah Rutinim)" value={ad} onChange={(e) => setAd(e.target.value)} autoFocus />
       <textarea className="rt-inp" placeholder="Amaç (isteğe bağlı)" rows={3} value={amac} onChange={(e) => setAmac(e.target.value)} />
-      <button type="button" className="rt-btn primary" disabled={!ad.trim()} onClick={async () => onOlustu(await programOlustur(ad.trim(), amac.trim()))}>Oluştur</button>
+      {klasorler.length > 0 && <YerSecici deger={klasor} klasorler={klasorler} onSec={setKlasor} />}
+      <button type="button" className="rt-btn primary" disabled={!ad.trim()} onClick={async () => {
+        const id = await programOlustur(ad.trim(), amac.trim());
+        if (klasor) await programTasi(id, klasor);
+        onOlustu(id);
+      }}>Oluştur</button>
     </Modal>
   );
 }
 
-function ProgramDetay({ p, onGeri }: { p: ProgramRow; onGeri: () => void }) {
+function AlanFormu({ onKapat }: { onKapat: () => void }) {
+  const [ad, setAd] = useState('');
+  const [kriterler, setKriterler] = useState('');
+  return (
+    <Modal baslik="Yaşam alanı ekle" onKapat={onKapat}>
+      <input className="rt-inp" placeholder="Ad (örn. İlişkiler, Beden, Anlam)" value={ad} onChange={(e) => setAd(e.target.value)} autoFocus />
+      <textarea className="rt-inp" rows={3} placeholder="Kendini neye göre değerlendireceksin? (her satır bir kriter, isteğe bağlı)" value={kriterler} onChange={(e) => setKriterler(e.target.value)} />
+      <button type="button" className="rt-btn primary" disabled={!ad.trim()} onClick={async () => {
+        await alanEkle(ad.trim(), kriterler.split('\n').map((s) => s.trim()).filter(Boolean));
+        onKapat();
+      }}>Ekle</button>
+    </Modal>
+  );
+}
+
+function KlasorFormu({ ust, onKapat }: { ust: KlasorRow; onKapat: () => void }) {
+  const [ad, setAd] = useState('');
+  const [hata, setHata] = useState<string | null>(null);
+  return (
+    <Modal baslik={`${ust.ad} içine klasör`} onKapat={onKapat}>
+      <input className="rt-inp" placeholder="Klasör adı (örn. Akdeniz tipi beslenme)" value={ad} onChange={(e) => setAd(e.target.value)} autoFocus />
+      {hata && <p className="rt-hata">{hata}</p>}
+      <button type="button" className="rt-btn primary" disabled={!ad.trim()} onClick={async () => {
+        try { await klasorEkle(ad.trim(), ust.id); onKapat(); } catch (e) { setHata((e as Error).message); }
+      }}>Ekle</button>
+    </Modal>
+  );
+}
+
+/** Alan ya da klasör detayı: ad, (alansa) kriterler ve öz değerlendirme, alt klasör, silme. */
+function KlasorDetay({ k, klasorler, deger, onKapat, onAltKlasor }: { k: KlasorRow; klasorler: KlasorRow[]; deger?: AlanDegerlendirmeRow; onKapat: () => void; onAltKlasor: () => void }) {
+  const alan = alanMi(k);
+  const [ad, setAd] = useState(k.ad);
+  const [kriterler, setKriterler] = useState((k.kriterler ?? []).join('\n'));
+  const altEklenebilir = seviye(k, klasorler) < EN_FAZLA_SEVIYE;
+  const kaydet = async () => {
+    const patch: Partial<KlasorRow> = {};
+    if (ad.trim() && ad.trim() !== k.ad) patch.ad = ad.trim();
+    if (alan) {
+      const yeni = kriterler.split('\n').map((s) => s.trim()).filter(Boolean);
+      if (yeni.join('\n') !== (k.kriterler ?? []).join('\n')) patch.kriterler = yeni;
+    }
+    if (Object.keys(patch).length) await klasorGuncelle(k.id, patch);
+  };
+  return (
+    <Modal baslik={alan ? 'Yaşam alanı' : 'Klasör'} onKapat={async () => { await kaydet(); onKapat(); }}>
+      <input className="rt-inp" value={ad} onChange={(e) => setAd(e.target.value)} onBlur={kaydet} />
+      {alan && (
+        <>
+          <label className="rt-alan"><span>Kriterler (her satır bir kriter)</span>
+            <textarea className="rt-inp" rows={3} value={kriterler} onChange={(e) => setKriterler(e.target.value)} onBlur={kaydet} />
+          </label>
+          <span className="rt-muted">Kriterlere bakarak bu alanda kendini bugün nasıl görüyorsun?</span>
+          <div className="rt-chips">
+            {DEGER_ETIKET.map((e, v) => (
+              <button key={v} type="button" className={`rt-chip${deger?.deger === v ? ' on' : ''}`} onClick={() => degerlendir(k.id, v)}>{e}</button>
+            ))}
+          </div>
+          {deger && <span className="rt-muted">Son değerlendirme: {new Date(deger.zaman).toLocaleDateString('tr-TR')}</span>}
+        </>
+      )}
+      <div className="rt-satir">
+        {altEklenebilir && <button type="button" className="rt-btn" onClick={async () => { await kaydet(); onAltKlasor(); }}>＋ Klasör</button>}
+        <button type="button" className="rt-btn tehlike" onClick={async () => {
+          const soru = alan ? `"${k.ad}" alanı silinsin mi? İçindeki programlar Alansız'a taşınır, silinmez.` : `"${k.ad}" klasörü silinsin mi? İçindekiler bir üste taşınır.`;
+          if (confirm(soru)) { await klasorSil(k.id); onKapat(); }
+        }}>Sil</button>
+      </div>
+    </Modal>
+  );
+}
+
+function ProgramDetay({ p, klasorler, onGeri }: { p: ProgramRow; klasorler: KlasorRow[]; onGeri: () => void }) {
+
   const il = useCanli(() => ilerleme(p.id), [p.id], null as ProgramIlerleme | null);
   const [adimAcik, setAdimAcik] = useState(false);
   const [duzenle, setDuzenle] = useState<ProgramAdimRow | null>(null);
@@ -83,14 +243,7 @@ function ProgramDetay({ p, onGeri }: { p: ProgramRow; onGeri: () => void }) {
         <Alan etiket="Kriterler (her satır bir kriter)" deger={p.kriterler.join('\n')} onKaydet={(v) => programGuncelle(p.id, { kriterler: v.split('\n').map((s) => s.trim()).filter(Boolean) })} />
         <Alan etiket="Hedef (isteğe bağlı)" deger={p.hedef} onKaydet={(v) => programGuncelle(p.id, { hedef: v })} />
 
-        <label className="rt-tog"><input type="checkbox" checked={p.degerlendirme_acik} onChange={(e) => programGuncelle(p.id, { degerlendirme_acik: e.target.checked })} /> Kendini değerlendir</label>
-        {p.degerlendirme_acik && (
-          <div className="rt-chips">
-            {[0, 1, 2, 3, 4].map((v) => (
-              <button key={v} type="button" className={`rt-chip${p.degerlendirme === v ? ' on' : ''}`} onClick={() => programGuncelle(p.id, { degerlendirme: v })}>{['Berbat', 'Zayıf', 'Orta', 'İyi', 'Çok iyi'][v]}</button>
-            ))}
-          </div>
-        )}
+        {klasorler.length > 0 && <YerSecici deger={p.klasor_id} klasorler={klasorler} onSec={(id) => programTasi(p.id, id)} />}
       </Kap>
 
       <Kap baslik="Görev planı" eylemler={<button type="button" className="rt-ikon" onClick={() => setAdimAcik(true)} aria-label="Adım ekle">＋</button>}>

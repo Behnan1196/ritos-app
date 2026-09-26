@@ -123,6 +123,21 @@ export interface KlasorRow {
   id: string;
   ad: string;
   ust_id: string | null;         // en fazla 3 seviye (K3)
+  // 26 eylül — en üst düzey "yaşam alanı" olabilir (PERMA, Wheel of Life ya da kullanıcının kendi sınıflaması).
+  // Öz değerlendirme ve kriterler programda değil alanda (K3/K4 revizyonu).
+  tur?: 'alan' | 'klasor';       // eski satırlarda yok → 'klasor' sayılır
+  sira?: number;
+  kriterler?: string[];          // yalnız alanda
+  aciklama?: string;
+  guncellendi?: number;
+}
+
+// Alan öz değerlendirmesi — tarihiyle saklanır (denge zamanla izlenebilsin), şimdilik sonuncusu gösterilir.
+export interface AlanDegerlendirmeRow {
+  id: string;
+  alan_id: string;
+  deger: number;                 // 0..4 (Berbat..Çok iyi)
+  zaman: number;
 }
 
 // ———————————————————————————————— v3 — 25 eylül: Gelenler + kişiler ————————————————————————————————
@@ -167,6 +182,7 @@ export class RitosDB extends Dexie {
   gelen!: EntityTable<GelenRow, 'id'>;
   kisi!: EntityTable<KisiRow, 'id'>;
   bekleyen!: EntityTable<BekleyenRow, 'anahtar'>;
+  alan_degerlendirme!: EntityTable<AlanDegerlendirmeRow, 'id'>;
 
   /** Sunucudan gelen değişiklik uygulanırken true — kancalar bunu yerel değişiklik saymaz. */
   uzaktan = false;
@@ -221,6 +237,21 @@ export class RitosDB extends Dexie {
       kisi: 'id, son',
       bekleyen: 'anahtar, zaman',
     });
+    // v5 — 26 eylül: yaşam alanı öz değerlendirmesi (tarihli).
+    this.version(5).stores({
+      home_widget: 'id, type',
+      ayar: 'anahtar',
+      ajanda_kart: 'id, kaynak_modul, kaynak_ref, baslangic',
+      ajanda_kayit: 'id, kart_id, tarih',
+      geri_bildirim: 'id, kart_id, kaynak_ref, zaman',
+      program: 'id, klasor_id',
+      program_adim: 'id, program_id',
+      klasor: 'id, ust_id',
+      gelen: 'id, gelis, alindi',
+      kisi: 'id, son',
+      bekleyen: 'anahtar, zaman',
+      alan_degerlendirme: 'id, alan_id, zaman',
+    });
 
     // Senkronlanan tablolardaki her yerel değişikliği "bekleyen"e işaretle.
     // Kanca transaction içinde çalışır; bekleyen'e yazmayı transaction dışına erteleriz.
@@ -265,7 +296,7 @@ export class RitosDB extends Dexie {
 // Hesapsız kullanımın verisi 'ritos' (misafir) veritabanında; her hesabın kendi veritabanı var.
 // Hangisinin açık olduğu cihazda küçük bir işarette tutulur; değişince sayfa yeniden yüklenir.
 
-export const SENKRON_TABLOLARI = ['home_widget', 'ajanda_kart', 'ajanda_kayit', 'geri_bildirim', 'program', 'program_adim', 'klasor', 'gelen', 'kisi'] as const;
+export const SENKRON_TABLOLARI = ['home_widget', 'ajanda_kart', 'ajanda_kayit', 'geri_bildirim', 'program', 'program_adim', 'klasor', 'gelen', 'kisi', 'alan_degerlendirme'] as const;
 export type SenkronTablo = (typeof SENKRON_TABLOLARI)[number];
 
 export const MISAFIR_DB = 'ritos';

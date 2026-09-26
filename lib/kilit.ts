@@ -22,7 +22,7 @@ import { anahtarDeposu, type KilitRow } from './anahtarDeposu';
 import { b64, b64Coz, rastgele } from './sifre';
 
 export const PIN_UZUNLUK = 6;
-const SIFRELI_TABLOLAR = new Set(['home_widget', 'ajanda_kart', 'ajanda_kayit', 'geri_bildirim', 'program', 'program_adim', 'klasor', 'gelen', 'kisi']);
+const SIFRELI_TABLOLAR = new Set(['home_widget', 'ajanda_kart', 'ajanda_kayit', 'geri_bildirim', 'program', 'program_adim', 'klasor', 'gelen', 'kisi', 'alan_degerlendirme']);
 const DOGRULAMA_METNI = 'ritos-kilit-v1';
 const enc = new TextEncoder();
 const dec = new TextDecoder();
