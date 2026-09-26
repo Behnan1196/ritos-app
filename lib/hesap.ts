@@ -13,13 +13,22 @@
 import { useEffect, useState } from 'react';
 import Dexie from 'dexie';
 import type { Session } from '@supabase/supabase-js';
-import { MISAFIR_DB, RitosDB, SENKRON_TABLOLARI, aktifHesap, aktifHesapAyarla, db, dbAdi } from './db';
+import { RitosDB, SENKRON_TABLOLARI, aktifHesap, aktifHesapAyarla, db, dbAdi, misafirDb } from './db';
 import { supabase } from './supabase';
 import { dekGetir, dekSakla, dekSil } from './anahtarDeposu';
 import { b64, coz, dekUret, girisSifresi, kurtarmaUret, rastgele, sar, sarimiAc, sarmaAnahtari, sifrele } from './sifre';
 import { senkronBaslat, senkronDurdur, senkronla } from './senkron';
 
 export const SIFRE_EN_AZ = 8;
+
+// "Bu cihaz benim değil": çıkışta o hesabın verisi cihazdan silinir, cihaz kilidi o hesaba uygulanmaz.
+const GECICI = 'ritos-gecici-hesap';
+export function geciciHesap(): string | null { try { return localStorage.getItem(GECICI); } catch { return null; } }
+function geciciAyarla(uid: string | null) { try { if (uid) localStorage.setItem(GECICI, uid); else localStorage.removeItem(GECICI); } catch { /* yoksay */ } }
+
+// Bilerek yapılan hesap geçişinden hemen sonraki yeniden yüklemede PIN'i tekrar sorma (bir kez).
+export const KILIT_GECIS = 'ritos-kilit-gecis';
+function kilitGecisiVer(uid: string) { try { sessionStorage.setItem(KILIT_GECIS, uid); } catch { /* yoksay */ } }
 
 export interface Oturum {
   hazir: boolean;
@@ -88,10 +97,6 @@ export async function profilGaranti(uid: string, eposta: string): Promise<string
 
 // ———————————————— misafir veri ————————————————
 
-function misafirDb(): RitosDB {
-  return db.name === MISAFIR_DB ? db : new RitosDB(MISAFIR_DB);
-}
-
 /** Misafir veritabanında kullanıcının girdiği bir şey var mı (varsayılan Home düzeni sayılmaz)? */
 export async function misafirDoluMu(): Promise<boolean> {
   const m = misafirDb();
@@ -155,6 +160,7 @@ export async function kayitOl(gorunenAd: string, eposta: string, sifre: string, 
   // Cihazdaki hesapsız veri: kullanıcı seçer — hesaba taşınır ya da cihazda ayrı (özel) kalır.
   if (misafiriTasi) await misafiriHesabaTasi(uid);
   aktifHesapAyarla(uid);
+  kilitGecisiVer(uid);
   return { tamam: true, kurtarma };
 }
 
@@ -162,7 +168,7 @@ export async function kayitOl(gorunenAd: string, eposta: string, sifre: string, 
 
 export type GirisSonuc = { tamam: true; uid: string; misafirVar: boolean } | { tamam: false; hata: string };
 
-export async function girisYap(eposta: string, sifre: string): Promise<GirisSonuc> {
+export async function girisYap(eposta: string, sifre: string, gecici = false): Promise<GirisSonuc> {
   const sb = supabase();
   if (!sb) return { tamam: false, hata: 'Sunucu ayarı yok' };
   if (!navigator.onLine) return { tamam: false, hata: 'İnternet yok' };
@@ -193,13 +199,15 @@ export async function girisYap(eposta: string, sifre: string): Promise<GirisSonu
   await profilGaranti(uid, email);
   await dekSakla(uid, dek);
   const zatenAcik = aktifHesap() === uid; // kilitli hesaba yeniden giriş
-  return { tamam: true, uid, misafirVar: !zatenAcik && (await misafirDoluMu()) };
+  geciciAyarla(gecici ? uid : null);
+  return { tamam: true, uid, misafirVar: !gecici && !zatenAcik && (await misafirDoluMu()) };
 }
 
 /** Giriş sonrası: misafir veri hesaba eklensin mi (S3 açık sorusu → "ekle / ayrı tut"). */
 export async function girisiTamamla(uid: string, misafiriEkle: boolean) {
   if (misafiriEkle) await misafiriHesabaTasi(uid);
   aktifHesapAyarla(uid);
+  kilitGecisiVer(uid);
   location.reload();
 }
 
@@ -207,6 +215,8 @@ export async function girisiTamamla(uid: string, misafiriEkle: boolean) {
 
 export async function cikisYap(buCihazdanSil: boolean) {
   const uid = aktifHesap();
+  if (uid && geciciHesap() === uid) buCihazdanSil = true;
+  geciciAyarla(null);
   try { await senkronla(); } catch { /* çevrimdışıysa bekleyenler cihazda kalır */ }
   senkronDurdur();
   await supabase()?.auth.signOut();
@@ -254,6 +264,16 @@ export async function sifreDegistir(eski: string, yeni: string) {
     await sb.from('cat_anahtar').update({ tuz: k.tuz, sarili_sifre: k.sarili_sifre }).eq('id', uid);
     throw new Error(u.error.message);
   }
+}
+
+/** PIN unutulduğunda hesaplı ekranda kimlik kanıtı: hesabın şifresi doğru mu? */
+export async function hesapSifresiDogru(sifre: string): Promise<boolean> {
+  const sb = supabase();
+  const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
+  const email = data.session?.user.email;
+  if (!sb || !email) return false;
+  const r = await sb.auth.signInWithPassword({ email, password: await girisSifresi(sifre, email) });
+  return !r.error;
 }
 
 export async function gorunenAdDegistir(uid: string, ad: string) {

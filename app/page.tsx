@@ -7,6 +7,7 @@ import AjandaPane from './ritos/AjandaPane';
 import KisiselGelisim from './ritos/KisiselGelisim';
 import { AyarlarPane, GelenlerTool, SenkronIsareti, useGelenSenkron, useGelenOzeti } from './ritos/Paylasim';
 import { useHesapBaslat } from '@/lib/hesap';
+import { KilitKapisi } from './ritos/Kilit';
 
 // ————————————————————————————————————————————————————————————————
 // Ritos yerleşim laboratuvarı — rite-app'ten AYRI, veri modeline bağlı değil.
@@ -98,6 +99,10 @@ function findFreeSlot(existing: CustomWidget[], size: { w: number; h: number }) 
 }
 
 export default function RitosLab() {
+  return <KilitKapisi><RitosUygulama /></KilitKapisi>;
+}
+
+function RitosUygulama() {
   useHesapBaslat();
   useGelenSenkron();
   const [isNarrow, setIsNarrow] = useState(false);

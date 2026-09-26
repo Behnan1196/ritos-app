@@ -8,6 +8,8 @@ import { useCanli } from '@/lib/canli';
 import { bugun } from '@/lib/paket';
 import { SIFRE_EN_AZ, misafirDoluMu, cikisYap, girisYap, girisiTamamla, gorunenAdDegistir, kayitOl, kurtarmaGoster, sifreDegistir, useOturum } from '@/lib/hesap';
 import { senkronla, useSenkronDurum } from '@/lib/senkron';
+import { pinDogrula, pinVar } from '@/lib/kilit';
+import { KilitAyarlari, PinGir } from './Kilit';
 import { sonYedek, yedegiYukle, yedekAl, yedekOku } from '@/lib/yedek';
 import { al, engelKaldir, engelle, engellenenler, gelenSil, gelenleriCek, gonder, kisiBul, type PaylasimPaketi } from '@/lib/paylasim';
 import { BlokGoster, Chips, Kap, Modal } from './ortak';
@@ -26,9 +28,12 @@ export function HesapModal({ onKapat, neden }: { onKapat: () => void; onTamam?: 
   const [misafirSor, setMisafirSor] = useState<string | null>(null);
   const misafirDolu = useCanli(() => misafirDoluMu(), [], false);
   const [tasi, setTasi] = useState<'tasi' | 'ayri' | null>(null);
+  const [gecici, setGecici] = useState(false);
+  const [pinOnay, setPinOnay] = useState(false); // özel alanı hesaba taşımak için PIN doğrulandı mı
+  const kilitli = pinVar();
 
   const gecerli = /\S+@\S+\.\S+/.test(eposta) && sifre.length >= SIFRE_EN_AZ
-    && (kip === 'giris' || (ad.trim().length > 0 && sifre === sifre2 && (!misafirDolu || tasi !== null)));
+    && (kip === 'giris' || (ad.trim().length > 0 && sifre === sifre2 && (!misafirDolu || tasi === 'ayri' || (tasi === 'tasi' && (!kilitli || pinOnay)))));
 
   async function gonderForm() {
     setBekle(true); setHata(null);
@@ -38,7 +43,7 @@ export function HesapModal({ onKapat, neden }: { onKapat: () => void; onTamam?: 
         if (!r.tamam) { setHata(r.hata); return; }
         setKurtarma(r.kurtarma);
       } else {
-        const r = await girisYap(eposta, sifre);
+        const r = await girisYap(eposta, sifre, gecici);
         if (!r.tamam) { setHata(r.hata); return; }
         if (r.misafirVar) setMisafirSor(r.uid);
         else await girisiTamamla(r.uid, false);
@@ -54,9 +59,10 @@ export function HesapModal({ onKapat, neden }: { onKapat: () => void; onTamam?: 
     <Modal baslik="Bu cihazda hesapsız girdiğin veriler var" onKapat={() => {}}>
       <p className="rt-metin">Hesabına giriş yapmadan önce bu cihazda kartlar ya da programlar oluşturmuşsun. Ne yapalım?</p>
       <div className="rt-satir">
-        <button type="button" className="rt-btn primary" onClick={() => girisiTamamla(misafirSor, true)}>Hesabıma ekle</button>
+        <button type="button" className="rt-btn primary" disabled={kilitli && !pinOnay} onClick={() => girisiTamamla(misafirSor, true)}>Hesabıma ekle</button>
         <button type="button" className="rt-btn" onClick={() => girisiTamamla(misafirSor, false)}>Ayrı tut</button>
       </div>
+      {kilitli && !pinOnay && <PinGir etiket="Eklemek için cihaz PIN'ini gir" onGirildi={async (p) => { const r = await pinDogrula(p); if (r.tamam) setPinOnay(true); return r.tamam ? null : r.hata; }} />}
       <p className="rt-muted">&quot;Ayrı tut&quot; dersen onlar yalnız bu cihazda, hesaptan çıktığında görünen özel alanında kalır; sunucuya gitmez.</p>
     </Modal>
   );
@@ -76,7 +82,14 @@ export function HesapModal({ onKapat, neden }: { onKapat: () => void; onTamam?: 
           <span>Bu cihazda hesapsız oluşturduğun kartlar ve programlar var:</span>
           <Chips secenekler={[['tasi', 'Hesabıma taşı'], ['ayri', 'Cihazda ayrı kalsın']]} deger={tasi ?? ('' as 'tasi')} onSec={setTasi} />
           {tasi === 'ayri' && <span className="rt-muted">Onlar yalnız bu cihazda, hesaptan çıktığında görünen özel alanında kalır; sunucuya gitmez.</span>}
+          {tasi === 'tasi' && kilitli && !pinOnay && <PinGir etiket="Taşımak için cihaz PIN'ini gir" onGirildi={async (p) => { const r = await pinDogrula(p); if (r.tamam) setPinOnay(true); return r.tamam ? null : r.hata; }} />}
         </div>
+      )}
+      {kip === 'giris' && (
+        <label className="rt-onay"><input type="checkbox" checked={gecici} onChange={(e) => setGecici(e.target.checked)} /> Bu cihaz benim değil — çıkışta verim bu cihazdan silinsin</label>
+      )}
+      {kip === 'giris' && !gecici && misafirDolu && !kilitli && (
+        <p className="rt-uyari">Bu cihazda kilitsiz bir özel alan var. Cihaz senin değilse yukarıdaki kutuyu işaretle; seninse Ayarlar'dan PIN koymanı öneririz.</p>
       )}
       {hata && <p className="rt-hata">{hata}</p>}
       <div className="rt-satir">
@@ -370,6 +383,8 @@ export function AyarlarPane() {
           </>
         )}
       </Kap>
+
+      <KilitAyarlari />
 
       <Kap baslik="Yedek">
         <p className="rt-muted">

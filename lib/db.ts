@@ -14,6 +14,7 @@
 
 import Dexie, { type EntityTable } from 'dexie';
 import type { Blok, GeriBildirimOlay, Izinler, KaynakModul, TemelTip } from './paket';
+import { kilitKatmani } from './kilit';
 
 export type CustomWidgetType = 'pomodoro' | 'foto' | 'sayac';
 
@@ -174,6 +175,8 @@ export class RitosDB extends Dexie {
   constructor(ad: string) {
     super(ad);
     this.hesapli = ad !== MISAFIR_DB;
+    // Özel alan (misafir veritabanı) PIN konunca satır satır şifrelenir (lib/kilit.ts).
+    if (!this.hesapli) this.use(kilitKatmani);
     // v1 — 25 eylül: Home "Senin alanın" düzeni + ayarlar.
     // Dexie söz dizimi: ilk alan birincil anahtar, sonrakiler indeks.
     this.version(1).stores({
@@ -267,6 +270,11 @@ export type SenkronTablo = (typeof SENKRON_TABLOLARI)[number];
 
 export const MISAFIR_DB = 'ritos';
 const AKTIF_HESAP = 'ritos-aktif-hesap';
+
+/** Özel alanın (misafir) veritabanı: açık olan o ise kendisi, değilse ayrı bir bağlantı. */
+export function misafirDb(): RitosDB {
+  return db.name === MISAFIR_DB ? db : new RitosDB(MISAFIR_DB);
+}
 
 export function dbAdi(uid: string | null) {
   return uid ? `ritos-u-${uid}` : MISAFIR_DB;
