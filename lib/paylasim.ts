@@ -58,28 +58,34 @@ export async function programPaketi(programId: string): Promise<PaylasimPaketi |
 
 // ———————————————— gönderme ————————————————
 
-export async function kisiBul(eposta: string): Promise<{ id: string; gorunen_ad: string } | null> {
+export type KisiSonuc = { kisi: { id: string; gorunen_ad: string } } | { hata: string };
+
+export async function kisiBul(eposta: string): Promise<KisiSonuc> {
   const sb = supabase();
-  if (!sb) return null;
+  if (!sb) return { hata: 'Sunucu ayarı yok.' };
+  if (!navigator.onLine) return { hata: 'İnternet yok.' };
   const r = await sb.rpc('cat_kisi_bul', { p_eposta: eposta });
+  if (r.error) return { hata: `Arama yapılamadı: ${r.error.message}` };
   const satir = (r.data as { id: string; gorunen_ad: string }[] | null)?.[0];
-  if (!satir) return null;
+  if (!satir) return { hata: "Bu e-postayla Ritos kullanan biri bulunamadı. Kişinin Ritos'ta en az bir kez giriş yapmış olması gerekir." };
   await db.kisi.put({ id: satir.id, gorunen_ad: satir.gorunen_ad, son: Date.now() });
-  return satir;
+  return { kisi: satir };
 }
 
 export async function gonder(paket: PaylasimPaketi, aliciIdler: string[], kaynak: 'dogrudan' | 'sohbet' = 'dogrudan') {
   const sb = supabase();
   if (!sb) return { basarili: 0, hata: 'Sunucu ayarı yok' };
   let basarili = 0;
+  let sonHata = '';
   for (const id of aliciIdler) {
     const r = await sb.rpc('cat_gonder', { p_alici: id, p_kaynak: kaynak, p_paket: paket });
-    if (!r.error) {
+    if (r.error) sonHata = r.error.message;
+    else {
       basarili++;
       await db.kisi.update(id, { son: Date.now() });
     }
   }
-  return { basarili, hata: basarili < aliciIdler.length ? 'Bazı gönderimler başarısız' : null };
+  return { basarili, hata: basarili < aliciIdler.length ? `Gönderilemedi: ${sonHata}` : null };
 }
 
 // ———————————————— alma tarafı ————————————————

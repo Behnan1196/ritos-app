@@ -27,10 +27,7 @@ export function useOturum(): Oturum {
     let iptal = false;
     async function yukle(session: Session | null) {
       let gorunenAd: string | null = null;
-      if (session) {
-        const r = await sb!.from('cat_profil').select('gorunen_ad').eq('id', session.user.id).maybeSingle();
-        gorunenAd = r.data?.gorunen_ad ?? null;
-      }
+      if (session) gorunenAd = await profilGaranti(session.user.id, session.user.email ?? '');
       if (!iptal) setO({ hazir: true, session, gorunenAd });
     }
     sb.auth.getSession().then(({ data }) => yukle(data.session));
@@ -39,6 +36,20 @@ export function useOturum(): Oturum {
     return () => { iptal = true; abone.subscription.unsubscribe(); };
   }, []);
   return o;
+}
+
+// Aynı Supabase hesabı Rite'ta ya da paylaşım tabloları kurulmadan önce açılmış olabilir:
+// giriş yapıldığında Ritos profili yoksa oluştur, yoksa kimse bu kişiyi e-postasıyla bulamaz.
+// Görünen ad e-postanın @ öncesinden başlar; Ayarlar › Hesap'tan değiştirilebilir.
+export async function profilGaranti(uid: string, eposta: string): Promise<string | null> {
+  const sb = supabase();
+  if (!sb) return null;
+  const r = await sb.from('cat_profil').select('gorunen_ad').eq('id', uid).maybeSingle();
+  if (r.data) return r.data.gorunen_ad;
+  if (r.error || !eposta) return null;
+  const ad = eposta.split('@')[0];
+  const e = await sb.from('cat_profil').insert({ id: uid, gorunen_ad: ad, eposta: eposta.trim().toLowerCase() });
+  return e.error ? null : ad;
 }
 
 export type HesapSonuc = { tamam: true; baskaKullanici: boolean } | { tamam: false; hata: string };
@@ -78,6 +89,7 @@ export async function girisYap(eposta: string, sifre: string): Promise<HesapSonu
   if (!navigator.onLine) return { tamam: false, hata: 'İnternet yok' };
   const r = await sb.auth.signInWithPassword({ email: eposta.trim(), password: sifre });
   if (r.error || !r.data.user) return { tamam: false, hata: 'E-posta ya da şifre hatalı.' }; // G3: hangi alan olduğu söylenmez
+  await profilGaranti(r.data.user.id, r.data.user.email ?? eposta);
   const baskaKullanici = await kullaniciKontrol(r.data.user.id);
   if (!baskaKullanici) await kullaniciOnayla(r.data.user.id);
   return { tamam: true, baskaKullanici };

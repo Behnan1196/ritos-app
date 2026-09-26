@@ -95,8 +95,9 @@ function PaylasModal({ paketUret, onKapat, benId }: { paketUret: () => Promise<P
 
   async function ekle() {
     setHata(null);
-    const k = await kisiBul(eposta);
-    if (!k) { setHata('Bu e-postayla bir Ritos hesabı bulunamadı.'); return; }
+    const r = await kisiBul(eposta);
+    if ('hata' in r) { setHata(r.hata); return; }
+    const k = r.kisi;
     if (k.id === benId) { setHata('Bu senin hesabın.'); return; }
     setSecili((s) => new Set(s).add(k.id)); setEposta('');
   }
