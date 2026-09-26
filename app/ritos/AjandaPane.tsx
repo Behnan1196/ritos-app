@@ -111,7 +111,9 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
   const yapildi = kayit?.yapildi ?? false;
   const [degerAcik, setDegerAcik] = useState(false);
   const [uygulaAcik, setUygulaAcik] = useState(false);
-  const meta = [kart.saatler.join(' · '), bagli && kart.kaynak_etiket ? `🌱 ${kart.kaynak_etiket}` : ''].filter(Boolean).join(' · ');
+  const uzak = kart.geri_bildirim === 'uzak';
+  const meta = [kart.saatler.join(' · '), bagli && kart.kaynak_etiket ? `${uzak ? '🤝' : '🌱'} ${kart.kaynak_etiket}` : ''].filter(Boolean).join(' · ');
+  const yeniGuncel = !!kart.isaret && Date.now() - kart.isaret < 3 * 86400000;
 
   return (
     <div className={`rt-kart${bagli ? ' bagli' : ''}${yapildi ? ' yapildi' : ''}`}>
@@ -126,7 +128,7 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
           <button type="button" className={`rt-chk${yapildi ? ' on' : ''}`} onClick={() => yapildiAyarla(kart.id, tarih, !yapildi)} aria-label="Yapıldı">{yapildi ? '✓' : ''}</button>
         )}
         <button type="button" className="rt-kart-ad" onClick={kart.izinler.ac ? onAc : undefined}>
-          <span className="t">{kart.ad}</span>
+          <span className="t">{kart.ad}{yeniGuncel && <span className="rt-rozet guncel">güncellendi</span>}</span>
           {meta && <span className="m">{meta}</span>}
           {(kart.tip === 'kaydet' || kart.tip === 'uygula') && kayit?.degerler && <span className="m">✓ {(kart.ek && sinavOzeti(kart.ek, kayit.degerler)) || degerMetni(kayit.degerler)}</span>}
         </button>
@@ -251,9 +253,14 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
   return (
     <Modal baslik={kart.ad} onKapat={onKapat}>
       <BlokGoster bloklar={kart.bloklar} />
-      {bagli && <p className="rt-muted">Bu kart <b>{kart.kaynak_etiket}</b> programından geliyor; içeriği ve günü programdan yönetilir.</p>}
+      {bagli && (kart.geri_bildirim === 'uzak'
+        ? <p className="rt-muted">🤝 Bu kart koçun <b>{kart.kaynak_etiket}</b>&apos;in programından. İşaretin ve girdiğin değerler yalnız ona gider.</p>
+        : <p className="rt-muted">Bu kart <b>{kart.kaynak_etiket}</b> programından geliyor; içeriği ve günü programdan yönetilir.</p>)}
 
       {tekSil && <OnayKutusu metin="Kart silinsin mi?" evet="Sil" onVazgec={() => setTekSil(false)} onEvet={() => kartKaldir(kart.id, tarih, 'tamamen').then(onKapat)} />}
+      {bagli && kart.geri_bildirim === 'uzak' && kart.izinler.gun_degistir && !tasiAcik && (
+        <div className="rt-satir"><button type="button" className="rt-btn" onClick={() => setTasiAcik(true)}>Başka güne taşı</button></div>
+      )}
       {!bagli && !tasiAcik && !silAcik && !tekSil && (
         <div className="rt-satir">
           {kart.izinler.gun_degistir && <button type="button" className="rt-btn" onClick={() => setTasiAcik(true)}>Taşı</button>}

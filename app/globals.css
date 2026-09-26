@@ -365,3 +365,20 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-net-grafik .cizgi{fill:none;stroke:var(--green);stroke-width:2;stroke-linejoin:round;}
 .rt-net-grafik .nokta{fill:var(--green);stroke:var(--bg);stroke-width:2;}
 .rt-net-grafik .hedef{fill:transparent;}
+/* danışmanlık (26 eylül) */
+.rt-danisan-zemin{background:#eef3ea;border-radius:14px;padding:8px;}
+.rt-danisan-bas{display:flex;flex-direction:column;gap:2px;margin:8px 2px 10px;}
+.rt-danisan-bas b{font-size:17px;}
+.rt-kisi-secici{margin-bottom:10px;}
+.rt-uzak-bilgi{display:flex;flex-direction:column;gap:8px;background:var(--green2);border-radius:10px;padding:10px;font-size:13px;margin-bottom:10px;}
+.rt-uzak-bilgi.koc{background:#fff;border:1px dashed var(--green);}
+.rt-uzak-bilgi p{margin:0;}
+.rt-salt{display:flex;flex-direction:column;gap:6px;margin-bottom:8px;}
+.rt-salt p{margin:0;}
+.rt-iliski-liste{display:flex;flex-direction:column;gap:4px;margin-top:10px;font-size:13px;}
+.rt-uyum{margin-left:auto;font-size:12px;font-weight:700;border-radius:10px;padding:2px 8px;background:#efe8da;}
+.rt-uyum.iyi{background:var(--green2);color:var(--green);}
+.rt-uyum.orta{background:#f3dfa6;color:#6f5310;}
+.rt-uyum.geride{background:#f4c9bf;color:#8a2e1c;}
+.rt-gelen .ic{flex:0 0 auto;}
+.rt-rozet.guncel{background:#dce8f7;color:#284a7a;margin-left:6px;}

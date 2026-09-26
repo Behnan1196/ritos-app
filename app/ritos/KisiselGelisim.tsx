@@ -10,20 +10,32 @@ import { Chips, Kap, Modal, OnayKutusu, degerMetni } from './ortak';
 import { PaylasDugmesi } from './Paylasim';
 import { GorevFormu, gorevBaslangic, useSinavOzeti } from './Sinav';
 import type { GorevTaslak } from '@/lib/sinavGorev';
+import { DanisanDosyasi, KisiSecici, ProgramDanismanlik, UzakDurum, programEkraniKaydet, useIliskiler } from './Danismanlik';
 import { programPaketi } from '@/lib/paylasim';
 
 // Kişisel Gelişim: yaşam alanları → (klasörler) → Bireysel Programlar.
 // Alanlar kullanıcının; kriterler ve öz değerlendirme alanda (26 eylül).
 export default function KisiselGelisim() {
-  const programlar = useCanli(() => db.program.toArray(), [], [] as ProgramRow[]);
+  const tumProgramlar = useCanli(() => db.program.toArray(), [], [] as ProgramRow[]);
   const klasorler = useCanli(() => db.klasor.toArray(), [], [] as KlasorRow[]);
   const degerler = useCanli(() => sonDegerlendirmeler(), [], {} as Record<string, AlanDegerlendirmeRow>);
+  const iliskiler = useIliskiler();
   const [secili, setSecili] = useState<string | null>(null);
+  const [kisi, setKisi] = useState('ben');
+  // Kendi ağacım: danışanlara atadıklarım ve şablonlar burada değil (D3, D4).
+  const programlar = tumProgramlar.filter((x) => !x.sablon && x.uzak?.rol !== 'koc');
   const [basaDon, setBasaDon] = useState(false);
   const [modal, setModal] = useState<null | { tur: 'program'; yer: string | null } | { tur: 'alan' } | { tur: 'klasor'; k: KlasorRow } | { tur: 'yeniKlasor'; ust: KlasorRow }>(null);
 
-  const p = programlar.find((x) => x.id === secili);
+  const p = tumProgramlar.find((x) => x.id === secili);
   if (p) return <ProgramDetay p={p} klasorler={klasorler} onGeri={() => setSecili(null)} />;
+  const danisan = kisi !== 'ben' ? iliskiler.find((x) => x.id === kisi) : undefined;
+  if (danisan) return (
+    <div className="rt-danisan-zemin">
+      <KisiSecici secili={kisi} onSec={setKisi} />
+      <DanisanDosyasi il={danisan} onProgram={setSecili} />
+    </div>
+  );
 
   const alanlar = klasorler.filter(alanMi).sort((a, b) => (a.sira ?? 0) - (b.sira ?? 0) || a.ad.localeCompare(b.ad, 'tr'));
   const alansiz = programlar.filter((x) => !x.klasor_id || !klasorler.some((k) => k.id === x.klasor_id));
@@ -33,6 +45,7 @@ export default function KisiselGelisim() {
 
   return (
     <div>
+      <KisiSecici secili={kisi} onSec={setKisi} />
       <Kap baslik="🌱 Kişisel Gelişim" eylemler={<>
         <button type="button" className="rt-btn" onClick={() => setModal({ tur: 'alan' })}>＋ Alan</button>
         <button type="button" className="rt-ikon" onClick={() => setModal({ tur: 'program', yer: null })} aria-label="Yeni program">＋</button>
@@ -101,7 +114,10 @@ function ProgramSatiri({ x, ag }: { x: ProgramRow; ag: Agac }) {
   return (
     <button type="button" className="rt-prog" onClick={() => ag.onProgram(x.id)}>
       <span className="t">{x.ad}</span>
-      <span className="m">{aktifMi(x) ? <span className="rt-aktif">aktif</span> : 'aktif değil'}</span>
+      <span className="m">
+        {x.uzak?.rol === 'danisan' && <span className="rt-rozet">🤝 {x.uzak.karsi_ad}</span>}{' '}
+        {x.uzak?.durum === 'ayrildi' ? <UzakDurum p={x} /> : aktifMi(x) ? <span className="rt-aktif">aktif</span> : 'aktif değil'}
+      </span>
     </button>
   );
 }
@@ -246,14 +262,18 @@ function ProgramDetay({ p, klasorler, onGeri }: { p: ProgramRow; klasorler: Klas
   const [durdurSor, setDurdurSor] = useState(false);
   const aktif = aktifMi(p);
   const yansir = aktif && p.calisma_bitis !== bugun();
+  const salt = p.uzak?.rol === 'danisan';               // koçun programı: danışan düzenlemez (D6)
+  const koc = p.uzak?.rol === 'koc';                    // danışana atadığım
+  const kapali = koc && (p.uzak!.durum === 'ret' || p.uzak!.durum === 'ayrildi');
+  const duzenlenir = !salt && !kapali;
 
   return (
-    <div>
-      <button type="button" className="rt-geri" onClick={onGeri}>‹ Kişisel Gelişim</button>
+    <div className={koc ? 'rt-danisan-zemin' : undefined}>
+      <button type="button" className="rt-geri" onClick={onGeri}>‹ Geri</button>
       <Kap
         baslik={<>{p.ad} {aktif ? <span className="rt-aktif">aktif</span> : <span className="rt-muted"> · aktif değil</span>}</>}
-        eylemler={<>
-          {!!il?.adimlar.length && <PaylasDugmesi paketUret={() => programPaketi(p.id)} />}
+        eylemler={p.sablon || salt || (koc && !(p.uzak!.durum === 'kabul' && aktif)) ? null : <>
+          {!!il?.adimlar.length && !p.uzak && <PaylasDugmesi paketUret={() => programPaketi(p.id)} />}
           {aktif && p.calisma_bitis === bugun()
           ? <span className="rt-muted">bugün son gün</span>
           : aktif
@@ -262,17 +282,29 @@ function ProgramDetay({ p, klasorler, onGeri }: { p: ProgramRow; klasorler: Klas
         </>}
       >
         {durdurSor && <OnayKutusu metin="Program durdurulsun mu? Geçmiş kayıtlar korunur; bugün son gün olur." evet="Durdur" onVazgec={() => setDurdurSor(false)} onEvet={async () => { await durdur(p.id); setDurdurSor(false); }} />}
+        <ProgramDanismanlik p={p} adimVar={!!il?.adimlar.length} />
         {aktif && il?.gunN != null && <p className="rt-gun">Gün {il.gunN}{il.gunM ? `/${il.gunM}` : ' · süregelen'}</p>}
 
-        <Alan etiket="Amaç" deger={p.amac} onKaydet={(v) => programGuncelle(p.id, { amac: v })} />
-        <Alan etiket="Dikkat edilecekler" deger={p.dikkat} onKaydet={(v) => programGuncelle(p.id, { dikkat: v })} />
-        <Alan etiket="Kriterler (her satır bir kriter)" deger={p.kriterler.join('\n')} onKaydet={(v) => programGuncelle(p.id, { kriterler: v.split('\n').map((s) => s.trim()).filter(Boolean) })} />
-        <Alan etiket="Hedef (isteğe bağlı)" deger={p.hedef} onKaydet={(v) => programGuncelle(p.id, { hedef: v })} />
+        {duzenlenir ? (
+          <>
+            <Alan etiket="Amaç" deger={p.amac} onKaydet={(v) => programGuncelle(p.id, { amac: v })} />
+            <Alan etiket="Dikkat edilecekler" deger={p.dikkat} onKaydet={(v) => programGuncelle(p.id, { dikkat: v })} />
+            <Alan etiket="Kriterler (her satır bir kriter)" deger={p.kriterler.join('\n')} onKaydet={(v) => programGuncelle(p.id, { kriterler: v.split('\n').map((s) => s.trim()).filter(Boolean) })} />
+            <Alan etiket="Hedef (isteğe bağlı)" deger={p.hedef} onKaydet={(v) => programGuncelle(p.id, { hedef: v })} />
+          </>
+        ) : (
+          <div className="rt-salt">
+            {p.amac && <p className="rt-metin"><b>Amaç:</b> {p.amac}</p>}
+            {p.dikkat && <p className="rt-metin"><b>Dikkat edilecekler:</b> {p.dikkat}</p>}
+            {p.kriterler.length > 0 && <ul className="rt-maddeler">{p.kriterler.map((k) => <li key={k}>{k}</li>)}</ul>}
+            {p.hedef && <p className="rt-metin"><b>Hedef:</b> {p.hedef}</p>}
+          </div>
+        )}
 
-        {klasorler.length > 0 && <YerSecici deger={p.klasor_id} klasorler={klasorler} onSec={(id) => programTasi(p.id, id)} />}
+        {klasorler.length > 0 && !koc && !p.sablon && <YerSecici deger={p.klasor_id} klasorler={klasorler} onSec={(id) => programTasi(p.id, id)} />}
       </Kap>
 
-      <Kap baslik="Görev planı" eylemler={<button type="button" className="rt-ikon" onClick={() => setAdimAcik(true)} aria-label="Adım ekle">＋</button>}>
+      <Kap baslik="Görev planı" eylemler={duzenlenir ? <button type="button" className="rt-ikon" onClick={() => setAdimAcik(true)} aria-label="Adım ekle">＋</button> : null}>
         {!il?.adimlar.length && <p className="rt-muted">Görev planı yok. İstersen ＋ ile Ajanda&apos;ya düşecek adımlar ekle.</p>}
         {il?.adimlar.map(({ adim, planli, yapildi, sonDegerler }) => (
           <div key={adim.id} className="rt-adim">
@@ -288,10 +320,12 @@ function ProgramDetay({ p, klasorler, onGeri }: { p: ProgramRow; klasorler: Klas
                 {sonDegerler && <span className="rt-muted"> · son: {degerMetni(sonDegerler)}</span>}
               </div>
             )}
-            <span className="rt-mini">
-              <button type="button" onClick={() => setDuzenle(adim)}>düzenle</button>
-              {!aktif && <button type="button" onClick={() => adimSil(adim.id)}>kaldır</button>}
-            </span>
+            {duzenlenir && (
+              <span className="rt-mini">
+                <button type="button" onClick={() => setDuzenle(adim)}>düzenle</button>
+                {(!aktif || koc) && <button type="button" onClick={() => adimSil(adim.id)}>kaldır</button>}
+              </span>
+            )}
           </div>
         ))}
       </Kap>
@@ -388,3 +422,11 @@ function AdimForm({ programId, adim, yansir, onKapat }: { programId: string; adi
     </Modal>
   );
 }
+
+// Koç panelinden (Home > Danışmanlık) program açılınca aynı ekran kullanılır.
+function ProgramEkrani({ programId, onGeri }: { programId: string; onGeri: () => void }) {
+  const p = useCanli(() => db.program.get(programId), [programId], undefined as ProgramRow | undefined);
+  const klasorler = useCanli(() => db.klasor.toArray(), [], [] as KlasorRow[]);
+  return p ? <ProgramDetay p={p} klasorler={klasorler} onGeri={onGeri} /> : null;
+}
+programEkraniKaydet(ProgramEkrani);

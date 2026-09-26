@@ -6,7 +6,8 @@ import { useHomeWidgets } from '@/lib/useHomeWidgets';
 import AjandaPane from './ritos/AjandaPane';
 import KisiselGelisim from './ritos/KisiselGelisim';
 import { SinavTool, useSinavOzeti } from './ritos/Sinav';
-import { AyarlarPane, GelenlerTool, SenkronIsareti, useGelenSenkron, useGelenOzeti } from './ritos/Paylasim';
+import { DanismanlikTool, DavetKarsilama, useDanismanlikOzeti } from './ritos/Danismanlik';
+import { AyarlarPane, GelenlerTool, HesapModal, SenkronIsareti, useGelenSenkron, useGelenOzeti } from './ritos/Paylasim';
 import { useHesapBaslat } from '@/lib/hesap';
 import { KilitDugmesi, KilitKapisi } from './ritos/Kilit';
 
@@ -56,12 +57,6 @@ const OPEN_MODE: Record<ToolId, OpenMode> = {
   sinav: 'C',
 };
 
-const DANISANLAR = [
-  { ad: 'Aylin', ozet: 'Beslenme görüşmesi bugün 13:30', mesaj: 'Bugünkü öğün fotoğrafını attım 🥗' },
-  { ad: 'Mehmet', ozet: '21 günlük seri — emekli olmaya yakın', mesaj: 'Yarın seansı erteleyebilir miyiz?' },
-  { ad: 'Nurkan', ozet: 'VO2max ölçümü bu hafta gecikti', mesaj: 'Model uçak kulübünden yeni fotoğraf 📸' },
-  { ad: 'Suzan', ozet: 'İnanılan-vs-gerçek karşılaştırması bekliyor', mesaj: 'Ölçüm sonuçlarını nasıl yorumlamalıyım?' },
-];
 
 // ———————————————————————————————————— "Senin alanın" — serbest widget ızgarası ————————————————————————————————————
 
@@ -108,6 +103,7 @@ export default function RitosLab() {
 function RitosUygulama() {
   useHesapBaslat();
   useGelenSenkron();
+  const [hesapAc, setHesapAc] = useState(false);
   const [isNarrow, setIsNarrow] = useState(false);
   const [width, setWidth] = useState(0);
 
@@ -163,6 +159,8 @@ function RitosUygulama() {
 
   return (
     <div className="shell">
+      <DavetKarsilama onHesap={() => setHesapAc(true)} />
+      {hesapAc && <HesapModal onKapat={() => setHesapAc(false)} neden="Danışmanlık daveti için giriş yap ya da hesap oluştur." />}
       {!isNarrow && (
         <div className="topbar">
           <b>Ritos</b>
@@ -304,6 +302,7 @@ function PlaceholderPane({ baslik, satirlar, not }: { baslik: string; satirlar: 
 function FixedWidgets({ onOpenTool }: { onOpenTool: (t: ToolId) => void }) {
   const gelen = useGelenOzeti();
   const sinav = useSinavOzeti();
+  const danismanlik = useDanismanlikOzeti();
   const [odakAcik, setOdakAcik] = useState(true);
 
   return (
@@ -346,11 +345,13 @@ function FixedWidgets({ onOpenTool }: { onOpenTool: (t: ToolId) => void }) {
         </button>
       )}
 
-      <button type="button" className="wrow tool" onClick={() => onOpenTool('danismanlik')}>
-        <span className="ic">🤝</span>
-        <span className="tx"><span className="t">Danışmanlık</span><span className="s">4 aktif danışan · yeni mesaj: Aylin</span></span>
-        <span className="chev">›</span>
-      </button>
+      {danismanlik.goster && (
+        <button type="button" className="wrow tool" onClick={() => onOpenTool('danismanlik')}>
+          <span className="ic">🤝</span>
+          <span className="tx"><span className="t">Danışmanlık</span><span className="s">{danismanlik.ozet}</span></span>
+          <span className="chev">›</span>
+        </button>
+      )}
     </div>
   );
 }
@@ -601,11 +602,12 @@ function SayacWidget() {
 
 // ———————————————————————————————————— Tool içerikleri ————————————————————————————————————
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ToolDetail({ tool, onBack, compact, nested }: { tool: ToolId; onBack: () => void; compact?: boolean; nested?: boolean }) {
   if (tool === 'notlar') return <NotlarPane compact={compact} onBack={onBack} />;
   if (tool === 'gelenler') return <GelenlerTool compact={compact} onBack={onBack} />;
   if (tool === 'sinav') return <SinavTool />;
-  return <Danismanlik compact={compact} nested={nested} onBack={onBack} />;
+  return <DanismanlikTool />;
 }
 
 function NotlarPane({ compact, onBack }: { compact?: boolean; onBack: () => void }) {
@@ -619,78 +621,6 @@ function NotlarPane({ compact, onBack }: { compact?: boolean; onBack: () => void
       <p style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 10 }}>
         Ajanda&apos;daki eski &quot;+ Hızlı Ekle&quot; not alanının yerini alıyor — notların yeni birincil yeri artık burası.
       </p>
-    </div>
-  );
-}
-
-function Danismanlik({ compact, nested, onBack }: { compact?: boolean; nested?: boolean; onBack: () => void }) {
-  const [secili, setSecili] = useState(0);
-  const [altSekme, setAltSekme] = useState<'sohbet' | 'gelisim'>('sohbet');
-  const [innerRatio, setInnerRatio] = useState(28); // sadece C modunda kullanılır, ama hook her zaman çağrılmalı
-  const d = DANISANLAR[secili];
-
-  const liste = (horiz: boolean) => (
-    <div className={`danisan-list${horiz ? ' horiz' : ''}`}>
-      {DANISANLAR.map((x, i) => (
-        <button key={x.ad} className={`danisan-chip${i === secili ? ' on' : ''}`} onClick={() => setSecili(i)}>
-          {x.ad}
-          {!horiz && <div style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 10.5, marginTop: 2 }}>{x.ozet}</div>}
-        </button>
-      ))}
-    </div>
-  );
-
-  const detay = (
-    <div className="danisan-detail">
-      {!nested && (
-        <div className="video-box">🎥 Görüşme — video görüşme yer tutucu</div>
-      )}
-      <div className="subtabs">
-        <button className={altSekme === 'sohbet' ? 'on' : ''} onClick={() => setAltSekme('sohbet')}>Sohbet</button>
-        <button className={altSekme === 'gelisim' ? 'on' : ''} onClick={() => setAltSekme('gelisim')}>Gelişim</button>
-      </div>
-      {altSekme === 'sohbet' ? (
-        <div className="msg-row"><div className="who">{d.ad}</div>{d.mesaj}</div>
-      ) : (
-        <div className="msg-row"><div className="who">Odak</div>{d.ozet}</div>
-      )}
-    </div>
-  );
-
-  // compact = A modu (sağ ray içinde, dar) → sadece liste + özet, video/detay yok (kasıtlı — sığmıyor)
-  if (compact) {
-    return (
-      <div className="side-content" style={{ height: '100%', overflowY: 'auto' }}>
-        <button className="tool-back" style={{ marginBottom: 10 }} onClick={onBack}>‹ Home</button>
-        <h4>🤝 Danışmanlık</h4>
-        {liste(false)}
-        <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
-          Bu dar alanda video/detay gösterilmiyor — A modunun sınırı tam da bu.
-        </p>
-      </div>
-    );
-  }
-
-  // nested = C modu (tam ekran + kendi iç sürüklenebilir düzeni: video üstte,
-  // altında değişen sohbet/gelişim — sınav koçluğu ön çalışmasındaki fikir)
-  if (nested) {
-    return (
-      <SplitPane
-        ratio={innerRatio}
-        setRatio={setInnerRatio}
-        min={18}
-        max={45}
-        left={<div style={{ padding: 12, height: '100%', overflowY: 'auto' }}>{liste(false)}</div>}
-        right={detay}
-      />
-    );
-  }
-
-  // B modu — tam ekran ama düz, tek sütun
-  return (
-    <div style={{ height: '100%', overflowY: 'auto' }}>
-      {liste(true)}
-      {detay}
     </div>
   );
 }

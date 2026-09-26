@@ -694,7 +694,7 @@ function Denemeler({ k }: { k: PaketKurulumRow }) {
   );
 }
 
-function DenemeSerisi({ baslik, liste }: { baslik: string; liste: DenemeSonuc[] }) {
+export function DenemeSerisi({ baslik, liste }: { baslik: string; liste: DenemeSonuc[] }) {
   const son = liste[liste.length - 1];
   const onceki = liste.length > 1 ? liste[liste.length - 2] : null;
   const fark = onceki ? Math.round((son.net - onceki.net) * 100) / 100 : null;

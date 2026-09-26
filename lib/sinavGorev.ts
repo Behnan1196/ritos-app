@@ -122,21 +122,48 @@ export interface DenemeSonuc {
 
 export interface SinavAnalizi { konular: Map<string, KonuIstatistik>; denemeler: DenemeSonuc[] }
 
-/** Tüm sınav kartları + yapılmış günlerden konu istatistikleri ve deneme sonuçları. */
+/** Analize giren tek bir "yapılmış gün": kartın eki + o günün değerleri. */
+export interface AnalizKaydi { kartId: string; ad: string; ek: SinavEk; tarih: string; yapildi: boolean; degerler: Record<string, unknown> | null }
+
+/** Kendi Ajanda'm: sınav kartları + gün kayıtları. */
 export async function sinavAnalizi(): Promise<SinavAnalizi> {
   const kartlar = (await db.ajanda_kart.toArray()).filter((k) => k.ek?.paket === 'sinav');
+  if (!kartlar.length) return analizEt([]);
+  const kartMap = new Map(kartlar.map((k) => [k.id, k]));
+  const kayitlar = await db.ajanda_kayit.where('kart_id').anyOf(kartlar.map((k) => k.id)).toArray();
+  return analizEt(kayitlar.map((r) => { const k = kartMap.get(r.kart_id)!; return { kartId: k.id, ad: k.ad, ek: k.ek as SinavEk, tarih: r.tarih, yapildi: r.yapildi, degerler: r.degerler }; }));
+}
+
+/** Koçun gördüğü: danışanın geri bildirimleri + program adımlarının eki (P10). */
+export async function danisanAnalizi(programIdler: string[]): Promise<SinavAnalizi> {
+  const kayitlar: AnalizKaydi[] = [];
+  for (const pid of programIdler) {
+    const adimlar = new Map((await db.program_adim.where('program_id').equals(pid).toArray()).map((a) => [a.id, a]));
+    const olaylar = (await db.geri_bildirim.where('kaynak_ref').startsWith(`${pid}/`).toArray()).sort((a, b) => a.zaman - b.zaman);
+    const son = new Map<string, AnalizKaydi>();
+    for (const o of olaylar) {
+      const a = adimlar.get((o.kaynak_ref ?? '').split('/')[1]);
+      if (!a?.ek || a.ek.paket !== 'sinav') continue;
+      const anahtar = `${o.kaynak_ref}|${o.tarih}`;
+      const onceki = son.get(anahtar);
+      son.set(anahtar, {
+        kartId: o.kaynak_ref!, ad: a.ad, ek: a.ek, tarih: o.tarih, yapildi: o.olay !== 'geri_alindi',
+        degerler: o.olay === 'deger' ? o.degerler : onceki?.degerler ?? null,
+      });
+    }
+    kayitlar.push(...Array.from(son.values()));
+  }
+  return analizEt(kayitlar);
+}
+
+export function analizEt(kayitlar: AnalizKaydi[]): SinavAnalizi {
   const konular = new Map<string, KonuIstatistik>();
   const denemeler: DenemeSonuc[] = [];
-  if (!kartlar.length) return { konular, denemeler };
-  const idler = kartlar.map((k) => k.id);
-  const kayitlar = await db.ajanda_kayit.where('kart_id').anyOf(idler).toArray();
-  const kartMap = new Map(kartlar.map((k) => [k.id, k]));
   const n = (v: unknown) => (typeof v === 'number' ? v : Number(v) || 0);
   for (const r of kayitlar) {
     if (!r.yapildi) continue;
-    const k = kartMap.get(r.kart_id);
-    const ek = k?.ek;
-    if (!k || !ek) continue;
+    const ek = r.ek;
+    const k = { id: r.kartId, ad: r.ad };
     const d = r.degerler ?? {};
     if (ek.tur === 'deneme' && ek.deneme && ek.sinav) {
       const dersler = ek.deneme.dersler.map((x) => {
@@ -160,6 +187,7 @@ export async function sinavAnalizi(): Promise<SinavAnalizi> {
   denemeler.sort((a, b) => a.tarih.localeCompare(b.tarih));
   return { konular, denemeler };
 }
+
 
 export const soruSayisi = (s: KonuIstatistik) => s.dogru + s.yanlis + s.bos;
 export const dogrulukOrani = (s: KonuIstatistik) => (soruSayisi(s) ? s.dogru / soruSayisi(s) : null);

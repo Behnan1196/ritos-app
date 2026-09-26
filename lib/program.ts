@@ -9,6 +9,15 @@ import { db, type ProgramAdimRow, type ProgramRow } from './db';
 import { kaynaktanCek, teslimAl, yenidenTeslim } from './ajanda';
 import { BAGLI_YEREL_IZIN, PAKET_SURUM, bugun, gunAktif, gunFarki, tarihEkle, type KartPaketi, type Zamanlama } from './paket';
 
+// Danışmanlık kancaları (lib/danismanlik.ts doldurur). Koçun danışana atadığı programda değişiklik
+// koçun Ajanda'sına değil, danışana gider (D8).
+export const programKancalari: {
+  degisti?: (programId: string, etkin: string) => void;
+  durduruldu?: (programId: string) => void;
+} = {};
+
+const kocProgrami = (p?: ProgramRow | null) => p?.uzak?.rol === 'koc';
+
 export async function programOlustur(ad: string, amac = ''): Promise<string> {
   const id = crypto.randomUUID();
   const p: ProgramRow = {
@@ -22,6 +31,8 @@ export async function programOlustur(ad: string, amac = ''): Promise<string> {
 
 export async function programGuncelle(id: string, patch: Partial<ProgramRow>) {
   await db.program.update(id, { ...patch, guncellendi: Date.now() });
+  const p = await db.program.get(id);
+  if (kocProgrami(p) && Object.keys(patch).some((k) => ['ad', 'amac', 'dikkat', 'kriterler', 'hedef'].includes(k))) programKancalari.degisti?.(id, bugun());
 }
 
 export async function adimEkle(programId: string, a: Omit<ProgramAdimRow, 'id' | 'program_id' | 'sira' | 'guncellendi'>) {
@@ -41,15 +52,16 @@ export async function adimGuncelle(adimId: string, patch: Partial<ProgramAdimRow
   if (adim) await calisanaYansit(adim.program_id, adim, etkin);
 }
 
-async function calisanaYansit(programId: string, adim: ProgramAdimRow, etkin: string) {
+export async function calisanaYansit(programId: string, adim: ProgramAdimRow, etkin: string) {
   const p = await db.program.get(programId);
+  if (kocProgrami(p)) { programKancalari.degisti?.(programId, etkin); return; } // danışana gider
   if (!p || !p.calisma_baslangic || !aktifMi(p) || p.calisma_bitis === bugun()) return; // durdurulmuş programa yansımaz
   await yenidenTeslim(`${programId}/${adim.id}`, etkin, adimPaketi(p, adim, p.calisma_baslangic));
   const adimlar = await db.program_adim.where('program_id').equals(programId).toArray();
   await programGuncelle(programId, { calisma_bitis: calismaBitisi(adimlar, p.calisma_baslangic) });
 }
 
-function calismaBitisi(adimlar: ProgramAdimRow[], baslangic: string): string | null {
+export function calismaBitisi(adimlar: ProgramAdimRow[], baslangic: string): string | null {
   const bitisler = adimlar.map((a) => adimZamanlama(a, baslangic).bitis);
   return bitisler.includes(null) ? null : (bitisler as string[]).sort().at(-1) ?? null;
 }
@@ -57,21 +69,26 @@ function calismaBitisi(adimlar: ProgramAdimRow[], baslangic: string): string | n
 function adimPaketi(p: ProgramRow, a: ProgramAdimRow, baslangic: string): KartPaketi {
   return {
     surum: PAKET_SURUM,
-    id: crypto.randomUUID(),
+    // Koçtan gelen programda kart kimliği belirleyici: danışanın iki cihazı aynı güncellemeyi
+    // işlese de aynı kart oluşur (çift kart olmaz).
+    id: p.uzak?.rol === 'danisan' ? `k-${a.id}-${p.uzak.surum}` : crypto.randomUUID(),
     tip: a.tip,
     ad: a.ad,
     bloklar: a.bloklar,
     zamanlama: adimZamanlama(a, baslangic),
-    kaynak: { modul: 'program', ref: `${p.id}/${a.id}`, etiket: p.ad },
-    sahip: 'ben',
-    izinler: BAGLI_YEREL_IZIN,
-    geri_bildirim: 'yerel',
+    // Koçtan gelen programın kartları: koçun izinleri, geri bildirim koça gider (D6/D7).
+    kaynak: { modul: p.uzak?.rol === 'danisan' ? 'danismanlik' : 'program', ref: `${p.id}/${a.id}`, etiket: p.uzak?.rol === 'danisan' ? p.uzak.karsi_ad : p.ad },
+    sahip: p.uzak?.rol === 'danisan' ? p.uzak.karsi_id : 'ben',
+    izinler: p.uzak?.rol === 'danisan' ? p.uzak.izinler : BAGLI_YEREL_IZIN,
+    geri_bildirim: p.uzak?.rol === 'danisan' ? 'uzak' : 'yerel',
     ek: a.ek ?? null,
   };
 }
 
 export async function adimSil(adimId: string) {
+  const a = await db.program_adim.get(adimId);
   await db.program_adim.delete(adimId);
+  if (a && kocProgrami(await db.program.get(a.program_id))) programKancalari.degisti?.(a.program_id, bugun());
 }
 
 // Program aktif mi? Arka planda iş çalıştırmadan, tarihlerden türetilir:
@@ -82,7 +99,7 @@ export function aktifMi(p: ProgramRow, tarih = bugun()): boolean {
   return p.calisma_bitis === null || p.calisma_bitis >= tarih;
 }
 
-function adimZamanlama(a: ProgramAdimRow, baslangic: string): Zamanlama {
+export function adimZamanlama(a: ProgramAdimRow, baslangic: string): Zamanlama {
   const bas = tarihEkle(baslangic, a.basla_gun);
   return {
     baslangic: bas,
@@ -95,7 +112,7 @@ function adimZamanlama(a: ProgramAdimRow, baslangic: string): Zamanlama {
 // K7 — programı başlat: her adım için bir kart paketi, Ajanda'ya bağlı kart olarak teslim.
 export async function baslat(programId: string, baslangic = bugun()) {
   const p = await db.program.get(programId);
-  if (!p || aktifMi(p)) return;
+  if (!p || aktifMi(p) || kocProgrami(p) || p.sablon) return; // atanan program ve şablon koçun Ajanda'sına düşmez
   const adimlar = await db.program_adim.where('program_id').equals(programId).sortBy('sira');
   if (adimlar.length === 0) return;
 
@@ -111,7 +128,8 @@ export async function baslat(programId: string, baslangic = bugun()) {
 export async function durdur(programId: string) {
   const t = bugun();
   await kaynaktanCek(`${programId}/`, tarihEkle(t, 1));
-  await programGuncelle(programId, { calisma_bitis: t });
+  await db.program.update(programId, { calisma_bitis: t, guncellendi: Date.now() });
+  if (kocProgrami(await db.program.get(programId))) programKancalari.durduruldu?.(programId);
 }
 
 // K8 — ilerleme: yalnızca geri bildirim günlüğünden türetilir.

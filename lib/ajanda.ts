@@ -61,6 +61,9 @@ export async function gununKartlari(tarih: string): Promise<GunSatiri[]> {
   return kartlar.map((kart) => ({ kart, kayit: byKart.get(kart.id) ?? null }));
 }
 
+// Danışmanlık kancası: koçun kartındaki olay şifrelenip koça gönderilecek (D7). lib/danismanlik.ts doldurur.
+export const ajandaKancalari: { uzakGeriBildirim?: (gb: GeriBildirimRow) => void } = {};
+
 async function yayinla(kart: AjandaKartRow, tarih: string, olay: GeriBildirimOlay, degerler: Record<string, unknown> | null) {
   if (kart.geri_bildirim === 'yok') return;
   const gb: GeriBildirimRow = {
@@ -74,7 +77,10 @@ async function yayinla(kart: AjandaKartRow, tarih: string, olay: GeriBildirimOla
     zaman: Date.now(),
   };
   await db.geri_bildirim.add(gb);
-  // 'uzak' sahipte bu satır ayrıca giden kuyruğuna düşecek (Danışmanlık ile — sonra).
+  if (kart.geri_bildirim === 'uzak') {
+    const f = ajandaKancalari.uzakGeriBildirim;
+    if (f) setTimeout(() => f(gb), 0); // transaction dışında kuyruğa al
+  }
 }
 
 async function kayitYaz(kartId: string, tarih: string, patch: Partial<AjandaKayitRow>) {

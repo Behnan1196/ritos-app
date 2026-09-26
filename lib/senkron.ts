@@ -14,6 +14,13 @@ import { SENKRON_TABLOLARI, db, degisiklikDinle, type SenkronTablo } from './db'
 import { supabase } from './supabase';
 import { coz, sifrele } from './sifre';
 
+// Danışmanlık motoru senkronla birlikte çalışır (lib/danismanlik.ts doldurur).
+export const senkronKancalari: {
+  basla?: (uid: string, dek: CryptoKey) => void;
+  tur?: () => Promise<void>;
+  dur?: () => void;
+} = {};
+
 const SIRA = 'senkron_sira';
 const SON = 'senkron_son';
 
@@ -67,16 +74,20 @@ export async function senkronBaslat(kullanici: string, anahtar: CryptoKey) {
   if (sb) {
     kanal = sb.channel(`kayit-${kullanici}-${Math.random().toString(36).slice(2, 8)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cat_kayit', filter: `sahip=eq.${kullanici}` }, () => zamanla(300))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cat_mesaj', filter: `alici=eq.${kullanici}` }, () => zamanla(300))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cat_iliski' }, () => zamanla(300))
       .subscribe();
   }
   window.addEventListener('focus', odak);
   window.addEventListener('online', odak);
   aralik = setInterval(() => { if (document.visibilityState === 'visible') zamanla(0); }, 30_000);
+  senkronKancalari.basla?.(kullanici, anahtar);
   await senkronla();
 }
 
 export function senkronDurdur() {
   nesil++;
+  senkronKancalari.dur?.();
   degisiklikDinle(null);
   if (kanal) supabase()?.removeChannel(kanal);
   kanal = null;
@@ -108,6 +119,8 @@ export async function senkronla(): Promise<void> {
       if (!navigator.onLine) throw new Error('İnternet yok — değişiklikler cihazda bekliyor.');
       await gonder();
       await cek();
+      // Danışmanlık: önce kendi verim güncellensin, sonra mesajlar (başka cihazda alınmış program tekrar gelmesin).
+      if (senkronKancalari.tur) await senkronKancalari.tur().catch((e) => console.warn('[ritos] danışmanlık', e));
       const son = Date.now();
       await db.ayar.put({ anahtar: SON, deger: son });
       guncelle({ son, hata: null, ilkIndirme: false });

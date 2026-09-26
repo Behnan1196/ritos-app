@@ -62,6 +62,7 @@ export interface AjandaKartRow {
   geri_bildirim: 'yok' | 'yerel' | 'uzak';
   sira: number;                  // gün listesindeki sıra — kart düzeyinde (A7)
   ek?: PaketEk | null;           // alan paketi bilgisi (26 eylül) — indekssiz
+  isaret?: number | null;        // D8 — koç güncelledi (zaman); kartta kısa süre "güncellendi" görünür
   atla?: string[];               // tekrar eden kartın "yalnız bu gün" kaldırılan günleri (A7) — indekssiz, göç gerektirmez
   guncellendi: number;
 }
@@ -103,7 +104,22 @@ export interface ProgramRow {
   degerlendirme: number | null;  // 0..4, yalnız güncel değer (tarihsel değil)
   calisma_baslangic: string | null; // son başlatmanın tarihi; null = hiç başlatılmadı
   calisma_bitis: string | null;     // null + baslangic dolu = süregelen; durdurunca dün
+  sablon?: boolean;              // D4 — koçun şablonu: başlatılmaz, yalnız atanır
+  uzak?: UzakProgram | null;     // D5/D6 — danışana atanmış (koç tarafı) ya da koçtan gelen (danışan tarafı)
   guncellendi: number;
+}
+
+// Danışmanlık programı: iki tarafta AYNI kimlikle durur (geri bildirim kaynak_ref'i eşleşsin diye).
+export interface UzakProgram {
+  iliski_id: string;
+  rol: 'koc' | 'danisan';        // bu cihazın sahibinin rolü
+  karsi_id: string;              // karşı tarafın kullanıcı kimliği
+  karsi_ad: string;
+  disiplin: string;
+  durum: 'taslak' | 'gonderildi' | 'kabul' | 'ret' | 'ayrildi';
+  baslangic: string;             // koçun seçtiği başlangıç (YYYY-MM-DD)
+  izinler: Izinler;              // danışanın Ajanda'sındaki kart izinleri (D9 varsayılanı)
+  surum: number;                 // her gönderimde artar — eski güncelleme yenisini ezmesin
 }
 
 export interface ProgramAdimRow {
@@ -150,7 +166,7 @@ export interface GelenRow {
   id: string;                    // sunucudaki cat_gelen id'si
   gonderen_id: string;
   gonderen_ad: string;
-  kaynak: 'dogrudan' | 'sohbet';
+  kaynak: 'dogrudan' | 'sohbet' | 'koc';
   paket: unknown;                // PaylasimPaketi (JSON)
   gelis: number;                 // sunucuya bırakıldığı an (epoch ms)
   alindi: number | null;         // "Al" denen an; null = alınmadı
@@ -220,6 +236,28 @@ export interface KonuDurumRow {
   guncellendi: number;
 }
 
+// v8 — 26 eylül: danışmanlık. İlişkiler sunucudan gelir (burada önbellek, senkronsuz);
+// giden = gönderilmeyi bekleyen şifreli mesajlar (cihaza özel, senkronsuz).
+export interface IliskiRow {
+  id: string;
+  koc: string;
+  danisan: string;
+  disiplin: string;
+  koc_ad: string;
+  danisan_ad: string;
+  durum: 'aktif' | 'sonlandi';
+  olusturuldu: string;
+  sonlandi: string | null;
+}
+
+export interface GidenRow {
+  id: string;
+  iliski_id: string;
+  alici: string;
+  icerik: unknown;               // MesajIcerik — gönderirken ilişki anahtarıyla şifrelenir
+  zaman: number;
+}
+
 export type KaynakTur = 'kitap' | 'soru_bankasi' | 'deneme' | 'video' | 'dokuman';
 export interface KaynakRow {
   id: string;
@@ -249,6 +287,8 @@ export class RitosDB extends Dexie {
   katalog_duzen!: EntityTable<KatalogDuzenRow, 'id'>;
   kaynak!: EntityTable<KaynakRow, 'id'>;
   konu_durum!: EntityTable<KonuDurumRow, 'id'>;
+  iliski!: EntityTable<IliskiRow, 'id'>;
+  giden!: EntityTable<GidenRow, 'id'>;
 
   /** Sunucudan gelen değişiklik uygulanırken true — kancalar bunu yerel değişiklik saymaz. */
   uzaktan = false;
@@ -357,6 +397,28 @@ export class RitosDB extends Dexie {
       katalog_duzen: 'id, sinav',
       kaynak: 'id',
       konu_durum: 'id',
+    });
+    // v8 — 26 eylül: danışmanlık — ilişki önbelleği, giden mesaj kuyruğu.
+    this.version(8).stores({
+      home_widget: 'id, type',
+      ayar: 'anahtar',
+      ajanda_kart: 'id, kaynak_modul, kaynak_ref, baslangic',
+      ajanda_kayit: 'id, kart_id, tarih',
+      geri_bildirim: 'id, kart_id, kaynak_ref, zaman',
+      program: 'id, klasor_id',
+      program_adim: 'id, program_id',
+      klasor: 'id, ust_id',
+      gelen: 'id, gelis, alindi',
+      kisi: 'id, son',
+      bekleyen: 'anahtar, zaman',
+      alan_degerlendirme: 'id, alan_id, zaman',
+      katalog: 'kod, paket',
+      paket_kurulum: 'id',
+      katalog_duzen: 'id, sinav',
+      kaynak: 'id',
+      konu_durum: 'id',
+      iliski: 'id, durum',
+      giden: 'id, zaman',
     });
 
     // Senkronlanan tablolardaki her yerel değişikliği "bekleyen"e işaretle.
