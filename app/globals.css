@@ -468,3 +468,4 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-hafta .rt-chk{width:20px;height:20px;font-size:11px;}
 .rt-hafta .rt-oynat{width:24px;height:24px;font-size:10px;}
 .rt-hafta-bos{text-align:center;margin:4px 0;}
+.rt-sekme-rozet.nokta{width:8px;height:8px;padding:0;border-radius:50%;background:#d9822b;}

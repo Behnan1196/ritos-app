@@ -116,22 +116,42 @@ export function SifreSifirlaEkrani() {
 // ———————————————— kurtarma kelimeleri: hatırlatma ————————————————
 
 /** Kurtarma kelimeleri kaydedilmediyse: birkaç gün sonra ya da ilk koç bağlantısında Home'un üstünde. */
-export function KurtarmaHatirlatma() {
+// Kurtarma hatırlatması (28 eylül): Home'dan Ayarlar › Hesap'a taşındı. Hatırlatma zamanı
+// geldiyse Ayarlar sekmesinde küçük bir nokta görünür; kaydedilince her yerde birlikte kalkar.
+const KURTARMA_OLAY = 'ritos-kurtarma-kaydedildi';
+async function kurtarmaKaydet(uid: string) {
+  await kurtarmaKaydedildi(uid);
+  window.dispatchEvent(new Event(KURTARMA_OLAY));
+}
+
+export function useKurtarmaHatirlat(): boolean {
   const o = useOturum();
   const d = useDanismanlik();
   const iliskiVar = useCanli(async () => (await db.iliski.count()) > 0, [], false);
   const [durum, setDurum] = useState<KurtarmaDurumu | null>(null);
-  const [acik, setAcik] = useState(false);
   const uid = o.session?.user.id;
   useEffect(() => { if (uid) kurtarmaDurumu(uid, iliskiVar).then(setDurum).catch(() => {}); }, [uid, iliskiVar, d.etkin]);
-  if (!durum?.hatirlat || !uid) return null;
+  useEffect(() => {
+    const f = () => setDurum({ kaydedildi: true, hatirlat: false });
+    window.addEventListener(KURTARMA_OLAY, f);
+    return () => window.removeEventListener(KURTARMA_OLAY, f);
+  }, []);
+  return !!uid && !!durum?.hatirlat;
+}
+
+function KurtarmaHatirlatma() {
+  const o = useOturum();
+  const hatirlat = useKurtarmaHatirlat();
+  const [acik, setAcik] = useState(false);
+  const uid = o.session?.user.id;
+  if (!hatirlat || !uid) return null;
   return (
     <>
       <div className="rt-uyari rt-kurtarma-uyari">
         <span><b>Hesabını güvenceye al.</b> Şifreni unutursan verini yalnız kurtarma anahtarın açar. Bir kez kaydetmen yeter.</span>
         <button type="button" className="rt-btn primary" onClick={() => setAcik(true)}>Şimdi kaydet</button>
       </div>
-      {acik && <KurtarmaIste onKapat={() => setAcik(false)} onKaydedildi={async () => { await kurtarmaKaydedildi(uid); setDurum({ kaydedildi: true, hatirlat: false }); setAcik(false); }} />}
+      {acik && <KurtarmaIste onKapat={() => setAcik(false)} onKaydedildi={async () => { await kurtarmaKaydet(uid); setAcik(false); }} />}
     </>
   );
 }
@@ -193,6 +213,7 @@ export function AyarlarPane() {
     <div className="side-content" style={{ height: '100%', overflowY: 'auto' }}>
       <h4>⚙️ Ayarlar</h4>
       <Kap baslik="Hesap">
+        <KurtarmaHatirlatma />
         {o.session && (
           <>
             {adDuzenle === null ? (
@@ -223,7 +244,7 @@ export function AyarlarPane() {
 
       {modal === 'cikis' && <CikisModal onKapat={() => setModal(null)} bekleyen={d.bekleyen} />}
       {modal === 'sifre' && <SifreModal onKapat={() => setModal(null)} />}
-      {modal === 'kurtarma' && <KurtarmaIste onKapat={() => setModal(null)} onKaydedildi={async () => { if (uid) await kurtarmaKaydedildi(uid); setModal(null); }} />}
+      {modal === 'kurtarma' && <KurtarmaIste onKapat={() => setModal(null)} onKaydedildi={async () => { if (uid) await kurtarmaKaydet(uid); setModal(null); }} />}
     </div>
   );
 }

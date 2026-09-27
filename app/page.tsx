@@ -15,7 +15,7 @@ import { SinavTool, useSinavOzeti } from './ritos/Sinav';
 import { DanismanlikTool, DavetKarsilama, KoclarimSatiri, useDanismanlikOzeti } from './ritos/Danismanlik';
 import { SenkronIsareti, useGelenSenkron } from './ritos/Paylasim';
 import { SohbetEkrani, useSohbetOzeti } from './ritos/Sohbet';
-import { AyarlarPane, GirisEkrani, KurtarmaHatirlatma, SifreSifirlaEkrani } from './ritos/Hesap';
+import { AyarlarPane, GirisEkrani, SifreSifirlaEkrani, useKurtarmaHatirlat } from './ritos/Hesap';
 import { useHesapBaslat, useOturum } from '@/lib/hesap';
 import { useDanismanlik } from '@/lib/danismanlik';
 
@@ -58,7 +58,12 @@ function RitosUygulama() {
 
   const home = <HomeEkrani onOpenTool={setActiveTool} onGelisim={() => setSekme('gelisim')} onSohbet={() => setSekme('sohbet')} />;
   const sohbet = useSohbetOzeti();
-  const rozet = (k: Sekme) => (k === 'sohbet' && sohbet.toplam + sohbet.davet > 0 ? <i className="rt-sekme-rozet">{sohbet.toplam + sohbet.davet}</i> : null);
+  const kurtarma = useKurtarmaHatirlat();
+  const rozet = (k: Sekme) => (
+    k === 'sohbet' && sohbet.toplam + sohbet.davet > 0 ? <i className="rt-sekme-rozet">{sohbet.toplam + sohbet.davet}</i>
+      : k === 'ayarlar' && kurtarma ? <i className="rt-sekme-rozet nokta" aria-label="Hesabını güvenceye al" />
+      : null
+  );
   const sagSekme = (s: Sekme) => (
     s === 'gelisim' ? <KisiselGelisim />
       : s === 'sohbet' ? <SohbetEkrani />
@@ -161,7 +166,6 @@ function HomeEkrani({ onOpenTool, onGelisim, onSohbet }: { onOpenTool: (t: ToolI
   const danismanlik = useDanismanlikOzeti();
   return (
     <div className="fixed-widgets">
-      <KurtarmaHatirlatma />
       <OdakAlanlari onAc={onGelisim} />
       <KoclarimSatiri />
       {(sohbet.toplam > 0 || sohbet.davet > 0) && (
