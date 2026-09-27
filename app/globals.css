@@ -384,3 +384,10 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-rozet.guncel{background:#dce8f7;color:#284a7a;margin-left:6px;}
 .rt-qr{display:flex;justify-content:center;margin:0 auto 10px;width:220px;max-width:70%;background:#fff;border-radius:12px;padding:6px;}
 .rt-qr svg{width:100%;height:auto;display:block;}
+/* 27 eylül — iPhone çentik/durum çubuğu: tam ekran katmanların üstü güvenli alanın altından başlasın */
+.tool-overlay{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);}
+.tool-topbar{min-height:48px;}
+.tool-back{min-height:40px;min-width:44px;}
+.rt-modal-bg{padding:calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));}
+.rt-modal{max-height:calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));}
+.rt-kilit{padding-top:calc(20px + env(safe-area-inset-top));}
