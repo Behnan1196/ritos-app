@@ -253,7 +253,8 @@ export interface IliskiRow {
 
 export interface GidenRow {
   id: string;
-  iliski_id: string;
+  iliski_id: string;             // koç–danışan kanalı ('' = aile)
+  aile_id?: string | null;       // aile grubu kanalı
   alici: string;
   icerik: unknown;               // MesajIcerik — gönderirken ilişki anahtarıyla şifrelenir
   zaman: number;
@@ -264,6 +265,32 @@ export interface IliskiAyarRow {
   id: string;
   izinler: Izinler;
   guncellendi: number;
+}
+
+// v10 — 27 eylül: Sohbet (C1–C4) ve aile grubu (F1–F4).
+// konusma = 'i:<ilişki id>' (koç–danışan) ya da 'a:<aile id>'. Mesajlar senkronlanır (diğer cihazlarda da geçmiş görünsün).
+export interface MesajRow {
+  id: string;
+  konusma: string;
+  gonderen: string;
+  gonderen_ad: string;
+  tur: 'metin' | 'paylasim';
+  metin: string;
+  paket: unknown | null;         // PaylasimPaketi — yalnız tanım (kart / program)
+  zaman: number;
+  durum: 'bekliyor' | 'gitti';
+  alindi?: number | null;        // paylaşımı "Al" dediğim an
+}
+
+export interface KonusmaOkunduRow { id: string; zaman: number }
+
+export interface AileUyesi { uye: string; ad: string; rol: 'yonetici' | 'uye'; durum: 'davet' | 'aktif' | 'ayrildi' }
+export interface AileRow {
+  id: string;
+  ad: string;
+  kurucu: string;
+  anahtar_surum: number;
+  uyeler: AileUyesi[];           // bana görünen üyeler (davetliyken yalnız ben)
 }
 
 export type KaynakTur = 'kitap' | 'soru_bankasi' | 'deneme' | 'video' | 'dokuman';
@@ -298,6 +325,9 @@ export class RitosDB extends Dexie {
   iliski!: EntityTable<IliskiRow, 'id'>;
   giden!: EntityTable<GidenRow, 'id'>;
   iliski_ayar!: EntityTable<IliskiAyarRow, 'id'>;
+  mesaj!: EntityTable<MesajRow, 'id'>;
+  konusma_okundu!: EntityTable<KonusmaOkunduRow, 'id'>;
+  aile!: EntityTable<AileRow, 'id'>;
 
   /** Sunucudan gelen değişiklik uygulanırken true — kancalar bunu yerel değişiklik saymaz. */
   uzaktan = false;
@@ -450,6 +480,32 @@ export class RitosDB extends Dexie {
       giden: 'id, zaman',
       iliski_ayar: 'id',
     });
+    // v10 — 27 eylül: sohbet mesajları, okundu işaretleri, aile önbelleği.
+    this.version(10).stores({
+      home_widget: 'id, type',
+      ayar: 'anahtar',
+      ajanda_kart: 'id, kaynak_modul, kaynak_ref, baslangic',
+      ajanda_kayit: 'id, kart_id, tarih',
+      geri_bildirim: 'id, kart_id, kaynak_ref, zaman',
+      program: 'id, klasor_id',
+      program_adim: 'id, program_id',
+      klasor: 'id, ust_id',
+      gelen: 'id, gelis, alindi',
+      kisi: 'id, son',
+      bekleyen: 'anahtar, zaman',
+      alan_degerlendirme: 'id, alan_id, zaman',
+      katalog: 'kod, paket',
+      paket_kurulum: 'id',
+      katalog_duzen: 'id, sinav',
+      kaynak: 'id',
+      konu_durum: 'id',
+      iliski: 'id, durum',
+      giden: 'id, zaman',
+      iliski_ayar: 'id',
+      mesaj: 'id, konusma, zaman',
+      konusma_okundu: 'id',
+      aile: 'id',
+    });
 
     // Senkronlanan tablolardaki her yerel değişikliği "bekleyen"e işaretle.
     // Kanca transaction içinde çalışır; bekleyen'e yazmayı transaction dışına erteleriz.
@@ -494,7 +550,7 @@ export class RitosDB extends Dexie {
 // Hesapsız kullanımın verisi 'ritos' (misafir) veritabanında; her hesabın kendi veritabanı var.
 // Hangisinin açık olduğu cihazda küçük bir işarette tutulur; değişince sayfa yeniden yüklenir.
 
-export const SENKRON_TABLOLARI = ['home_widget', 'ajanda_kart', 'ajanda_kayit', 'geri_bildirim', 'program', 'program_adim', 'klasor', 'gelen', 'kisi', 'alan_degerlendirme', 'paket_kurulum', 'katalog_duzen', 'kaynak', 'konu_durum', 'iliski_ayar'] as const;
+export const SENKRON_TABLOLARI = ['home_widget', 'ajanda_kart', 'ajanda_kayit', 'geri_bildirim', 'program', 'program_adim', 'klasor', 'gelen', 'kisi', 'alan_degerlendirme', 'paket_kurulum', 'katalog_duzen', 'kaynak', 'konu_durum', 'iliski_ayar', 'mesaj', 'konusma_okundu'] as const;
 export type SenkronTablo = (typeof SENKRON_TABLOLARI)[number];
 
 export const MISAFIR_DB = 'ritos';

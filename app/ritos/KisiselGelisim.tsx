@@ -11,6 +11,8 @@ import { GorevFormu, gorevBaslangic, useSinavOzeti } from './Sinav';
 import type { GorevTaslak } from '@/lib/sinavGorev';
 import { ProgramDanismanlik, programEkraniKaydet } from './Danismanlik';
 import { V2 } from '@/lib/surum';
+import { PaylasDugmesi } from './Sohbet';
+import { programPaketi } from '@/lib/paylasim';
 
 // Kişisel Gelişim: kullanıcının kendi haritası — yaşam alanları → klasörler → programlar.
 // Alanlar kullanıcının; kriterler ve öz değerlendirme alanda (26 eylül).
@@ -266,6 +268,7 @@ function ProgramDetay({ p, klasorler, onGeri }: { p: ProgramRow; klasorler: Klas
       <Kap
         baslik={<>{p.ad} {aktif ? <span className="rt-aktif">aktif</span> : <span className="rt-muted"> · aktif değil</span>}</>}
         eylemler={p.sablon || salt || (koc && !(p.uzak!.durum === 'kabul' && aktif)) ? null : <>
+          {!p.uzak && <PaylasDugmesi paketUret={() => programPaketi(p.id)} />}
           {aktif && p.calisma_bitis === bugun()
           ? <span className="rt-muted">bugün son gün</span>
           : aktif

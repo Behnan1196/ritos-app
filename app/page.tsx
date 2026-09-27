@@ -13,7 +13,8 @@ import AjandaPane from './ritos/AjandaPane';
 import KisiselGelisim, { OdakAlanlari } from './ritos/KisiselGelisim';
 import { SinavTool, useSinavOzeti } from './ritos/Sinav';
 import { DanismanlikTool, DavetKarsilama, KoclarimSatiri, useDanismanlikOzeti } from './ritos/Danismanlik';
-import { BekleyenDavetler, SenkronIsareti, useGelenSenkron } from './ritos/Paylasim';
+import { SenkronIsareti, useGelenSenkron } from './ritos/Paylasim';
+import { SohbetEkrani, useSohbetOzeti } from './ritos/Sohbet';
 import { AyarlarPane, GirisEkrani, KurtarmaHatirlatma, SifreSifirlaEkrani } from './ritos/Hesap';
 import { useHesapBaslat, useOturum } from '@/lib/hesap';
 import { useDanismanlik } from '@/lib/danismanlik';
@@ -55,10 +56,12 @@ function RitosUygulama() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const home = <HomeEkrani onOpenTool={setActiveTool} onGelisim={() => setSekme('gelisim')} />;
+  const home = <HomeEkrani onOpenTool={setActiveTool} onGelisim={() => setSekme('gelisim')} onSohbet={() => setSekme('sohbet')} />;
+  const sohbet = useSohbetOzeti();
+  const rozet = (k: Sekme) => (k === 'sohbet' && sohbet.toplam + sohbet.davet > 0 ? <i className="rt-sekme-rozet">{sohbet.toplam + sohbet.davet}</i> : null);
   const sagSekme = (s: Sekme) => (
     s === 'gelisim' ? <KisiselGelisim />
-      : s === 'sohbet' ? <SohbetYakinda />
+      : s === 'sohbet' ? <SohbetEkrani />
       : s === 'ayarlar' ? <AyarlarPane />
       : home
   );
@@ -81,7 +84,7 @@ function RitosUygulama() {
           <div className="mobile-main">{sekme === 'ajanda' ? <AjandaPane /> : sagSekme(sekme)}</div>
           <div className="mobile-nav">
             {([['home', '🏠', 'Home'], ['ajanda', '📅', 'Ajanda'], ['gelisim', '🌱', 'Gelişim'], ['sohbet', '💬', 'Sohbet'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sekme, string, string][]).map(([k, ic, ad]) => (
-              <button key={k} className={sekme === k ? 'on' : ''} onClick={() => setSekme(k)}><span className="ic">{ic}</span>{ad}</button>
+              <button key={k} className={sekme === k ? 'on' : ''} onClick={() => setSekme(k)}><span className="ic">{ic}{rozet(k)}</span>{ad}</button>
             ))}
           </div>
           {arac}
@@ -98,7 +101,7 @@ function RitosUygulama() {
                 <div className="side-content">{sagSekme(sekme === 'ajanda' ? 'home' : sekme)}</div>
                 <div className="side-tabs">
                   {([['home', '🏠', 'Home'], ['gelisim', '🌱', 'Kişisel Gelişim'], ['sohbet', '💬', 'Sohbet'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sekme, string, string][]).map(([k, ic, ad]) => (
-                    <button key={k} className={(sekme === 'ajanda' ? 'home' : sekme) === k ? 'on' : ''} onClick={() => setSekme(k)}><span>{ic}</span>{ad}</button>
+                    <button key={k} className={(sekme === 'ajanda' ? 'home' : sekme) === k ? 'on' : ''} onClick={() => setSekme(k)}><span>{ic}{rozet(k)}</span>{ad}</button>
                   ))}
                 </div>
               </>
@@ -151,16 +154,23 @@ function SplitPane({
 
 // ———————————————————————————————————— Home (V1: bizim tasarladığımız sabit düzen) ————————————————————————————————————
 
-function HomeEkrani({ onOpenTool, onGelisim }: { onOpenTool: (t: ToolId) => void; onGelisim: () => void }) {
+function HomeEkrani({ onOpenTool, onGelisim, onSohbet }: { onOpenTool: (t: ToolId) => void; onGelisim: () => void; onSohbet: () => void }) {
+  const sohbet = useSohbetOzeti();
   const d = useDanismanlik();
   const sinav = useSinavOzeti();
   const danismanlik = useDanismanlikOzeti();
   return (
     <div className="fixed-widgets">
       <KurtarmaHatirlatma />
-      <BekleyenDavetler />
       <OdakAlanlari onAc={onGelisim} />
       <KoclarimSatiri />
+      {(sohbet.toplam > 0 || sohbet.davet > 0) && (
+        <button type="button" className="wrow tool" onClick={onSohbet}>
+          <span className="ic">💬</span>
+          <span className="tx"><span className="t">Sohbet</span><span className="s">{[sohbet.davet ? `${sohbet.davet} davet` : '', sohbet.toplam ? `${sohbet.toplam} okunmamış mesaj` : ''].filter(Boolean).join(' · ')}</span></span>
+          <span className="chev">›</span>
+        </button>
+      )}
       {danismanlik.goster && (
         <button type="button" className="wrow tool" onClick={() => onOpenTool('danismanlik')}>
           <span className="ic">🤝</span>
@@ -179,11 +189,3 @@ function HomeEkrani({ onOpenTool, onGelisim }: { onOpenTool: (t: ToolId) => void
   );
 }
 
-function SohbetYakinda() {
-  return (
-    <div>
-      <h4>💬 Sohbet</h4>
-      <p className="rt-muted">Koçunla, danışanlarınla ve ailenle yazışma ve paylaşım burada olacak. Yapım aşamasında.</p>
-    </div>
-  );
-}

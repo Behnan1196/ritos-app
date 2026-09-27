@@ -191,3 +191,45 @@ export async function engellenenler(): Promise<{ engellenen: string; gorunen_ad:
 export async function engelKaldir(gonderenId: string) {
   await supabase()?.from('cat_engel').delete().eq('engellenen', gonderenId);
 }
+
+// ———————————————— Sohbet'ten gelen paylaşımı almak (C3, 27 eylül) ————————————————
+
+/** Paylaşılan kartı Ajanda'ya (verilen günden) ya da programı Kişisel Gelişim'e (verilen yere) ekler. */
+export async function paketiAl(p: PaylasimPaketi, gonderenAd: string, secenek: { baslangic: string; klasor: string | null }): Promise<string> {
+  if (p.tur === 'kart' && p.kart) {
+    await teslimAl([{
+      surum: PAKET_SURUM,
+      id: crypto.randomUUID(),
+      // veri üreten kart (Kaydet/Uygula) paylaşımda "Yap" olur — değer geçmişi programda yaşar
+      tip: (p.kart.tip === 'kaydet' || p.kart.tip === 'uygula') && !p.kart.ek ? 'yap' : p.kart.tip,
+      ad: p.ad,
+      bloklar: p.kart.bloklar,
+      zamanlama: {
+        baslangic: secenek.baslangic,
+        bitis: p.kart.gun_sayisi === null ? null : tarihEkle(secenek.baslangic, p.kart.gun_sayisi - 1),
+        gunler: p.kart.gunler,
+        saatler: p.kart.saatler,
+      },
+      kaynak: { modul: 'ajanda', ref: null, etiket: null },
+      sahip: 'ben',
+      izinler: TAM_IZIN,
+      geri_bildirim: 'yok',
+      ek: p.kart.ek ?? null,
+    }]);
+    return "Ajanda'na eklendi";
+  }
+  if (p.tur === 'program' && p.program) {
+    const mevcut = await db.program.toArray();
+    let ad = p.ad;
+    if (mevcut.some((x) => x.ad.toLocaleLowerCase('tr') === ad.toLocaleLowerCase('tr'))) ad = `${p.ad} · ${gonderenAd}`;
+    const id = crypto.randomUUID();
+    await db.program.add({
+      id, ad, amac: p.program.amac, dikkat: p.program.dikkat, kriterler: p.program.kriterler, hedef: p.program.hedef,
+      klasor_id: secenek.klasor, home_goster: false, degerlendirme_acik: false, degerlendirme: null,
+      calisma_baslangic: null, calisma_bitis: null, kimden: gonderenAd, guncellendi: Date.now(),
+    });
+    for (const a of p.program.adimlar) await adimEkle(id, a);
+    return "Kişisel Gelişim'ine eklendi";
+  }
+  throw new Error('Tanınmayan paylaşım');
+}

@@ -11,6 +11,8 @@ import { BlokGoster, Chips, Kap, Modal, OnayKutusu, degerMetni } from './ortak';
 import { DenemeGir, GorevFormu, gorevTeslim, useSinavOzeti } from './Sinav';
 import { sinavOzeti, type GorevTaslak } from '@/lib/sinavGorev';
 import { V2 } from '@/lib/surum';
+import { kartPaketi } from '@/lib/paylasim';
+import { PaylasDugmesi } from './Sohbet';
 
 // A1–A9 (ilk dilim). Ajanda yalnızca kart satırlarını bilir; kaynağın içini bilmez.
 export default function AjandaPane() {
@@ -266,6 +268,7 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
       {!bagli && !tasiAcik && !silAcik && !tekSil && (
         <div className="rt-satir">
           {kart.izinler.gun_degistir && <button type="button" className="rt-btn" onClick={() => setTasiAcik(true)}>Taşı</button>}
+          <PaylasDugmesi paketUret={() => kartPaketi(kart)} />
           {kart.izinler.sil && <button type="button" className="rt-btn tehlike" onClick={() => (tekrarli ? setSilAcik(true) : setTekSil(true))}>Kaldır</button>}
         </div>
       )}

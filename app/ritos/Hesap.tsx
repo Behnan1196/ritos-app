@@ -13,6 +13,7 @@ import { senkronla, useSenkronDurum } from '@/lib/senkron';
 import { Chips, Kap, Modal } from './ortak';
 import { PaketlerKap } from './Sinav';
 import { DanismanlikAyarlari } from './Danismanlik';
+import { AileAyarlari } from './Sohbet';
 import { useDanismanlik } from '@/lib/danismanlik';
 
 // ———————————————— giriş kapısı ————————————————
@@ -218,6 +219,7 @@ export function AyarlarPane() {
 
       {dn.profil?.koc && <PaketlerKap />}
       <DanismanlikAyarlari />
+      <AileAyarlari />
 
       {modal === 'cikis' && <CikisModal onKapat={() => setModal(null)} bekleyen={d.bekleyen} />}
       {modal === 'sifre' && <SifreModal onKapat={() => setModal(null)} />}
