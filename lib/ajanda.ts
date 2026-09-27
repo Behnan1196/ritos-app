@@ -245,3 +245,15 @@ export async function yenidenTeslim(ref: string, etkin: string, paket: KartPaket
     }
   });
 }
+
+// Kişinin kendi kartını düzenleme (28 eylül — "ajandaya eklediğim kartın açıklamasını değiştiremiyorum").
+// Yalnız düzenleme izni olan, bağımsız kartta. Başlangıç günü değişmez; taşıma ayrı (kartTasi).
+// Geçmiş kayıtlar (yapıldı / değerler) yerinde kalır.
+export async function kartGuncelle(
+  kartId: string,
+  patch: Partial<Pick<AjandaKartRow, 'tip' | 'ad' | 'bloklar' | 'bitis' | 'gunler' | 'saatler'>>,
+) {
+  const kart = await db.ajanda_kart.get(kartId);
+  if (!kart || !kart.izinler.duzenle || kart.geri_bildirim !== 'yok') return;
+  await db.ajanda_kart.update(kartId, { ...patch, guncellendi: Date.now() });
+}

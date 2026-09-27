@@ -1,18 +1,18 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ayOzeti, degerKaydet, gununKartlari, kartKaldir, kartTasi, siraDegistir, teslimAl, yapildiAyarla, type GunSatiri } from '@/lib/ajanda';
+import { ayOzeti, degerKaydet, gununKartlari, kartKaldir, kartTasi, siraDegistir, yapildiAyarla, type GunSatiri } from '@/lib/ajanda';
 import { useCanli } from '@/lib/canli';
 import {
-  GUN_KISA, PAKET_SURUM, TAM_IZIN, bugun, degerBloklari, gunFarki, tarihEkle, tarihEtiket, tarihParse, tarihStr,
-  type Blok, type KartPaketi, type TemelTip,
+  bugun, degerBloklari, gunFarki, tarihEkle, tarihEtiket, tarihParse, tarihStr,
+  type Blok,
 } from '@/lib/paket';
-import { BlokGoster, Chips, Kap, Modal, OnayKutusu, degerMetni } from './ortak';
-import { DenemeGir, GorevFormu, gorevTeslim, useSinavOzeti } from './Sinav';
-import { sinavOzeti, type GorevTaslak } from '@/lib/sinavGorev';
-import { V2 } from '@/lib/surum';
+import { BlokGoster, Kap, Modal, OnayKutusu, degerMetni } from './ortak';
+import { DenemeGir } from './Sinav';
+import { sinavOzeti } from '@/lib/sinavGorev';
 import { kartPaketi } from '@/lib/paylasim';
 import { PaylasDugmesi } from './Sohbet';
+import { KartEditor } from './KartEditor';
 
 // A1–A9 (ilk dilim). Ajanda yalnızca kart satırlarını bilir; kaynağın içini bilmez.
 export default function AjandaPane() {
@@ -42,7 +42,7 @@ export default function AjandaPane() {
         <SiraliListe satirlar={satirlar} tarih={tarih} onAc={setDetay} />
       </Kap>
 
-      {ekleAcik && <HizliEkle tarih={tarih} onKapat={() => setEkleAcik(false)} />}
+      {ekleAcik && <KartEditor tarih={tarih} onKapat={() => setEkleAcik(false)} />}
       {ayAcik && <AyTakvimi secili={tarih} onSec={(t) => { setTarih(t); setAyAcik(false); }} onKapat={() => setAyAcik(false)} />}
       {detay && <KartDetay satir={detay} tarih={tarih} onKapat={() => setDetay(null)} />}
     </div>
@@ -117,6 +117,17 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
   const yeniGuncel = !!kart.isaret && Date.now() - kart.isaret < 3 * 86400000;
   // A9 — değer düzeltme süresi (koçun izni): süre geçtiyse yapılmış kart değiştirilemez.
   const kilitli = !!kayit?.yapildi && kart.izinler.duzeltme_gun !== null && gunFarki(tarih, bugun()) > kart.izinler.duzeltme_gun;
+  // Tek kart + ekler (28 eylül): yapılacak kartına kayıt eki takılıysa işaretlerken değer sorulur,
+  // zamanlayıcı takılıysa ▶ ile başlatılır; video sayısı satırda rozet olarak görünür.
+  const kayitBl = kart.tip === 'yap' ? degerBloklari(kart.bloklar) : [];
+  const zamanli = kart.tip === 'yap' && kart.bloklar.some((b) => b.tur === 'zamanlayici');
+  const videoSay = kart.bloklar.filter((b) => b.tur === 'video').length;
+  const ekMeta = [videoSay ? `🎬 ${videoSay}` : ''].filter(Boolean).join(' ');
+  function isaretle() {
+    if (yapildi) { yapildiAyarla(kart.id, tarih, false); setDegerAcik(false); return; }
+    if (kayitBl.length) setDegerAcik((v) => !v);
+    else yapildiAyarla(kart.id, tarih, true);
+  }
 
   return (
     <div className={`rt-kart${bagli ? ' bagli' : ''}${yapildi ? ' yapildi' : ''}`}>
@@ -128,13 +139,14 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
         ) : kart.tip === 'kaydet' ? (
           <button type="button" className={`rt-chk${yapildi ? ' on' : ''}`} disabled={kilitli} title={kilitli ? 'Düzeltme süresi geçti' : undefined} onClick={() => setDegerAcik((v) => !v)} aria-label="Değer gir">{yapildi ? '✓' : '✎'}</button>
         ) : (
-          <button type="button" className={`rt-chk${yapildi ? ' on' : ''}`} disabled={kilitli} title={kilitli ? 'Düzeltme süresi geçti' : undefined} onClick={() => yapildiAyarla(kart.id, tarih, !yapildi)} aria-label="Yapıldı">{yapildi ? '✓' : ''}</button>
+          <button type="button" className={`rt-chk${yapildi ? ' on' : ''}`} disabled={kilitli} title={kilitli ? 'Düzeltme süresi geçti' : undefined} onClick={isaretle} aria-label="Yapıldı">{yapildi ? '✓' : ''}</button>
         )}
         <button type="button" className="rt-kart-ad" onClick={kart.izinler.ac ? onAc : undefined}>
           <span className="t">{kart.ad}{yeniGuncel && <span className="rt-rozet guncel">güncellendi</span>}</span>
-          {meta && <span className="m">{meta}</span>}
-          {(kart.tip === 'kaydet' || kart.tip === 'uygula') && kayit?.degerler && <span className="m">✓ {(kart.ek && sinavOzeti(kart.ek, kayit.degerler)) || degerMetni(kayit.degerler)}</span>}
+          {(meta || ekMeta) && <span className="m">{[meta, ekMeta].filter(Boolean).join(' · ')}</span>}
+          {(kart.tip === 'kaydet' || kart.tip === 'uygula' || (kart.tip === 'yap' && yapildi)) && kayit?.degerler && degerMetni(kayit.degerler, kart.bloklar) && <span className="m">✓ {(kart.ek && sinavOzeti(kart.ek, kayit.degerler)) || degerMetni(kayit.degerler, kart.bloklar)}</span>}
         </button>
+        {zamanli && !yapildi && !kilitli && <button type="button" className="rt-oynat" onClick={() => setUygulaAcik(true)} aria-label="Zamanlayıcıyı başlat">▶</button>}
         {tutamac}
       </div>
       {uygulaAcik && <Uygula satir={satir} tarih={tarih} onKapat={() => setUygulaAcik(false)} />}
@@ -144,11 +156,19 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
       {degerAcik && kart.tip === 'kaydet' && kart.ek?.tur !== 'deneme' && (
         <DegerGir bloklar={kart.bloklar} ilk={kayit?.degerler ?? null} onKaydet={async (d) => { await degerKaydet(kart.id, tarih, d); setDegerAcik(false); }} />
       )}
+      {degerAcik && kart.tip === 'yap' && !yapildi && (
+        <DegerGir
+          bloklar={kart.bloklar}
+          ilk={kayit?.degerler ?? null}
+          onKaydet={async (d) => { await degerKaydet(kart.id, tarih, d); setDegerAcik(false); }}
+          onSadeceIsaretle={async () => { await yapildiAyarla(kart.id, tarih, true); setDegerAcik(false); }}
+        />
+      )}
     </div>
   );
 }
 
-function DegerGir({ bloklar, ilk, onKaydet }: { bloklar: Blok[]; ilk: Record<string, unknown> | null; onKaydet: (d: Record<string, unknown>) => void }) {
+function DegerGir({ bloklar, ilk, onKaydet, onSadeceIsaretle }: { bloklar: Blok[]; ilk: Record<string, unknown> | null; onKaydet: (d: Record<string, unknown>) => void; onSadeceIsaretle?: () => void }) {
   const alanlar = degerBloklari(bloklar);
   const [d, setD] = useState<Record<string, string>>(() => Object.fromEntries(alanlar.map((a) => [a.anahtar, String(ilk?.[a.anahtar] ?? '')])));
   return (
@@ -166,82 +186,11 @@ function DegerGir({ bloklar, ilk, onKaydet }: { bloklar: Blok[]; ilk: Record<str
           )}
         </label>
       ))}
-      <button type="button" className="rt-btn primary" onClick={() => onKaydet(Object.fromEntries(alanlar.map((a) => [a.anahtar, a.tur === 'sayi' && d[a.anahtar] !== '' ? Number(d[a.anahtar]) : d[a.anahtar]])))}>Kaydet</button>
+      <div className="rt-satir">
+        {onSadeceIsaretle && <button type="button" className="rt-btn" onClick={onSadeceIsaretle}>Değer girmeden işaretle</button>}
+        <button type="button" className="rt-btn primary" onClick={() => onKaydet(Object.fromEntries(alanlar.map((a) => [a.anahtar, a.tur === 'sayi' && d[a.anahtar] !== '' ? Number(d[a.anahtar]) : d[a.anahtar]])))}>Kaydet</button>
+      </div>
     </div>
-  );
-}
-
-function HizliEkle({ tarih, onKapat }: { tarih: string; onKapat: () => void }) {
-  // V1 (27 eylül): sınav görevleri yalnız koçun planında; kişinin kendi Ajanda'sında yok.
-  const sinavKurulu = V2 && useSinavOzeti().kurulu; // eslint-disable-line react-hooks/rules-of-hooks
-  const [tip, setTip] = useState<TemelTip | 'sinav'>('yap');
-  const [gorev, setGorev] = useState<GorevTaslak | null>(null);
-  const [ad, setAd] = useState('');
-  const [metin, setMetin] = useState('');
-  const [url, setUrl] = useState('');
-  const [saat, setSaat] = useState('');
-  const [tekrar, setTekrar] = useState<'tek' | 'tekrar'>('tek');
-  const [gunler, setGunler] = useState<number[]>([]);
-  const [sure, setSure] = useState('');
-
-  async function ekle() {
-    if (tip === 'sinav') {
-      if (!gorev) return;
-      const n = Number(sure);
-      await gorevTeslim(gorev, tarih, saat, tekrar === 'tek' ? tarih : sure && n > 0 ? tarihEkle(tarih, n - 1) : null, tekrar === 'tekrar' && gunler.length ? gunler : null);
-      onKapat();
-      return;
-    }
-    if (!ad.trim()) return;
-    const bloklar: Blok[] = [];
-    if (metin.trim()) bloklar.push({ tur: 'metin', metin: metin.trim() });
-    if (url.trim()) bloklar.push({ tur: /youtu|vimeo|instagram/.test(url) ? 'video' : 'baglanti', url: url.trim() });
-    const n = Number(sure);
-    const paket: KartPaketi = {
-      surum: PAKET_SURUM,
-      id: crypto.randomUUID(),
-      tip,
-      ad: ad.trim(),
-      bloklar,
-      zamanlama: {
-        baslangic: tarih,
-        bitis: tekrar === 'tek' ? tarih : sure && n > 0 ? tarihEkle(tarih, n - 1) : null,
-        gunler: tekrar === 'tekrar' && gunler.length ? gunler : null,
-        saatler: saat ? [saat] : [],
-      },
-      kaynak: { modul: 'ajanda', ref: null, etiket: null },
-      sahip: 'ben',
-      izinler: TAM_IZIN,
-      geri_bildirim: 'yok',
-    };
-    await teslimAl([paket]);
-    onKapat();
-  }
-
-  return (
-    <Modal baslik="Kart ekle" onKapat={onKapat}>
-      <Chips<TemelTip | 'sinav'> secenekler={[['yap', 'Yapılacak'], ['oku', 'Okunacak / izlenecek'], ...(sinavKurulu ? [['sinav', '📚 Sınav görevi'] as ['sinav', string]] : [])]} deger={tip} onSec={setTip} />
-      {tip === 'sinav' ? <GorevFormu onChange={setGorev} /> : (
-        <>
-          <input className="rt-inp" placeholder="Ad" value={ad} onChange={(e) => setAd(e.target.value)} autoFocus />
-          <textarea className="rt-inp" placeholder={tip === 'oku' ? 'Metin' : 'Açıklama (isteğe bağlı)'} value={metin} onChange={(e) => setMetin(e.target.value)} rows={3} />
-        </>
-      )}
-      {tip === 'oku' && <input className="rt-inp" placeholder="Video ya da bağlantı (isteğe bağlı)" value={url} onChange={(e) => setUrl(e.target.value)} />}
-      <label className="rt-alan"><span>Saat (isteğe bağlı)</span><input className="rt-inp" type="time" value={saat} onChange={(e) => setSaat(e.target.value)} /></label>
-      <Chips<'tek' | 'tekrar'> secenekler={[['tek', 'Yalnız bu gün'], ['tekrar', 'Tekrarla']]} deger={tekrar} onSec={setTekrar} />
-      {tekrar === 'tekrar' && (
-        <>
-          <div className="rt-chips">
-            {GUN_KISA.map(([g, e]) => (
-              <button key={g} type="button" className={`rt-chip${gunler.includes(g) ? ' on' : ''}`} onClick={() => setGunler(gunler.includes(g) ? gunler.filter((x) => x !== g) : [...gunler, g])}>{e}</button>
-            ))}
-          </div>
-          <input className="rt-inp" inputMode="numeric" placeholder="Süre (gün) — boş = süregelen" value={sure} onChange={(e) => setSure(e.target.value.replace(/\D/g, ''))} />
-        </>
-      )}
-      <button type="button" className="rt-btn primary" disabled={tip === 'sinav' ? !gorev : !ad.trim()} onClick={ekle}>Ekle</button>
-    </Modal>
   );
 }
 
@@ -253,6 +202,11 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
   const [yeniTarih, setYeniTarih] = useState(tarihEkle(tarih, 1));
   const [silAcik, setSilAcik] = useState(false);
   const [tekSil, setTekSil] = useState(false);
+  const [duzenle, setDuzenle] = useState(false);
+  // Kendi kartı (Ajanda'dan eklenen, bağımsız) her zaman düzenlenebilir.
+  const duzenlenir = !bagli && kart.kaynak_modul === 'ajanda' && kart.izinler.duzenle && (kart.tip === 'yap' || kart.tip === 'oku');
+
+  if (duzenle) return <KartEditor tarih={tarih} kart={kart} onKapat={onKapat} />;
 
   return (
     <Modal baslik={kart.ad} onKapat={onKapat}>
@@ -267,6 +221,7 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
       )}
       {!bagli && !tasiAcik && !silAcik && !tekSil && (
         <div className="rt-satir">
+          {duzenlenir && <button type="button" className="rt-btn" onClick={() => setDuzenle(true)}>Düzenle</button>}
           {kart.izinler.gun_degistir && <button type="button" className="rt-btn" onClick={() => setTasiAcik(true)}>Taşı</button>}
           <PaylasDugmesi paketUret={() => kartPaketi(kart)} />
           {kart.izinler.sil && <button type="button" className="rt-btn tehlike" onClick={() => (tekrarli ? setSilAcik(true) : setTekSil(true))}>Kaldır</button>}
@@ -336,7 +291,7 @@ function AyTakvimi({ secili, onSec, onKapat }: { secili: string; onSec: (t: stri
 function Uygula({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string; onKapat: () => void }) {
   const { kart } = satir;
   const zb = kart.bloklar.find((b): b is Extract<Blok, { tur: 'zamanlayici' }> => b.tur === 'zamanlayici');
-  const hedefSn = zb ? zb.dakika * 60 : null;
+  const hedefSn = zb && zb.dakika > 0 ? zb.dakika * 60 : null; // 0 = serbest süre (ileri sayar)
   const [gecen, setGecen] = useState(0);
   const [calisiyor, setCalisiyor] = useState(false);
 
@@ -360,7 +315,7 @@ function Uygula({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string; on
       <div className={`rt-sayac${bitti ? ' bitti' : ''}`}>{mmss}</div>
       <div className="rt-satir">
         {!bitti && <button type="button" className="rt-btn" onClick={() => setCalisiyor((c) => !c)}>{calisiyor ? 'Duraklat' : gecen ? 'Devam' : 'Başla'}</button>}
-        <button type="button" className="rt-btn primary" disabled={gecen === 0} onClick={async () => { await degerKaydet(kart.id, tarih, { sure_dk: Math.max(1, Math.round(gecen / 60)) }); onKapat(); }}>Bitir ve kaydet</button>
+        <button type="button" className="rt-btn primary" disabled={gecen === 0} onClick={async () => { await degerKaydet(kart.id, tarih, { ...(satir.kayit?.degerler ?? {}), sure_dk: Math.max(1, Math.round(gecen / 60)) }); onKapat(); }}>Bitir ve kaydet</button>
       </div>
     </Modal>
   );

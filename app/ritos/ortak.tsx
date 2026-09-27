@@ -48,6 +48,18 @@ export function BlokGoster({ bloklar }: { bloklar: Blok[] }) {
     <div className="rt-bloklar">
       {bloklar.map((b, i) => {
         if (b.tur === 'metin') return <p key={i} className="rt-metin">{b.metin}</p>;
+        if (b.tur === 'video') {
+          const id = youtubeId(b.url);
+          if (id) {
+            const q = [b.bas !== undefined ? `start=${b.bas}` : '', b.bit !== undefined ? `end=${b.bit}` : '', 'rel=0'].filter(Boolean).join('&');
+            return (
+              <div key={i} className="rt-video">
+                {b.baslik && <span className="rt-video-bas">{b.baslik}</span>}
+                <div className="rt-video-kutu"><iframe src={`https://www.youtube-nocookie.com/embed/${id}?${q}`} title={b.baslik || 'Video'} allow="encrypted-media; picture-in-picture; fullscreen" /></div>
+              </div>
+            );
+          }
+        }
         if (b.tur === 'baglanti' || b.tur === 'video')
           return <a key={i} className="rt-link" href={b.url} target="_blank" rel="noreferrer">{b.tur === 'video' ? '▶ ' : '🔗 '}{b.baslik || b.url}</a>;
         if (b.tur === 'sayi') return <p key={i} className="rt-muted">Değer: {b.etiket}{b.birim ? ` (${b.birim})` : ''}{b.hedef !== undefined ? ` · hedef ${b.hedef}` : ''}</p>;
@@ -58,9 +70,22 @@ export function BlokGoster({ bloklar }: { bloklar: Blok[] }) {
   );
 }
 
-// Girilen değerlerin kısa metni (sure_dk → "12 dk").
-export function degerMetni(d: Record<string, unknown>): string {
-  return Object.entries(d).map(([k, v]) => (k === 'sure_dk' ? `${v} dk` : String(v))).join(' · ');
+// YouTube bağlantısından video kimliği (watch?v=, youtu.be/, shorts/, embed/).
+export function youtubeId(url: string): string | null {
+  const m = url.match(/(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})/);
+  return m ? m[1] : null;
+}
+
+// Girilen değerlerin kısa metni (sure_dk → "12 dk"). Bloklar verilirse birim de eklenir.
+export function degerMetni(d: Record<string, unknown>, bloklar?: Blok[]): string {
+  return Object.entries(d)
+    .filter(([, v]) => v !== '' && v !== null && v !== undefined)
+    .map(([k, v]) => {
+      if (k === 'sure_dk') return `${v} dk`;
+      const b = bloklar?.find((x) => 'anahtar' in x && x.anahtar === k);
+      return b && b.tur === 'sayi' && b.birim ? `${v} ${b.birim}` : String(v);
+    })
+    .join(' · ');
 }
 
 // Tarayıcının onay kutusu yerine sayfa içi onay (PWA'da confirm() güvenilmez; formlar da modalda).

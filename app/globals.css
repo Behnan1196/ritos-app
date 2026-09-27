@@ -429,3 +429,23 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 /* son mesaja kayarken sabit yazma kutusu + alt menünün altında kalmasın */
 .mobile-main .rt-mesaj-son{scroll-margin-bottom:calc(128px + env(safe-area-inset-bottom));}
 .rt-sekme-rozet{position:absolute;margin:-4px 0 0 -6px;background:var(--green);color:#fff;border-radius:9px;font-size:9.5px;font-style:normal;font-weight:700;padding:0 5px;line-height:15px;}
+
+/* ---------- Tek kart + ekler (28 eylül) ---------- */
+.rt-ek-ad{font-size:16px;font-weight:600;}
+.rt-ek{border:1px solid var(--line);border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;background:#fff;}
+.rt-ek-hd{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:700;color:var(--muted);}
+.rt-ek-hd .rt-x{font-size:16px;}
+.rt-ek-cipler{padding-top:2px;}
+.rt-ek-cip{background:transparent;border-style:dashed;color:var(--muted);}
+.rt-ek-video{display:flex;flex-direction:column;gap:4px;}
+.rt-kisa{flex:0 0 76px;width:76px;}
+.rt-link-btn{background:none;border:none;color:var(--green);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;align-self:flex-start;padding:2px 0;}
+.rt-oynat{flex:0 0 auto;width:30px;height:30px;border-radius:50%;border:1px solid var(--green);background:#fff;color:var(--green);font-size:12px;cursor:pointer;}
+.rt-video{display:flex;flex-direction:column;gap:4px;}
+.rt-video-bas{font-size:12.5px;font-weight:700;}
+.rt-video-kutu{position:relative;width:100%;padding-top:56.25%;border-radius:10px;overflow:hidden;background:#000;}
+.rt-video-kutu iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+.rt-ek-video .rt-satir,.rt-ek .rt-satir{flex-wrap:nowrap;align-items:center;}
+.rt-ek-video .rt-inp,.rt-ek .rt-satir .rt-inp{flex:1 1 auto;min-width:0;width:auto;}
+.rt-ek .rt-satir .rt-kisa{flex:0 0 64px;width:64px;}
+.rt-ek-video + .rt-ek-video{border-top:1px dashed var(--line);padding-top:6px;}
