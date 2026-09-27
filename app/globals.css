@@ -409,6 +409,10 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 /* sohbet (27 eylül) */
 .rt-okunmamis{margin-left:auto;background:var(--green);color:#fff;border-radius:10px;font-size:11px;font-weight:700;padding:1px 7px;}
 .rt-konusma{display:flex;flex-direction:column;min-height:60vh;}
+/* geniş ekran: konuşma sağ bölmeyi boydan boya doldursun, yazma kutusu altta dursun */
+.side-content > .rt-konusma{min-height:100%;}
+.side-content > .rt-konusma .rt-yaz{bottom:-16px;padding-bottom:24px;}
+.rt-mesaj-son{scroll-margin-bottom:76px;}
 .rt-konusma-bas{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:8px;}
 .rt-konusma-bas .rt-geri{margin:0;font-size:22px;}
 .rt-mesajlar{flex:1;display:flex;flex-direction:column;gap:6px;padding:4px 0 10px;}
