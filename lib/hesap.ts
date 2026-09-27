@@ -1,55 +1,36 @@
 'use client';
 
 // ————————————————————————————————————————————————————————————————
-// Hesap (G1–G6) + uçtan uca şifreli senkron (S1–S7, 26 eylül).
+// Hesap + uçtan uca şifreli senkron (27 eylül — V1 sadelik kararı).
 //
-// Hesapsız kullanımın verisi cihazdaki 'ritos' (misafir) veritabanında durur; sunucuya hiçbir
-// şey gitmez. Hesap açılınca bu veri hesabın kendi veritabanına taşınır ve şifreli olarak
-// senkronlanır. Her hesabın cihazda ayrı veritabanı var; hangisinin açık olduğu değişince
-// sayfa yeniden yüklenir (tüm canlı sorgular yeni veritabanına bağlansın diye).
-// Test döneminde Supabase'de e-posta doğrulaması kapalı: kayıt biter bitmez girişli.
+// Ritos hesapla kullanılır: ilk ekran kayıt / giriş. Bir cihazda bir hesap açık olur; verisi
+// cihazda o hesabın veritabanında durur, şifreli olarak senkronlanır, internetsiz de çalışır.
+// Çıkışta cihazdaki kopya silinir (veri hesapta durur). Hesapsız kullanım, özel alan, PIN,
+// cihazı başkasına verme akışları ve yedek dosyası kaldırıldı (bkz. "V1 sadelik ilkesi").
+//
+// Kurtarma kelimeleri kayıtta gösterilmez; birkaç gün sonra hatırlatılır. Şifre unutulursa
+// e-postayla yeni şifre belirlenir; veri ancak kurtarma kelimeleriyle geri açılır.
 // ————————————————————————————————————————————————————————————————
 
 import { useEffect, useState } from 'react';
 import Dexie from 'dexie';
-import type { Session } from '@supabase/supabase-js';
-import { RitosDB, SENKRON_TABLOLARI, aktifHesap, aktifHesapAyarla, db, dbAdi, misafirDb } from './db';
+import type { Session, SupabaseClient } from '@supabase/supabase-js';
+import { aktifHesap, aktifHesapAyarla, db, dbAdi } from './db';
 import { supabase } from './supabase';
 import { dekGetir, dekSakla, dekSil } from './anahtarDeposu';
-import { b64, coz, dekUret, girisSifresi, kurtarmaUret, rastgele, sar, sarimiAc, sarmaAnahtari, sifrele } from './sifre';
+import { b64, coz, dekUret, girisSifresi, kurtarmaNormalize, kurtarmaUret, rastgele, sar, sarimiAc, sarmaAnahtari, sifrele } from './sifre';
 import { senkronBaslat, senkronDurdur, senkronla } from './senkron';
 
 export const SIFRE_EN_AZ = 8;
-
-// "Bu cihaz benim değil": çıkışta o hesabın verisi cihazdan silinir, cihaz kilidi o hesaba uygulanmaz.
-const GECICI = 'ritos-gecici-hesap';
-export function geciciHesap(): string | null { try { return localStorage.getItem(GECICI); } catch { return null; } }
-function geciciAyarla(uid: string | null) { try { if (uid) localStorage.setItem(GECICI, uid); else localStorage.removeItem(GECICI); } catch { /* yoksay */ } }
-
-// Bilerek yapılan hesap geçişinden hemen sonraki yeniden yüklemede PIN'i tekrar sorma (bir kez).
-export const KILIT_GECIS = 'ritos-kilit-gecis';
-// Kilit ekranından "başka biri kendi hesabıyla girecek": sahibin oturumu (varsa) bir kenara
-// konur; misafir hesaptan çıkınca geri yüklenir, böylece sahibin yeniden şifre girmesi gerekmez.
-const ONCEKI = 'ritos-onceki-oturum';
-export async function baskasiIcinHazirla() {
-  const sb = supabase();
-  const aktif = aktifHesap();
-  if (!sb || !aktif) return;
-  const { data } = await sb.auth.getSession();
-  if (data.session?.user.id !== aktif) return;
-  try { localStorage.setItem(ONCEKI, JSON.stringify({ uid: aktif, access_token: data.session.access_token, refresh_token: data.session.refresh_token })); } catch { /* yoksay */ }
-}
-export function baskasiIcinVazgec() { try { localStorage.removeItem(ONCEKI); } catch { /* yoksay */ } }
-
-function kilitGecisiVer(uid: string) { try { sessionStorage.setItem(KILIT_GECIS, uid); } catch { /* yoksay */ } }
+export const KURTARMA_HATIRLATMA_GUN = 3;
 
 export interface Oturum {
   hazir: boolean;
   session: Session | null;
   gorunenAd: string | null;
-  /** Bu cihazda açık olan veri bir hesaba mı ait (misafir değil)? */
+  /** Bu cihazda bir hesabın verisi açık mı? */
   hesapli: boolean;
-  /** Hesaplı veri açık ama oturum ya da anahtar yok — yeniden giriş gerekli. */
+  /** Hesabın verisi cihazda ama oturum ya da anahtar yok — yeniden giriş gerekli. */
   kilitli: boolean;
 }
 
@@ -75,19 +56,14 @@ export function useOturum(): Oturum {
   return o;
 }
 
-/** Uygulama açılışında bir kez: durum tutarlı mı, senkronu başlat. */
+/** Uygulama açılışında bir kez: senkronu başlat. */
 export function useHesapBaslat() {
   useEffect(() => {
     (async () => {
       const sb = supabase();
-      if (!sb) return;
-      const { data } = await sb.auth.getSession();
       const aktif = aktifHesap();
-      if (!aktif) {
-        // Misafir veri açıkken kalmış bir oturum (eski sürüm ya da yarım kalmış işlem): kapat.
-        if (data.session) await sb.auth.signOut();
-        return;
-      }
+      if (!sb || !aktif) return;
+      const { data } = await sb.auth.getSession();
       const dek = await dekGetir(aktif);
       if (data.session?.user.id === aktif && dek) await senkronBaslat(aktif, dek);
     })();
@@ -95,8 +71,7 @@ export function useHesapBaslat() {
   }, []);
 }
 
-// Aynı Supabase hesabı paylaşım tabloları kurulmadan önce açılmış olabilir:
-// oturum açıldığında Ritos profili yoksa oluştur, yoksa kimse bu kişiyi e-postasıyla bulamaz.
+// Oturum açıldığında Ritos profili yoksa oluştur (yoksa kimse bu kişiyi e-postasıyla bulamaz).
 export async function profilGaranti(uid: string, eposta: string): Promise<string | null> {
   const sb = supabase();
   if (!sb) return null;
@@ -108,37 +83,29 @@ export async function profilGaranti(uid: string, eposta: string): Promise<string
   return e.error ? null : ad;
 }
 
-// ———————————————— misafir veri ————————————————
+// ———————————————— kayıt ————————————————
 
-/** Misafir veritabanında kullanıcının girdiği bir şey var mı (varsayılan Home düzeni sayılmaz)? */
-export async function misafirDoluMu(): Promise<boolean> {
-  const m = misafirDb();
-  for (const t of ['ajanda_kart', 'program', 'klasor', 'gelen'] as const) {
-    if ((await m.table(t).count()) > 0) return true;
-  }
-  return false;
+export type Sonuc = { tamam: true } | { tamam: false; hata: string };
+
+async function anahtarlariOlustur(uid: string, sifre: string): Promise<{ dek: CryptoKey; satir: Record<string, string> }> {
+  const dek = await dekUret();
+  const tuz = b64(rastgele(16));
+  const kurtarmaTuz = b64(rastgele(16));
+  const kurtarma = kurtarmaUret();
+  return {
+    dek,
+    satir: {
+      id: uid,
+      tuz,
+      sarili_sifre: await sar(dek, await sarmaAnahtari(sifre, tuz)),
+      kurtarma_tuz: kurtarmaTuz,
+      sarili_kurtarma: await sar(dek, await sarmaAnahtari(kurtarma.join(' '), kurtarmaTuz, 'kurtarma')),
+      kurtarma_sifreli: await sifrele(dek, kurtarma.join(' ')),
+    },
+  };
 }
 
-/** Misafir veriyi hesabın veritabanına ekle (üzerine yazmaz, birleştirir) ve misafiri boşalt. */
-async function misafiriHesabaTasi(uid: string) {
-  const kaynak = misafirDb();
-  const hedef = new RitosDB(dbAdi(uid));
-  for (const t of SENKRON_TABLOLARI) {
-    const satirlar = await kaynak.table(t).toArray();
-    if (satirlar.length) await hedef.table(t).bulkPut(satirlar);
-  }
-  const ayarlar = (await kaynak.ayar.toArray()).filter((a) => !a.anahtar.startsWith('senkron_'));
-  if (ayarlar.length) await hedef.ayar.bulkPut(ayarlar);
-  await hedef.hepsiniIsaretle();
-  for (const t of SENKRON_TABLOLARI) await kaynak.table(t).clear();
-  hedef.close();
-}
-
-// ———————————————— kayıt (G2 + S2) ————————————————
-
-export type KayitSonuc = { tamam: true; kurtarma: string[] } | { tamam: false; hata: string };
-
-export async function kayitOl(gorunenAd: string, eposta: string, sifre: string, misafiriTasi: boolean): Promise<KayitSonuc> {
+export async function kayitOl(gorunenAd: string, eposta: string, sifre: string): Promise<Sonuc> {
   const sb = supabase();
   if (!sb) return { tamam: false, hata: 'Sunucu ayarı yok' };
   if (!navigator.onLine) return { tamam: false, hata: 'İnternet yok' };
@@ -153,35 +120,19 @@ export async function kayitOl(gorunenAd: string, eposta: string, sifre: string, 
 
   const p = await sb.from('cat_profil').insert({ id: uid, gorunen_ad: gorunenAd.trim(), eposta: email });
   if (p.error) return { tamam: false, hata: p.error.message };
-
-  // Veri anahtarı: şifreyle ve kurtarma kelimeleriyle ayrı ayrı sarılır.
-  const dek = await dekUret();
-  const tuz = b64(rastgele(16));
-  const kurtarmaTuz = b64(rastgele(16));
-  const kurtarma = kurtarmaUret();
-  const a = await sb.from('cat_anahtar').insert({
-    id: uid,
-    tuz,
-    sarili_sifre: await sar(dek, await sarmaAnahtari(sifre, tuz)),
-    kurtarma_tuz: kurtarmaTuz,
-    sarili_kurtarma: await sar(dek, await sarmaAnahtari(kurtarma.join(' '), kurtarmaTuz, 'kurtarma')),
-    kurtarma_sifreli: await sifrele(dek, kurtarma.join(' ')),
-  });
+  // Veri anahtarı: şifreyle ve kurtarma kelimeleriyle ayrı ayrı sarılır. Kelimeler şimdi gösterilmez.
+  const { dek, satir } = await anahtarlariOlustur(uid, sifre);
+  const a = await sb.from('cat_anahtar').insert(satir);
   if (a.error) return { tamam: false, hata: `Anahtar kaydedilemedi: ${a.error.message}` };
-
   await dekSakla(uid, dek);
-  // Cihazdaki hesapsız veri: kullanıcı seçer — hesaba taşınır ya da cihazda ayrı (özel) kalır.
-  if (misafiriTasi) await misafiriHesabaTasi(uid);
   aktifHesapAyarla(uid);
-  kilitGecisiVer(uid);
-  return { tamam: true, kurtarma };
+  location.reload();
+  return { tamam: true };
 }
 
-// ———————————————— giriş (G3 + S3) ————————————————
+// ———————————————— giriş ————————————————
 
-export type GirisSonuc = { tamam: true; uid: string; misafirVar: boolean } | { tamam: false; hata: string };
-
-export async function girisYap(eposta: string, sifre: string, gecici = false): Promise<GirisSonuc> {
+export async function girisYap(eposta: string, sifre: string): Promise<Sonuc> {
   const sb = supabase();
   if (!sb) return { tamam: false, hata: 'Sunucu ayarı yok' };
   if (!navigator.onLine) return { tamam: false, hata: 'İnternet yok' };
@@ -194,14 +145,11 @@ export async function girisYap(eposta: string, sifre: string, gecici = false): P
       await sb.auth.signOut();
       return { tamam: false, hata: "Bu hesap şifreli senkrondan önce (ya da Rite'ta) açılmış. Ritos için yeni bir e-postayla hesap aç." };
     }
-    return { tamam: false, hata: 'E-posta ya da şifre hatalı.' }; // G3: hangi alan olduğu söylenmez
+    return { tamam: false, hata: 'E-posta ya da şifre hatalı.' };
   }
   const uid = r.data.user.id;
   const k = await sb.from('cat_anahtar').select('tuz, sarili_sifre').eq('id', uid).maybeSingle();
-  if (!k.data) {
-    await sb.auth.signOut();
-    return { tamam: false, hata: 'Bu hesabın şifreleme anahtarı bulunamadı.' };
-  }
+  if (!k.data) { await sb.auth.signOut(); return { tamam: false, hata: 'Bu hesabın şifreleme anahtarı bulunamadı.' }; }
   let dek: CryptoKey;
   try {
     dek = await sarimiAc(k.data.sarili_sifre, await sarmaAnahtari(sifre, k.data.tuz));
@@ -210,54 +158,33 @@ export async function girisYap(eposta: string, sifre: string, gecici = false): P
     return { tamam: false, hata: 'Veri anahtarı açılamadı.' };
   }
   await profilGaranti(uid, email);
+  // Cihazda başka bir hesabın verisi kalmışsa (beklenmez; çıkış siler) önce onu sil.
+  const onceki = aktifHesap();
+  if (onceki && onceki !== uid) { await dekSil(onceki); db.close(); await Dexie.delete(dbAdi(onceki)); }
   await dekSakla(uid, dek);
-  const zatenAcik = aktifHesap() === uid; // kilitli hesaba yeniden giriş
-  geciciAyarla(gecici ? uid : null);
-  return { tamam: true, uid, misafirVar: !gecici && !zatenAcik && (await misafirDoluMu()) };
-}
-
-/** Giriş sonrası: misafir veri hesaba eklensin mi (S3 açık sorusu → "ekle / ayrı tut"). */
-export async function girisiTamamla(uid: string, misafiriEkle: boolean) {
-  if (misafiriEkle) await misafiriHesabaTasi(uid);
   aktifHesapAyarla(uid);
-  kilitGecisiVer(uid);
   location.reload();
+  return { tamam: true };
 }
 
-// ———————————————— çıkış (G5 + S5) ————————————————
+// ———————————————— çıkış ————————————————
 
-export async function cikisYap(buCihazdanSil: boolean) {
+/** Çıkış: bekleyenler gönderilir, cihazdaki kopya silinir; veri hesapta durur. */
+export async function cikisYap() {
   const uid = aktifHesap();
-  const gecici = !!uid && geciciHesap() === uid;
-  if (gecici) buCihazdanSil = true;
-  geciciAyarla(null);
-  try { await senkronla(); } catch { /* çevrimdışıysa bekleyenler cihazda kalır */ }
+  try { await senkronla(); } catch { /* çevrimdışıysa bekleyenler kaybolur — ekranda uyarılır */ }
   senkronDurdur();
   await supabase()?.auth.signOut({ scope: 'local' });
   if (uid) {
     await dekSil(uid);
-    if (buCihazdanSil) {
-      db.close();
-      await Dexie.delete(dbAdi(uid));
-    }
+    db.close();
+    await Dexie.delete(dbAdi(uid));
   }
-  // Misafir hesap çıktı: sahibin kenara konmuş oturumu varsa geri yükle (PIN yine sorulur).
-  let sonraki: string | null = null;
-  if (gecici) {
-    try {
-      const o = JSON.parse(localStorage.getItem(ONCEKI) ?? 'null') as { uid: string; access_token: string; refresh_token: string } | null;
-      if (o) {
-        const r = await supabase()?.auth.setSession({ access_token: o.access_token, refresh_token: o.refresh_token });
-        if (r && !r.error && r.data.session?.user.id === o.uid) sonraki = o.uid;
-      }
-    } catch { /* geri yüklenemezse sahip yeniden giriş yapar */ }
-  }
-  baskasiIcinVazgec();
-  aktifHesapAyarla(sonraki);
+  aktifHesapAyarla(null);
   location.reload();
 }
 
-// ———————————————— şifre ve kurtarma (S6) ————————————————
+// ———————————————— kurtarma kelimeleri ————————————————
 
 async function anahtarKaydi() {
   const sb = supabase()!;
@@ -265,7 +192,10 @@ async function anahtarKaydi() {
   if (!s.session) throw new Error('Oturum yok');
   const k = await sb.from('cat_anahtar').select('*').eq('id', s.session.user.id).single();
   if (k.error) throw new Error(k.error.message);
-  return { sb, uid: s.session.user.id, email: s.session.user.email ?? '', k: k.data as { tuz: string; sarili_sifre: string; kurtarma_sifreli: string } };
+  return {
+    sb, uid: s.session.user.id, email: s.session.user.email ?? '',
+    k: k.data as { tuz: string; sarili_sifre: string; kurtarma_tuz: string; sarili_kurtarma: string; kurtarma_sifreli: string },
+  };
 }
 
 export async function kurtarmaGoster(sifre: string): Promise<string[]> {
@@ -275,31 +205,86 @@ export async function kurtarmaGoster(sifre: string): Promise<string[]> {
   return (await coz<string>(dek, k.kurtarma_sifreli)).split(' ');
 }
 
+export interface KurtarmaDurumu { kaydedildi: boolean; hatirlat: boolean }
+
+/** Kurtarma kelimeleri kaydedildi mi; kaydedilmediyse hesap açılalı birkaç gün geçti mi (ya da koç bağlantısı var mı)? */
+export async function kurtarmaDurumu(uid: string, iliskiVar: boolean): Promise<KurtarmaDurumu> {
+  const sb = supabase();
+  if (!sb) return { kaydedildi: true, hatirlat: false };
+  const r = await sb.from('cat_profil').select('olusturuldu, kurtarma_kaydedildi').eq('id', uid).maybeSingle();
+  if (r.error || !r.data) return { kaydedildi: true, hatirlat: false };
+  if (r.data.kurtarma_kaydedildi) return { kaydedildi: true, hatirlat: false };
+  const gun = (Date.now() - new Date(r.data.olusturuldu).getTime()) / 86400000;
+  return { kaydedildi: false, hatirlat: iliskiVar || gun >= KURTARMA_HATIRLATMA_GUN };
+}
+
+export async function kurtarmaKaydedildi(uid: string) {
+  await supabase()?.from('cat_profil').update({ kurtarma_kaydedildi: new Date().toISOString() }).eq('id', uid);
+}
+
+// ———————————————— şifre değiştirme ve sıfırlama ————————————————
+
 export async function sifreDegistir(eski: string, yeni: string) {
   const { sb, uid, email, k } = await anahtarKaydi();
   let dek: CryptoKey;
   try { dek = await sarimiAc(k.sarili_sifre, await sarmaAnahtari(eski, k.tuz), true); } catch { throw new Error('Mevcut şifre hatalı.'); }
+  await yeniSifreyleSar(sb, uid, email, dek, yeni, k);
+}
+
+async function yeniSifreyleSar(sb: SupabaseClient, uid: string, email: string, dek: CryptoKey, yeni: string, eski: { tuz: string; sarili_sifre: string }) {
   // Veri yeniden şifrelenmez; yalnız anahtar yeni şifreyle yeniden sarılır.
   const tuz = b64(rastgele(16));
   const sarili = await sar(dek, await sarmaAnahtari(yeni, tuz));
-  // Önce anahtar, sonra giriş şifresi; ikincisi olmazsa anahtarı eski haline döndür.
   const w = await sb.from('cat_anahtar').update({ tuz, sarili_sifre: sarili, guncellendi: new Date().toISOString() }).eq('id', uid);
   if (w.error) throw new Error(`Anahtar güncellenemedi: ${w.error.message}`);
   const u = await sb.auth.updateUser({ password: await girisSifresi(yeni, email) });
   if (u.error) {
-    await sb.from('cat_anahtar').update({ tuz: k.tuz, sarili_sifre: k.sarili_sifre }).eq('id', uid);
+    await sb.from('cat_anahtar').update({ tuz: eski.tuz, sarili_sifre: eski.sarili_sifre }).eq('id', uid);
     throw new Error(u.error.message);
   }
 }
 
-/** PIN unutulduğunda hesaplı ekranda kimlik kanıtı: hesabın şifresi doğru mu? */
-export async function hesapSifresiDogru(sifre: string): Promise<boolean> {
+/** "Şifremi unuttum": e-postaya sıfırlama bağlantısı. Bağlantı uygulamayı ?sifirla=1 ile açar. */
+export async function sifirlamaIste(eposta: string): Promise<Sonuc> {
   const sb = supabase();
-  const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
-  const email = data.session?.user.email;
-  if (!sb || !email) return false;
-  const r = await sb.auth.signInWithPassword({ email, password: await girisSifresi(sifre, email) });
-  return !r.error;
+  if (!sb) return { tamam: false, hata: 'Sunucu ayarı yok' };
+  const r = await sb.auth.resetPasswordForEmail(eposta.trim().toLowerCase(), { redirectTo: `${location.origin}/?sifirla=1` });
+  return r.error ? { tamam: false, hata: r.error.message } : { tamam: true };
+}
+
+/**
+ * Sıfırlama bağlantısından dönüldü (oturum açık, şifre bilinmiyor):
+ *  • kurtarma kelimeleri verildiyse veri anahtarı onlarla açılır ve yeni şifreyle sarılır — veri geri gelir;
+ *  • verilmediyse yeni bir anahtarla baştan başlanır — eski şifreli veri açılamaz, sunucudan silinir.
+ */
+export async function sifirlamaTamamla(yeni: string, kelimeler: string | null): Promise<Sonuc> {
+  const { sb, uid, email, k } = await anahtarKaydi();
+  if (kelimeler) {
+    const norm = kurtarmaNormalize(kelimeler);
+    if (!norm) return { tamam: false, hata: 'Kurtarma kelimeleri tanınmadı; 12 kelimeyi aralarında boşlukla yaz.' };
+    let dek: CryptoKey;
+    try { dek = await sarimiAc(k.sarili_kurtarma, await sarmaAnahtari(norm, k.kurtarma_tuz, 'kurtarma'), true); }
+    catch { return { tamam: false, hata: 'Kurtarma kelimeleri bu hesaba ait değil.' }; }
+    try { await yeniSifreyleSar(sb, uid, email, dek, yeni, k); } catch (e) { return { tamam: false, hata: e instanceof Error ? e.message : String(e) }; }
+    await dekSakla(uid, dek);
+  } else {
+    const { dek, satir } = await anahtarlariOlustur(uid, yeni);
+    const w = await sb.from('cat_anahtar').update({ ...satir, cift_sifreli: null, guncellendi: new Date().toISOString() }).eq('id', uid);
+    if (w.error) return { tamam: false, hata: w.error.message };
+    const u = await sb.auth.updateUser({ password: await girisSifresi(yeni, email) });
+    if (u.error) return { tamam: false, hata: u.error.message };
+    await sb.from('cat_kayit').delete().eq('sahip', uid);           // açılamayacak eski veri
+    await sb.from('cat_acik_anahtar').delete().eq('id', uid);       // danışmanlık anahtar çifti yeniden üretilecek
+    await sb.from('cat_profil').update({ kurtarma_kaydedildi: null }).eq('id', uid);
+    await dekSakla(uid, dek);
+    // Bu cihazda hesabın verisi duruyorsa kaybolmaz: yeni anahtarla yeniden yüklenir.
+    if (aktifHesap() === uid) { await db.hepsiniIsaretle(); await db.ayar.delete('senkron_sira'); }
+  }
+  const onceki = aktifHesap();
+  if (onceki && onceki !== uid) { await dekSil(onceki); db.close(); await Dexie.delete(dbAdi(onceki)); }
+  aktifHesapAyarla(uid);
+  location.replace(location.pathname);
+  return { tamam: true };
 }
 
 export async function gorunenAdDegistir(uid: string, ad: string) {

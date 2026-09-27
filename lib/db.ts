@@ -14,7 +14,6 @@
 
 import Dexie, { type EntityTable } from 'dexie';
 import type { Blok, GeriBildirimOlay, Izinler, KaynakModul, PaketEk, TemelTip } from './paket';
-import { kilitKatmani } from './kilit';
 
 export type CustomWidgetType = 'pomodoro' | 'foto' | 'sayac';
 
@@ -104,6 +103,7 @@ export interface ProgramRow {
   degerlendirme: number | null;  // 0..4, yalnız güncel değer (tarihsel değil)
   calisma_baslangic: string | null; // son başlatmanın tarihi; null = hiç başlatılmadı
   calisma_bitis: string | null;     // null + baslangic dolu = süregelen; durdurunca dün
+  kimden?: string;               // V1 (27 eylül): programı kim hazırladı — Kendim, Ayşe Hoca, X Kliniği (serbest metin)
   sablon?: boolean;              // D4 — koçun şablonu: başlatılmaz, yalnız atanır
   sablon_disiplin?: string | null; // D4 — şablonlar disipline göre gruplanır
   uzak?: UzakProgram | null;     // D5/D6 — danışana atanmış (koç tarafı) ya da koçtan gelen (danışan tarafı)
@@ -306,8 +306,6 @@ export class RitosDB extends Dexie {
   constructor(ad: string) {
     super(ad);
     this.hesapli = ad !== MISAFIR_DB;
-    // Özel alan (misafir veritabanı) PIN konunca satır satır şifrelenir (lib/kilit.ts).
-    if (!this.hesapli) this.use(kilitKatmani);
     // v1 — 25 eylül: Home "Senin alanın" düzeni + ayarlar.
     // Dexie söz dizimi: ilk alan birincil anahtar, sonrakiler indeks.
     this.version(1).stores({

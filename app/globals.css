@@ -391,3 +391,18 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-modal-bg{padding:calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));}
 .rt-modal{max-height:calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));}
 .rt-kilit{padding-top:calc(20px + env(safe-area-inset-top));}
+/* V1 sadelik (27 eylül) */
+.rt-zaman-ozet{display:flex;gap:6px;align-items:center;width:100%;text-align:left;background:#fff;border:1px dashed var(--line);border-radius:10px;padding:9px 10px;font:inherit;font-size:13px;color:var(--ink);cursor:pointer;}
+.rt-giris{min-height:100dvh;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:calc(20px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));}
+.rt-giris-kutu{width:100%;max-width:380px;display:flex;flex-direction:column;gap:10px;}
+.rt-giris-kutu p{margin:0;}
+.rt-giris-logo{font-size:30px;font-weight:800;color:var(--green);margin-bottom:4px;}
+.rt-genis{width:100%;padding:11px;}
+.rt-kurtarma-uyari{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
+.rt-davetler{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
+.rt-davet{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;background:var(--green2);border:0;border-radius:12px;padding:10px 12px;font:inherit;font-size:13px;color:var(--ink);cursor:pointer;}
+.rt-odak{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
+.rt-odak-alan{display:flex;flex-direction:column;gap:3px;text-align:left;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;font:inherit;color:var(--ink);cursor:pointer;}
+.rt-odak-alan .t{font-weight:700;font-size:13.5px;}
+.rt-odak-alan .s{font-size:11.5px;color:var(--muted);}
+.cc-block{margin-bottom:10px;}

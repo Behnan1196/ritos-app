@@ -315,15 +315,27 @@ async function programGeldi(il: IliskiRow, s: ProgramOzeti, etkin: string) {
     await programUygula(p, s, etkin);
     return;
   }
-  const id = `koc-${s.id}`;
-  const paket: KocPaketi = { tur: 'koc_program', iliski_id: il.id, koc_id: il.koc, koc_ad: il.koc_ad, disiplin: il.disiplin, program: s };
-  const boyut = JSON.stringify(paket).length;
-  const g = await db.gelen.get(id);
-  if (g) {
-    if ((g.paket as KocPaketi).program.surum < s.surum) await db.gelen.update(id, { paket, boyut });
-    return;
-  }
-  await db.gelen.put({ id, gonderen_id: il.koc, gonderen_ad: il.koc_ad, kaynak: 'koc', paket, gelis: Date.now(), alindi: null, boyut });
+  // V1 (27 eylül): onay davette verildi — plan Gelenler'e uğramadan doğrudan Ajanda'ya düşer.
+  await kocPlaniniKur(il, s);
+}
+
+async function kocPlaniniKur(il: IliskiRow, s: ProgramOzeti) {
+  const bas = s.baslangic > bugun() ? s.baslangic : bugun();
+  const uzak: UzakProgram = {
+    iliski_id: il.id, rol: 'danisan', karsi_id: il.koc, karsi_ad: il.koc_ad, disiplin: il.disiplin,
+    durum: 'kabul', baslangic: s.baslangic, izinler: s.izinler, surum: s.surum,
+  };
+  await db.transaction('rw', db.program, db.program_adim, async () => {
+    await db.program.put({
+      id: s.id, ad: s.ad, amac: s.amac, dikkat: s.dikkat, kriterler: s.kriterler, hedef: s.hedef, klasor_id: null,
+      home_goster: false, degerlendirme_acik: false, degerlendirme: null, calisma_baslangic: null, calisma_bitis: null,
+      uzak, guncellendi: Date.now(),
+    });
+    await db.program_adim.bulkPut(s.adimlar.map((a) => ({ ...a, program_id: s.id })));
+  });
+  await baslat(s.id, bas);
+  await kuyruk(il.id, il.koc, { tur: 'kabul', program_id: s.id, baslangic: bas });
+  tetikle();
 }
 
 /** Gelenler'den "Al": program aynı kimlikle kurulur, başlatılır, koça kabul gider. */

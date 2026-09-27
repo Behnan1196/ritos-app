@@ -11,6 +11,7 @@ import {
   sinavAdi, sinavVerisi, tabloCoz, type Ders, type Oge, type SinavVeri, type Unite,
 } from '@/lib/sinav';
 import { Chips, Kap, Modal, OnayKutusu } from './ortak';
+import { V2 } from '@/lib/surum';
 import { teslimAl } from '@/lib/ajanda';
 import { PAKET_SURUM, TAM_IZIN, bugun, tarihEtiket, type Blok, type SinavEk, type SinavGorevTur } from '@/lib/paket';
 import {
@@ -103,8 +104,8 @@ function KurulumModal({ k, onKapat }: { k: PaketKurulumRow | null; onKapat: () =
           </label>
         ))}
       </div>
-      <p className="rt-muted" style={{ marginTop: 12 }}>Hazır katalog yerine kendi ders–konu listenle çalışmak istersen bir ad ver; boş bir liste açılır, dersleri kendin ekler ya da Excel&apos;den yapıştırırsın.</p>
-      <input className="rt-inp" placeholder="Kendi listem (isteğe bağlı), ör. Kurum TYT programı" value={ozelAd} onChange={(e) => setOzelAd(e.target.value)} />
+      {V2 && <><p className="rt-muted" style={{ marginTop: 12 }}>Hazır katalog yerine kendi ders–konu listenle çalışmak istersen bir ad ver; boş bir liste açılır, dersleri kendin ekler ya da Excel&apos;den yapıştırırsın.</p>
+      <input className="rt-inp" placeholder="Kendi listem (isteğe bağlı), ör. Kurum TYT programı" value={ozelAd} onChange={(e) => setOzelAd(e.target.value)} /></>}
       {hata && <p className="rt-hata">{hata}</p>}
       <div className="rt-satir" style={{ marginTop: 12 }}>
         <button type="button" className="rt-btn" onClick={onKapat}>Vazgeç</button>
@@ -136,13 +137,13 @@ export function SinavTool() {
     </div>
   );
   const aktif = sekme && (sekme === 'kaynak' || sekme === 'deneme' || k.secim.includes(sekme)) ? sekme : k.secim[0] ?? 'kaynak';
-  const sekmeler: [string, string][] = [...k.secim.map((s) => [s, sinavAdi(s, k)] as [string, string]), ['deneme', 'Denemeler'], ['kaynak', 'Kaynaklar']];
+  const sekmeler: [string, string][] = [...k.secim.map((s) => [s, sinavAdi(s, k)] as [string, string]), ...(V2 ? [['deneme', 'Denemeler'] as [string, string]] : []), ['kaynak', 'Kaynaklar']];
 
   return (
     <div className="side-content rt-sinav" style={{ height: '100%', overflowY: 'auto' }}>
       <div className="rt-satir" style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}>
         <div style={{ flex: 1 }}><Chips secenekler={sekmeler} deger={aktif} onSec={setSekme} /></div>
-        <button type="button" className="rt-btn primary" onClick={() => setGorev(true)}>＋ Görev</button>
+        {V2 && <button type="button" className="rt-btn primary" onClick={() => setGorev(true)}>＋ Görev</button>}
       </div>
       {gorev && <GorevEkleModal ilk={k.secim.includes(aktif) ? { sinav: aktif } : undefined} onKapat={() => setGorev(false)} />}
       <div style={{ marginTop: 10 }}>
@@ -201,7 +202,7 @@ function KatalogGorunum({ kod, k, satir, dersler }: { kod: string; k: PaketKurul
         <span className="rt-muted" style={{ alignSelf: 'center' }}>{dersler.filter(gor).length} ders · {konuSayisi(dersler)} konu</span>
         <span style={{ flex: 1 }} />
         {veri?.testler?.length ? <button type="button" className="rt-linkbtn" onClick={() => setYapi((v) => !v)}>Sınav yapısı</button> : null}
-        <button type="button" className="rt-linkbtn" onClick={() => setGizliler((v) => !v)}>{gizliler ? 'Gizlileri sakla' : 'Gizlileri göster'}</button>
+        {V2 && <button type="button" className="rt-linkbtn" onClick={() => setGizliler((v) => !v)}>{gizliler ? 'Gizlileri sakla' : 'Gizlileri göster'}</button>}
       </div>
       {yapi && veri && <SinavYapisi veri={veri} />}
 
@@ -209,8 +210,8 @@ function KatalogGorunum({ kod, k, satir, dersler }: { kod: string; k: PaketKurul
         bulunan.length === 0 ? <p className="rt-muted">Eşleşen konu yok.</p> : (
           <div className="rt-konular">
             {bulunan.map(({ d, u, x }) => (
-              <button key={x.id} type="button" className="rt-konu" onClick={() => setSecim({ o: x, kardesler: u.konular, ust: u })}>
-                <span><DurumNokta d={durum(x.id)} />{x.ad}<OgeIsaret o={x} /></span><span className="rt-muted">{d.ad} › {u.ad}</span>
+              <button key={x.id} type="button" className="rt-konu" onClick={() => V2 && setSecim({ o: x, kardesler: u.konular, ust: u })}>
+                <span>{V2 && <DurumNokta d={durum(x.id)} />}{x.ad}<OgeIsaret o={x} /></span><span className="rt-muted">{d.ad} › {u.ad}</span>
               </button>
             ))}
           </div>
@@ -222,22 +223,22 @@ function KatalogGorunum({ kod, k, satir, dersler }: { kod: string; k: PaketKurul
             <div key={d.id} className={`rt-klasor${d.gizli ? ' rt-gizli' : ''}`}>
               <div className="rt-klasor-bas">
                 <button type="button" className="rt-klasor-ad" onClick={() => ac(d.id)}>
-                  {acik.has(d.id) ? '▾' : '▸'} {d.ad}<OgeIsaret o={d} /> <span className="rt-muted">· {tamamSay(d) ? `${tamamSay(d)}/` : ''}{konuSayisi([d])}</span>
+                  {acik.has(d.id) ? '▾' : '▸'} {d.ad}<OgeIsaret o={d} /> <span className="rt-muted">· {V2 && tamamSay(d) ? `${tamamSay(d)}/` : ''}{konuSayisi([d])}</span>
                 </button>
-                <button type="button" className="rt-ikon" aria-label="Ders seçenekleri" onClick={() => setSecim({ o: d, kardesler: dersler })}>⋯</button>
+                {V2 && <button type="button" className="rt-ikon" aria-label="Ders seçenekleri" onClick={() => setSecim({ o: d, kardesler: dersler })}>⋯</button>}
               </div>
               {acik.has(d.id) && (
                 <div className="rt-klasor-ic">
                   {d.uniteler.filter(gor).map((u) => (
                     <div key={u.id} className={u.gizli ? 'rt-gizli' : ''}>
-                      <button type="button" className="rt-unite" onClick={() => setSecim({ o: u, kardesler: d.uniteler, ust: d })}>
+                      <button type="button" className="rt-unite" onClick={() => V2 && setSecim({ o: u, kardesler: d.uniteler, ust: d })}>
                         {u.ad}<OgeIsaret o={u} />{u.test && <span className="rt-rozet">{u.test}</span>}
                       </button>
                       <div className="rt-konular">
                         {u.konular.filter(gor).map((x) => (
-                          <button key={x.id} type="button" className={`rt-konu${x.gizli ? ' rt-gizli' : ''}`} onClick={() => setSecim({ o: x, kardesler: u.konular, ust: u })}>
-                            <span><DurumNokta d={durum(x.id)} />{x.ad}<OgeIsaret o={x} /></span>
-                            <KonuOzet s={analiz?.konular.get(x.id)} />
+                          <button key={x.id} type="button" className={`rt-konu${x.gizli ? ' rt-gizli' : ''}`} onClick={() => V2 && setSecim({ o: x, kardesler: u.konular, ust: u })}>
+                            <span>{V2 && <DurumNokta d={durum(x.id)} />}{x.ad}<OgeIsaret o={x} /></span>
+                            {V2 && <KonuOzet s={analiz?.konular.get(x.id)} />}
                           </button>
                         ))}
                       </div>
@@ -248,10 +249,10 @@ function KatalogGorunum({ kod, k, satir, dersler }: { kod: string; k: PaketKurul
               )}
             </div>
           ))}
-          <div className="rt-satir" style={{ marginTop: 10 }}>
+          {V2 && <div className="rt-satir" style={{ marginTop: 10 }}>
             <button type="button" className="rt-btn" onClick={() => setModal('ders')}>＋ Ders</button>
             <button type="button" className="rt-btn" onClick={() => setModal('yapistir')}>Excel&apos;den yapıştır</button>
-          </div>
+          </div>}
         </>
       )}
 

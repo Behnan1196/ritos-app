@@ -114,7 +114,8 @@ export async function baslat(programId: string, baslangic = bugun()) {
   const p = await db.program.get(programId);
   if (!p || aktifMi(p) || kocProgrami(p) || p.sablon) return; // atanan program ve şablon koçun Ajanda'sına düşmez
   const adimlar = await db.program_adim.where('program_id').equals(programId).sortBy('sira');
-  if (adimlar.length === 0) return;
+  // V1: görev planı olmadan da "aktif" olunur (başka yerde yürüyen bir program — Kişisel Gelişim haritası için).
+  if (adimlar.length === 0) { await programGuncelle(programId, { calisma_baslangic: baslangic, calisma_bitis: null }); return; }
 
   const paketler = adimlar.map((a) => adimPaketi(p, a, baslangic));
   const calismaBitis = calismaBitisi(adimlar, baslangic);

@@ -8,10 +8,9 @@ import {
   type Blok, type KartPaketi, type TemelTip,
 } from '@/lib/paket';
 import { BlokGoster, Chips, Kap, Modal, OnayKutusu, degerMetni } from './ortak';
-import { PaylasDugmesi } from './Paylasim';
 import { DenemeGir, GorevFormu, gorevTeslim, useSinavOzeti } from './Sinav';
 import { sinavOzeti, type GorevTaslak } from '@/lib/sinavGorev';
-import { kartPaketi } from '@/lib/paylasim';
+import { V2 } from '@/lib/surum';
 
 // A1–A9 (ilk dilim). Ajanda yalnızca kart satırlarını bilir; kaynağın içini bilmez.
 export default function AjandaPane() {
@@ -171,7 +170,8 @@ function DegerGir({ bloklar, ilk, onKaydet }: { bloklar: Blok[]; ilk: Record<str
 }
 
 function HizliEkle({ tarih, onKapat }: { tarih: string; onKapat: () => void }) {
-  const sinavKurulu = useSinavOzeti().kurulu;
+  // V1 (27 eylül): sınav görevleri yalnız koçun planında; kişinin kendi Ajanda'sında yok.
+  const sinavKurulu = V2 && useSinavOzeti().kurulu; // eslint-disable-line react-hooks/rules-of-hooks
   const [tip, setTip] = useState<TemelTip | 'sinav'>('yap');
   const [gorev, setGorev] = useState<GorevTaslak | null>(null);
   const [ad, setAd] = useState('');
@@ -218,7 +218,7 @@ function HizliEkle({ tarih, onKapat }: { tarih: string; onKapat: () => void }) {
 
   return (
     <Modal baslik="Kart ekle" onKapat={onKapat}>
-      <Chips<TemelTip | 'sinav'> secenekler={[['yap', 'Yap'], ['oku', 'Oku'], ...(sinavKurulu ? [['sinav', '📚 Sınav görevi'] as ['sinav', string]] : [])]} deger={tip} onSec={setTip} />
+      <Chips<TemelTip | 'sinav'> secenekler={[['yap', 'Yapılacak'], ['oku', 'Okunacak / izlenecek'], ...(sinavKurulu ? [['sinav', '📚 Sınav görevi'] as ['sinav', string]] : [])]} deger={tip} onSec={setTip} />
       {tip === 'sinav' ? <GorevFormu onChange={setGorev} /> : (
         <>
           <input className="rt-inp" placeholder="Ad" value={ad} onChange={(e) => setAd(e.target.value)} autoFocus />
@@ -266,7 +266,6 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
       {!bagli && !tasiAcik && !silAcik && !tekSil && (
         <div className="rt-satir">
           {kart.izinler.gun_degistir && <button type="button" className="rt-btn" onClick={() => setTasiAcik(true)}>Taşı</button>}
-          <PaylasDugmesi paketUret={() => kartPaketi(kart)} />
           {kart.izinler.sil && <button type="button" className="rt-btn tehlike" onClick={() => (tekrarli ? setSilAcik(true) : setTekSil(true))}>Kaldır</button>}
         </div>
       )}
