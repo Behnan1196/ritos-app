@@ -15,36 +15,97 @@ import { PaylasDugmesi } from './Sohbet';
 import { KartEditor } from './KartEditor';
 
 // A1–A9 (ilk dilim). Ajanda yalnızca kart satırlarını bilir; kaynağın içini bilmez.
+const GORUNUM_ANAH = 'ritos-ajanda-gorunum';
+function gorunumOku(): 'gun' | 'hafta' {
+  try { return localStorage.getItem(GORUNUM_ANAH) === 'hafta' ? 'hafta' : 'gun'; } catch { return 'gun'; }
+}
+/** Tarihin içinde olduğu haftanın pazartesisi. */
+export function haftaBasi(t: string) {
+  return tarihEkle(t, -((tarihParse(t).getDay() + 6) % 7));
+}
+function haftaEtiket(bas: string) {
+  const a = tarihParse(bas), b = tarihParse(tarihEkle(bas, 6));
+  const ay = (d: Date) => d.toLocaleDateString('tr-TR', { month: 'short' });
+  return a.getMonth() === b.getMonth() ? `${a.getDate()}–${b.getDate()} ${ay(b)}` : `${a.getDate()} ${ay(a)} – ${b.getDate()} ${ay(b)}`;
+}
+
 export default function AjandaPane() {
   const [tarih, setTarih] = useState(bugun());
-  const [ekleAcik, setEkleAcik] = useState(false);
+  const [gorunum, setGorunumS] = useState<'gun' | 'hafta'>('gun');
+  useEffect(() => { setGorunumS(gorunumOku()); }, []);
+  const setGorunum = (g: 'gun' | 'hafta') => { setGorunumS(g); try { localStorage.setItem(GORUNUM_ANAH, g); } catch { /* yok say */ } };
+  const [ekle, setEkle] = useState<string | null>(null); // hangi güne kart eklenecek
   const [ayAcik, setAyAcik] = useState(false);
-  const [detay, setDetay] = useState<GunSatiri | null>(null);
+  const [detay, setDetay] = useState<{ satir: GunSatiri; tarih: string } | null>(null);
   const satirlar = useCanli(() => gununKartlari(tarih), [tarih], [] as GunSatiri[]);
   const t0 = bugun();
+  const hafta = gorunum === 'hafta';
+  const adim = hafta ? 7 : 1;
+  const bugunGorunur = hafta ? haftaBasi(tarih) === haftaBasi(t0) : tarih === t0;
 
   return (
     <div className="rt-ajanda">
       <div className="rt-daterow">
-        <button className="arrow" onClick={() => setTarih(tarihEkle(tarih, -1))} aria-label="Önceki gün">‹</button>
+        <button className="arrow" onClick={() => setTarih(tarihEkle(tarih, -adim))} aria-label={hafta ? 'Önceki hafta' : 'Önceki gün'}>‹</button>
         <button className="rt-dlabel" onClick={() => setAyAcik(true)}>
-          {tarihEtiket(tarih)}
-          {tarih !== t0 && <span className="rt-totoday" onClick={(e) => { e.stopPropagation(); setTarih(t0); }}>↺ bugüne dön</span>}
+          {hafta ? haftaEtiket(haftaBasi(tarih)) : tarihEtiket(tarih)}
+          {!bugunGorunur && <span className="rt-totoday" onClick={(e) => { e.stopPropagation(); setTarih(t0); }}>↺ bugüne dön</span>}
         </button>
-        <button className="arrow" onClick={() => setTarih(tarihEkle(tarih, 1))} aria-label="Sonraki gün">›</button>
+        <button className="arrow" onClick={() => setTarih(tarihEkle(tarih, adim))} aria-label={hafta ? 'Sonraki hafta' : 'Sonraki gün'}>›</button>
+        <div className="rt-gorunum" role="group" aria-label="Görünüm">
+          <button type="button" className={!hafta ? 'on' : ''} onClick={() => setGorunum('gun')}>Gün</button>
+          <button type="button" className={hafta ? 'on' : ''} onClick={() => setGorunum('hafta')}>Hafta</button>
+        </div>
       </div>
 
-      <Kap
-        baslik="Gün"
-        eylemler={<button type="button" className="rt-ikon" onClick={() => setEkleAcik(true)} aria-label="Kart ekle">＋</button>}
-      >
-        {satirlar.length === 0 && <p className="rt-muted">Bu gün için kart yok.</p>}
-        <SiraliListe satirlar={satirlar} tarih={tarih} onAc={setDetay} />
-      </Kap>
+      {hafta ? (
+        <HaftaGorunumu bas={haftaBasi(tarih)} onAc={(satir, t) => setDetay({ satir, tarih: t })} onEkle={setEkle} onGun={(t) => { setTarih(t); setGorunum('gun'); }} />
+      ) : (
+        <Kap
+          baslik="Gün"
+          eylemler={<button type="button" className="rt-ikon" onClick={() => setEkle(tarih)} aria-label="Kart ekle">＋</button>}
+        >
+          {satirlar.length === 0 && <p className="rt-muted">Bu gün için kart yok.</p>}
+          <SiraliListe satirlar={satirlar} tarih={tarih} onAc={(s) => setDetay({ satir: s, tarih })} />
+        </Kap>
+      )}
 
-      {ekleAcik && <KartEditor tarih={tarih} onKapat={() => setEkleAcik(false)} />}
+      {ekle && <KartEditor tarih={ekle} onKapat={() => setEkle(null)} />}
       {ayAcik && <AyTakvimi secili={tarih} onSec={(t) => { setTarih(t); setAyAcik(false); }} onKapat={() => setAyAcik(false)} />}
-      {detay && <KartDetay satir={detay} tarih={tarih} onKapat={() => setDetay(null)} />}
+      {detay && <KartDetay satir={detay.satir} tarih={detay.tarih} onKapat={() => setDetay(null)} />}
+    </div>
+  );
+}
+
+// Haftalık görünüm (28 eylül — iPad/geniş ekran). Her gün kendi kabında; kaplar en az
+// genişlik kuralıyla yan yana dizilir, sığmayanlar alt satıra kayar (CSS grid auto-fill).
+function HaftaGorunumu({ bas, onAc, onEkle, onGun }: { bas: string; onAc: (s: GunSatiri, t: string) => void; onEkle: (t: string) => void; onGun: (t: string) => void }) {
+  const gunler = Array.from({ length: 7 }, (_, i) => tarihEkle(bas, i));
+  const veri = useCanli(() => Promise.all(gunler.map((t) => gununKartlari(t))), [bas], [] as GunSatiri[][]);
+  const t0 = bugun();
+  return (
+    <div className="rt-hafta">
+      {gunler.map((t, i) => {
+        const d = tarihParse(t);
+        const liste = veri[i] ?? [];
+        const yapilan = liste.filter((s) => s.kayit?.yapildi && s.kart.tip !== 'oku').length;
+        const toplam = liste.filter((s) => s.kart.tip !== 'oku').length;
+        return (
+          <div key={t} className={`rt-hafta-gun${t === t0 ? ' bugun' : ''}${t < t0 ? ' gecmis' : ''}`}>
+            <div className="rt-hafta-hd">
+              <button type="button" className="rt-hafta-ad" onClick={() => onGun(t)} title="Gün görünümünde aç">
+                <b>{d.toLocaleDateString('tr-TR', { weekday: 'short' })}</b> {d.getDate()}
+              </button>
+              {toplam > 0 && <span className={`rt-rozet${yapilan === toplam ? ' tam' : ''}`}>{yapilan}/{toplam}</span>}
+              <button type="button" className="rt-ikon" onClick={() => onEkle(t)} aria-label={`${d.getDate()} için kart ekle`}>＋</button>
+            </div>
+            <div className="rt-liste">
+              {liste.map((s) => <KartSatiri key={s.kart.id} satir={s} tarih={t} onAc={() => onAc(s, t)} />)}
+              {liste.length === 0 && <p className="rt-muted rt-hafta-bos">—</p>}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

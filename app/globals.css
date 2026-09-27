@@ -449,3 +449,22 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-ek-video .rt-inp,.rt-ek .rt-satir .rt-inp{flex:1 1 auto;min-width:0;width:auto;}
 .rt-ek .rt-satir .rt-kisa{flex:0 0 64px;width:64px;}
 .rt-ek-video + .rt-ek-video{border-top:1px dashed var(--line);padding-top:6px;}
+
+/* ---------- Ajanda haftalık görünüm (28 eylül) ---------- */
+.rt-gorunum{margin-left:auto;display:flex;background:#efe8da;border-radius:9px;padding:2px;}
+.rt-gorunum button{border:none;background:none;font:inherit;font-size:12px;font-weight:700;color:#6b6250;padding:5px 10px;border-radius:7px;cursor:pointer;}
+.rt-gorunum button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08);}
+.rt-hafta{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;align-items:start;}
+.rt-hafta-gun{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px;min-width:0;}
+.rt-hafta-gun.bugun{border-color:var(--green);box-shadow:0 0 0 1px var(--green) inset;}
+.rt-hafta-gun.gecmis{opacity:.8;}
+.rt-hafta-hd{display:flex;align-items:center;gap:6px;padding:2px 2px 6px;}
+.rt-hafta-ad{background:none;border:none;font:inherit;font-size:13px;color:var(--ink);cursor:pointer;padding:0;text-transform:capitalize;}
+.rt-hafta-hd .rt-ikon{margin-left:auto;}
+.rt-hafta .rt-kart{padding:6px 7px;margin-bottom:5px;}
+.rt-hafta .rt-kart-ust{gap:6px;}
+.rt-hafta .rt-kart-ad .t{font-size:12.5px;}
+.rt-hafta .rt-kart-ad .m{font-size:10.5px;}
+.rt-hafta .rt-chk{width:20px;height:20px;font-size:11px;}
+.rt-hafta .rt-oynat{width:24px;height:24px;font-size:10px;}
+.rt-hafta-bos{text-align:center;margin:4px 0;}
