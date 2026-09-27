@@ -139,7 +139,7 @@ function KonusmaEkrani({ k, onGeri }: { k: Konusma; onGeri: () => void }) {
             </div>
           );
         })}
-        <div ref={son} />
+        <div ref={son} className="rt-mesaj-son" />
       </div>
       {k.aktif ? (
         <div className="rt-yaz">
