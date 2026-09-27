@@ -319,6 +319,7 @@ async function mesajlariCek() {
     for (const m of liste) {
       const il = await db.iliski.get(m.iliski);
       const k = il ? await iliskiAnahtari(il) : null;
+      if (il && !k) return; // anahtar henüz yok: imleç ilerlemez, sonraki turda yeniden denenir (mesaj kaybolmaz)
       if (il && k) {
         try { await mesajIsle(il, await coz<MesajIcerik>(k, m.veri)); }
         catch (e) { console.warn('[ritos] mesaj işlenemedi', e); }
@@ -794,14 +795,16 @@ async function aileAnahtarDagit(a: AileRow) {
 
 async function aileMesajlariCek(a: AileRow) {
   const tt = tasimaVar();
-  const ANAH = `aile_sira_${a.id}`;
+  const ANAH = `aile_sira2_${a.id}`; // 27 eylül: '2' — anahtar beklenirken atlanmış mesajlar baştan yeniden çekilsin
   let sira = ((await db.ayar.get(ANAH))?.deger as number | undefined) ?? 0;
   for (;;) {
     const liste = await tt.aileMesajCek(a.id, sira);
     if (!liste.length) return;
     for (const m of liste) {
       const k = await aileAnahtari(a, m.anahtar_surum);
-      if (k) {
+      // Grup anahtarı bana henüz bırakılmadı (yöneticinin cihazı açılınca bırakılır): imleç ilerlemez, mesaj kaybolmaz.
+      if (!k) return;
+      {
         try {
           const ic = await coz<MesajIcerik>(k, m.veri);
           if (ic.tur === 'sohbet') await sohbetMesajiKaydet(ic.mesaj, konusmaAile(a.id));

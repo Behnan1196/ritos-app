@@ -76,6 +76,9 @@ export async function senkronBaslat(kullanici: string, anahtar: CryptoKey) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cat_kayit', filter: `sahip=eq.${kullanici}` }, () => zamanla(300))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cat_mesaj', filter: `alici=eq.${kullanici}` }, () => zamanla(300))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cat_iliski' }, () => zamanla(300))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cat_aile_mesaj' }, () => zamanla(300))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cat_aile_uye' }, () => zamanla(300))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cat_aile_anahtar', filter: `uye=eq.${kullanici}` }, () => zamanla(300))
       .subscribe();
   }
   window.addEventListener('focus', odak);

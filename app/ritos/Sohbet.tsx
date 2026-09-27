@@ -108,6 +108,7 @@ function KonusmaEkrani({ k, onGeri }: { k: Konusma; onGeri: () => void }) {
   const son = useRef<HTMLDivElement>(null);
   useEffect(() => { okunduIsaretle(k.id); son.current?.scrollIntoView({ block: 'end' }); }, [k.id, mesajlar.length]);
   const aile = k.id.startsWith('a:');
+  const bekleyen = mesajlar.some((m) => m.gonderen === d.uid && m.durum === 'bekliyor' && Date.now() - m.zaman > 20_000);
   const gonder = async () => {
     if (!metin.trim()) return;
     setHata(null);
@@ -147,6 +148,8 @@ function KonusmaEkrani({ k, onGeri }: { k: Konusma; onGeri: () => void }) {
           <button type="button" className="rt-btn primary" disabled={!metin.trim()} onClick={gonder}>Gönder</button>
         </div>
       ) : <p className="rt-muted">Bu danışmanlık sonlandı; konuşma yalnız okunur.</p>}
+      {bekleyen && <p className="rt-muted">{aile ? 'Bazı mesajların bekliyor: grubun şifre anahtarı yöneticinin cihazında hazırlanır; yönetici uygulamayı açınca gider.' : 'Bazı mesajların bekliyor; karşı taraf uygulamayı ilk kez açınca gider.'}</p>}
+      {d.hata && <p className="rt-hata">⚠ {d.hata}</p>}
       {hata && <p className="rt-hata">{hata}</p>}
       {paylas && <PaylasSec onKapat={() => setPaylas(false)} onSec={async (paket) => { await sohbetGonder(k.id, { paket }); setPaylas(false); }} />}
       {al && <AlModal m={al} onKapat={() => setAl(null)} />}
