@@ -171,7 +171,15 @@ function supabaseTasima(uid: string): Tasima {
       return (r.data ?? []) as { surum: number; saran: string; sarili: string }[];
     },
     async aileAnahtarYaz(satirlar) {
-      hata((await sb.from('cat_aile_anahtar').upsert(satirlar, { onConflict: 'aile,uye,surum', ignoreDuplicates: true })).error);
+      // upsert (ON CONFLICT) RLS'e takılıyordu: önce benim sardıklarımı oku, yalnız eksikleri düz insert et.
+      const { aile, surum } = satirlar[0];
+      const r = await sb.from('cat_aile_anahtar').select('uye').eq('aile', aile).eq('surum', surum).eq('saran', uid);
+      hata(r.error);
+      const var_ = new Set((r.data ?? []).map((x) => x.uye as string));
+      for (const s of satirlar.filter((x) => !var_.has(x.uye))) {
+        const e = (await sb.from('cat_aile_anahtar').insert(s)).error;
+        if (e && e.code !== '23505') hata(e); // 23505: aynı anda başka cihaz yazmış — sorun değil
+      }
     },
     async aileMesajGonder(aile, surum, veri) {
       hata((await sb.from('cat_aile_mesaj').insert({ aile, gonderen: uid, anahtar_surum: surum, veri })).error);
