@@ -38,7 +38,7 @@ export const KOC_DENEME_GUN = 60;
 // ———————————————— taşıma (sunucu) ————————————————
 
 export interface Profil { ad: string; koc: boolean; disiplinler: string[]; koc_baslangic: string | null }
-export interface DavetSatir { kod: string; disiplin: string; son: string; kullanildi: boolean }
+export interface DavetSatir { kod: string; disiplin: string; son: string; kullanildi: boolean; alici?: string | null }
 export interface UzakMesaj { sira: number; iliski: string; gonderen: string; veri: string }
 
 /** Sunucuyla konuşan her şey burada — testte bellekteki bir taşımayla değiştirilir. */
@@ -49,7 +49,7 @@ export interface Tasima {
   anahtarKoy(acik: string, ozel: string): Promise<{ acik: string; ozel: string }>;
   acikAnahtar(kisi: string): Promise<string | null>;
   iliskiler(): Promise<IliskiRow[]>;
-  davetOlustur(kod: string, disiplin: string, kocAd: string): Promise<void>;
+  davetOlustur(kod: string, disiplin: string, kocAd: string, alici?: string | null): Promise<void>;
   davetler(): Promise<DavetSatir[]>;
   davetSil(kod: string): Promise<void>;
   davetBak(kod: string): Promise<{ koc_ad: string; disiplin: string; gecerli: boolean; kendi: boolean } | null>;
@@ -113,11 +113,19 @@ function supabaseTasima(uid: string): Tasima {
       hata(r.error);
       return (r.data ?? []) as IliskiRow[];
     },
-    async davetOlustur(kod, disiplin, kocAd) {
-      hata((await sb.from('cat_davet').insert({ kod, koc: uid, koc_ad: kocAd, disiplin })).error);
+    async davetOlustur(kod, disiplin, kocAd, alici) {
+      const r = await sb.from('cat_davet').insert({ kod, koc: uid, koc_ad: kocAd, disiplin, ...(alici ? { alici } : {}) });
+      // cat-08 henüz çalıştırılmadıysa 'alici' sütunu yok: onsuz dene (davet yine çalışsın).
+      if (r.error && alici && /alici/.test(r.error.message)) { hata((await sb.from('cat_davet').insert({ kod, koc: uid, koc_ad: kocAd, disiplin })).error); return; }
+      hata(r.error);
     },
     async davetler() {
-      const r = await sb.from('cat_davet').select('kod, disiplin, son, kullanildi').eq('koc', uid).order('olusturuldu', { ascending: false });
+      const r = await sb.from('cat_davet').select('kod, disiplin, son, kullanildi, alici').eq('koc', uid).order('olusturuldu', { ascending: false });
+      if (r.error && /alici/.test(r.error.message)) {
+        const r2 = await sb.from('cat_davet').select('kod, disiplin, son, kullanildi').eq('koc', uid).order('olusturuldu', { ascending: false });
+        hata(r2.error);
+        return (r2.data ?? []) as DavetSatir[];
+      }
       hata(r.error);
       return (r.data ?? []) as DavetSatir[];
     },
@@ -516,11 +524,11 @@ function davetKodu(): string {
   return Array.from(crypto.getRandomValues(new Uint8Array(14)), (b) => a[b % a.length]).join('');
 }
 
-export async function davetOlustur(disiplin: string): Promise<{ kod: string; baglanti: string }> {
+export async function davetOlustur(disiplin: string, alici: string | null = null): Promise<{ kod: string; baglanti: string }> {
   const tt = tasimaVar();
   await anahtarGaranti(); // danışan kabul edince hemen mesajlaşabilsin
   const kod = davetKodu();
-  await tt.davetOlustur(kod, disiplin, durum.profil?.ad ?? 'Koç');
+  await tt.davetOlustur(kod, disiplin, durum.profil?.ad ?? 'Koç', alici);
   return { kod, baglanti: `${location.origin}/?davet=${kod}` };
 }
 
@@ -530,7 +538,7 @@ export async function ePostaDaveti(eposta: string, disiplin: string): Promise<st
   const kisi = await tt.kisiBul(eposta.trim());
   if (!kisi) throw new Error("Bu e-postayla Ritos kullanan biri bulunamadı. Kişinin en az bir kez giriş yapmış olması gerekir; ya da bağlantıyı gönder.");
   if (kisi.id === uid) throw new Error('Kendini davet edemezsin.');
-  const { kod } = await davetOlustur(disiplin);
+  const { kod } = await davetOlustur(disiplin, `${kisi.gorunen_ad} · ${eposta.trim().toLowerCase()}`);
   await tt.davetGonder(kisi.id, { surum: 1, tur: 'davet', ad: 'Danışmanlık daveti', davet: { kod, koc_ad: durum.profil?.ad ?? 'Koç', disiplin } });
   return kisi.gorunen_ad;
 }

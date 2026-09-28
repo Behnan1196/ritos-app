@@ -241,7 +241,8 @@ export function DavetModal({ onKapat, sabitDisiplin }: { onKapat: () => void; sa
             <p className="rt-metin">Hangi alanda çalışacaksınız?</p>
             <Chips secenekler={secenekler} deger={disiplin} onSec={setDisiplin} />
           </>}
-          <div style={{ marginTop: sabitDisiplin ? 0 : 12 }}><Chips<'baglanti' | 'eposta'> secenekler={[['eposta', 'E-postayla'], ['baglanti', 'Bağlantı / QR']]} deger={yol} onSec={setYol} /></div>
+          {/* V1 (28 eylül): bağlantı/QR kapalı — telefonda PWA yerine tarayıcıda açılıp yeniden giriş istiyor; mobil uygulamada (V2) çözülecek. */}
+          {V2 && <div style={{ marginTop: sabitDisiplin ? 0 : 12 }}><Chips<'baglanti' | 'eposta'> secenekler={[['eposta', 'E-postayla'], ['baglanti', 'Bağlantı / QR']]} deger={yol} onSec={setYol} /></div>}
           {yol === 'baglanti'
             ? <p className="rt-muted" style={{ marginTop: 10 }}>Bağlantı tek kullanımlık, 7 gün geçerli. Danışanın açınca hesabına giriş yapar (yoksa ücretsiz oluşturur) ve kabul eder. Yüz yüzeysen QR kodu okutabilir.</p>
             : (
@@ -301,7 +302,10 @@ export function Davetler({ disiplin }: { disiplin?: string } = {}) {
     <Kap baslik={<span className="rt-muted">Bekleyen davetler</span>}>
       {bekleyen.map((x) => (
         <div key={x.kod} className="rt-kaynak">
-          <div className="rt-konu" style={{ cursor: 'default' }}><span>{disiplinAdi(x.disiplin)}</span><span className="rt-muted">son gün {new Date(x.son).toLocaleDateString('tr-TR')}</span></div>
+          <div className="rt-konu" style={{ cursor: 'default' }}>
+            <span>{x.alici ?? (disiplin ? 'Bağlantıyla davet' : disiplinAdi(x.disiplin))}{x.alici && !disiplin ? ` · ${disiplinAdi(x.disiplin)}` : ''}</span>
+            <span className="rt-muted">yanıt bekleniyor · son gün {new Date(x.son).toLocaleDateString('tr-TR')}</span>
+          </div>
           <button type="button" className="rt-btn" onClick={async () => { await davetSil(x.kod); setYenile((n) => n + 1); }}>İptal</button>
         </div>
       ))}
