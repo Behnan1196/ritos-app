@@ -15,7 +15,9 @@ import { PaylasDugmesi } from './Sohbet';
 import { KartEditor } from './KartEditor';
 import { DanisanAjandasi } from './DanisanAjanda';
 import { useDanismanlik } from '@/lib/danismanlik';
-import { db, type IliskiRow } from '@/lib/db';
+import { db, type IliskiRow, type ProgramRow } from '@/lib/db';
+import type { PlanHedef } from '@/lib/danisanAjanda';
+import { disiplinAdi } from '@/lib/danismanlik';
 import { useSeciliDanisan } from '@/lib/seciliDanisan';
 
 // A1–A9 (ilk dilim). Ajanda yalnızca kart satırlarını bilir; kaynağın içini bilmez.
@@ -52,15 +54,25 @@ export default function AjandaPane() {
   const danisanlar = useCanli(async () => (await db.iliski.toArray()).filter((i) => i.durum === 'aktif' && i.koc === dn.uid), [dn.uid], [] as IliskiRow[]);
   // Seçim danışmanlık ekranıyla ortak ve oturum boyunca korunur (lib/seciliDanisan).
   const [kisi, setKisi] = useSeciliDanisan();
+  // Kişisel programlar da odaklanabilir (28 eylül): "p:<id>" — yalnız o programın kartları, planlama araçlarıyla.
+  const programlar = useCanli(() => db.program.filter((p) => !p.uzak && !p.sablon).toArray(), [], [] as ProgramRow[]);
   const secili = danisanlar.find((i) => i.id === kisi) ?? null;
+  const seciliProgram = kisi.startsWith('p:') ? programlar.find((p) => p.id === kisi.slice(2)) ?? null : null;
+  const hedef: PlanHedef | null = secili ? { tur: 'danisan', il: secili } : seciliProgram ? { tur: 'program', programId: seciliProgram.id } : null;
+  const odakVar = (dn.profil?.koc && danisanlar.length > 0) || programlar.length > 0;
 
   return (
     <div className="rt-ajanda">
-      {dn.profil?.koc && danisanlar.length > 0 && (
-        <div className={`rt-kisi-sec${secili ? ' danisan' : ''}`}>
-          <select value={secili ? kisi : ''} onChange={(e) => setKisi(e.target.value)} aria-label="Kimin ajandası">
+      {odakVar && (
+        <div className={`rt-kisi-sec${hedef ? ' danisan' : ''}`}>
+          <select value={hedef ? kisi : ''} onChange={(e) => setKisi(e.target.value)} aria-label="Ajanda odağı">
             <option value="">📅 Benim ajandam</option>
-            {danisanlar.map((i) => <option key={i.id} value={i.id}>🤝 {i.danisan_ad}</option>)}
+            {programlar.length > 0 && <optgroup label="Programlarım">
+              {programlar.sort((a, b) => a.ad.localeCompare(b.ad, 'tr')).map((p) => <option key={p.id} value={`p:${p.id}`}>🌱 {p.ad}</option>)}
+            </optgroup>}
+            {dn.profil?.koc && danisanlar.length > 0 && <optgroup label="Danışanlarım">
+              {danisanlar.map((i) => <option key={i.id} value={i.id}>🤝 {i.danisan_ad}</option>)}
+            </optgroup>}
           </select>
         </div>
       )}
@@ -77,8 +89,13 @@ export default function AjandaPane() {
         </div>
       </div>
 
-      {secili ? (
-        <DanisanAjandasi il={secili} tarih={tarih} hafta={hafta} haftaBas={haftaBasi(tarih)} onGun={(t) => { setTarih(t); setGorunum('gun'); }} />
+      {hedef ? (
+        <DanisanAjandasi
+          h={hedef}
+          baslik={secili
+            ? <>🤝 <b>{secili.danisan_ad}</b> · {disiplinAdi(secili.disiplin)} — yalnız senin atadığın kartlar görünür.</>
+            : <>🌱 <b>{seciliProgram!.ad}</b> — yalnız bu programın kartları. Burada kurduğun kartlar Benim ajandam&apos;a da düşer.</>}
+          tarih={tarih} hafta={hafta} haftaBas={haftaBasi(tarih)} onGun={(t) => { setTarih(t); setGorunum('gun'); }} />
       ) : hafta ? (
         <HaftaGorunumu bas={haftaBasi(tarih)} onAc={(satir, t) => setDetay({ satir, tarih: t })} onEkle={setEkle} onGun={(t) => { setTarih(t); setGorunum('gun'); }} />
       ) : (

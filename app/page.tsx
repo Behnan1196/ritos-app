@@ -53,6 +53,14 @@ function RitosUygulama() {
   const [danismanlik, setDanismanlik] = useState<string | null>(null);
   const sinav = useSinavOzeti();
 
+  // Başka ekrandan "Ajanda'ya git" (ör. Kişisel Gelişim › Planla): telefonda Ajanda sekmesine geçilir;
+  // geniş ekranda Ajanda zaten solda.
+  useEffect(() => {
+    const f = () => { if (window.innerWidth < NARROW_BREAKPOINT) setSekme('ajanda'); };
+    window.addEventListener('ritos-ajandaya-git', f);
+    return () => window.removeEventListener('ritos-ajandaya-git', f);
+  }, []);
+
   useEffect(() => {
     function onResize() { setIsNarrow(window.innerWidth < NARROW_BREAKPOINT); }
     onResize();

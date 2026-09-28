@@ -3,7 +3,9 @@
 import React, { useState } from 'react';
 import { db, type AlanDegerlendirmeRow, type KlasorRow, type ProgramAdimRow, type ProgramRow } from '@/lib/db';
 import { useCanli } from '@/lib/canli';
-import { GUN_KISA, TIP_ETIKET, bugun, tarihEkle, type Blok, type TemelTip } from '@/lib/paket';
+import { GUN_KISA, TIP_ETIKET, bugun, tarihEkle, tarihParse, type Blok, type TemelTip } from '@/lib/paket';
+import { useSeciliDanisan } from '@/lib/seciliDanisan';
+import { danisanGunleri } from '@/lib/danisanAjanda';
 import { adimEkle, adimGuncelle, adimSil, aktifMi, baslat, durdur, ilerleme, programGuncelle, programOlustur, type ProgramIlerleme } from '@/lib/program';
 import { DEGER_ETIKET, EN_FAZLA_SEVIYE, HAZIR_SETLER, alanEkle, alanMi, degerlendir, hazirSetKur, klasorEkle, klasorGuncelle, klasorSil, programTasi, seviye, sonDegerlendirmeler, yol } from '@/lib/alan';
 import { Chips, Kap, Modal, OnayKutusu, degerMetni } from './ortak';
@@ -278,7 +280,8 @@ function ProgramDetay({ p, klasorler, onGeri }: { p: ProgramRow; klasorler: Klas
       >
         {durdurSor && <OnayKutusu metin={il?.adimlar.length ? 'Program durdurulsun mu? Geçmiş kayıtlar korunur; bugün son gün olur.' : 'Program bitti olarak işaretlensin mi?'} evet={il?.adimlar.length ? 'Durdur' : 'Bitti'} onVazgec={() => setDurdurSor(false)} onEvet={async () => { await durdur(p.id); setDurdurSor(false); }} />}
         {V2 && <ProgramDanismanlik p={p} adimVar={!!il?.adimlar.length} />}
-        {aktif && il?.gunN != null && <p className="rt-gun">Gün {il.gunN}{il.gunM ? `/${il.gunM}` : ' · süregelen'}</p>}
+        {aktif && il?.gunN != null && !p.plan && <p className="rt-gun">Gün {il.gunN}{il.gunM ? `/${il.gunM}` : ' · süregelen'}</p>}
+        {!p.uzak && !p.sablon && <PlanSatiri p={p} />}
 
         {duzenlenir ? (
           <>
@@ -302,7 +305,7 @@ function ProgramDetay({ p, klasorler, onGeri }: { p: ProgramRow; klasorler: Klas
 
       {/* V1 (28 eylül): program kimlik kartıdır (ad, amaç, kimden, aktif/bitti); plan Ajanda'da kurulur.
           Adım editörü V2'de; eski programların adımları yalnız okunur listelenir. */}
-      {(V2 || !!il?.adimlar.length) && <Kap baslik="Görev planı" eylemler={V2 && duzenlenir ? <button type="button" className="rt-ikon" onClick={() => setAdimAcik(true)} aria-label="Adım ekle">＋</button> : null}>
+      {(V2 || (!!il?.adimlar.length && !p.plan)) && <Kap baslik="Görev planı" eylemler={V2 && duzenlenir ? <button type="button" className="rt-ikon" onClick={() => setAdimAcik(true)} aria-label="Adım ekle">＋</button> : null}>
         {!il?.adimlar.length && <p className="rt-muted">Görev planı yok. İstersen ＋ ile Ajanda&apos;ya düşecek adımlar ekle.</p>}
         {il?.adimlar.map(({ adim, planli, yapildi, sonDegerler }) => (
           <div key={adim.id} className="rt-adim">
@@ -327,10 +330,28 @@ function ProgramDetay({ p, klasorler, onGeri }: { p: ProgramRow; klasorler: Klas
           </div>
         ))}
       </Kap>}
-      {!V2 && !il?.adimlar.length && !p.uzak && <p className="rt-muted">Bu programın kartlarını Ajanda&apos;da kurarsın; burada adı, amacı ve aktif olup olmadığı durur.</p>}
+
 
       {adimAcik && <AdimForm programId={p.id} sinavIzinli={koc || !!p.sablon} yansir={yansir} onKapat={() => setAdimAcik(false)} />}
       {duzenle && <AdimForm programId={p.id} sinavIzinli={koc || !!p.sablon} adim={duzenle} yansir={yansir} onKapat={() => setDuzenle(null)} />}
+    </div>
+  );
+}
+
+/** 28 eylül — program Ajanda'dan planlanır: "Planla" Ajanda'yı bu programa odaklar; bu haftanın durumu burada. */
+function PlanSatiri({ p }: { p: ProgramRow }) {
+  const [, setOdak] = useSeciliDanisan();
+  const t0 = bugun();
+  const bas = tarihEkle(t0, -((tarihParse(t0).getDay() + 6) % 7));
+  const hafta = useCanli(async () => {
+    const v = await danisanGunleri({ tur: 'program', programId: p.id }, Array.from({ length: 7 }, (_, i) => tarihEkle(bas, i)));
+    const kartlar = Object.values(v).flat();
+    return { toplam: kartlar.length, yapildi: kartlar.filter((k) => k.yapildi).length };
+  }, [p.id, bas], { toplam: 0, yapildi: 0 });
+  return (
+    <div className="rt-plan-satiri">
+      <span className="rt-muted">{hafta.toplam ? <>Bu hafta <b>{hafta.yapildi}/{hafta.toplam}</b> kart yapıldı</> : 'Kartlarını Ajanda\u2019da planlarsın; tekrar, geçen haftayı kopyala ve görev planı (şablon) orada.'}</span>
+      <button type="button" className="rt-btn primary" onClick={() => { setOdak(`p:${p.id}`); window.dispatchEvent(new Event('ritos-ajandaya-git')); }}>📅 Planla</button>
     </div>
   );
 }

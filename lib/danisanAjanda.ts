@@ -1,5 +1,11 @@
 // ————————————————————————————————————————————————————————————————
-// Koçun gözünden danışanın Ajanda'sı (28 eylül).
+// Plan odaklı Ajanda (28 eylül) — iki hedef, tek motor:
+//  • danışan: koç bir danışan seçer, ona atadığı kartları görür/planlar (aşağıdaki açıklama).
+//  • program: kişi kendi programına odaklanır; yalnız o programın kartlarını görür/planlar.
+//    Program yerel bir "plan" programıdır (tarihler mutlak, kendiliğinden bitmez); kartlar
+//    kişinin kendi Ajanda'sına düşer, durum yerel geri bildirimden okunur.
+//
+// Koçun gözünden danışanın Ajanda'sı:
 // Koç bir danışan seçer, ona atadığı kartları gün gün görür (yapıldı mı, girilen değerler),
 // gelecek günlere doğrudan kart ekler, kartın gününü değiştirir ya da kaldırır.
 //
@@ -10,7 +16,7 @@
 // ————————————————————————————————————————————————————————————————
 
 import { db, type GeriBildirimRow, type IliskiRow, type ProgramAdimRow, type ProgramRow } from './db';
-import { adimEkle, adimGuncelle, adimSil, adimZamanlama } from './program';
+import { adimEkle, adimGuncelle, adimSil, adimZamanlama, aktifMi, calisanaYansit, programGuncelle } from './program';
 import { disiplinAdi, danisanIzinleri, programGonder } from './danismanlik';
 import { bugun, gunAktif, gunFarki, tarihEkle, type Blok, type PaketEk, type TemelTip } from './paket';
 
@@ -23,14 +29,20 @@ export interface KocKarti {
   degerler: Record<string, unknown> | null;
 }
 
-const kocProgramlari = async (iliskiId: string) =>
-  (await db.program.toArray()).filter((p) => p.uzak?.rol === 'koc' && p.uzak.iliski_id === iliskiId && p.uzak.durum !== 'ret' && p.uzak.durum !== 'ayrildi' && p.uzak.durum !== 'taslak');
+export type PlanHedef = { tur: 'danisan'; il: IliskiRow } | { tur: 'program'; programId: string };
+/** Şablonların gruplandığı anahtar: danışmanlıkta disiplin, kişisel programlarda 'kisisel'. */
+export const hedefGrubu = (h: PlanHedef) => (h.tur === 'danisan' ? h.il.disiplin : 'kisisel');
 
-/** Programın takvim tabanı: danışan kabul ettiyse onun başlangıcı, yoksa koçun seçtiği. */
-const taban = (p: ProgramRow) => p.calisma_baslangic ?? p.uzak!.baslangic;
+async function hedefProgramlari(h: PlanHedef): Promise<ProgramRow[]> {
+  if (h.tur === 'program') { const p = await db.program.get(h.programId); return p ? [p] : []; }
+  return (await db.program.toArray()).filter((p) => p.uzak?.rol === 'koc' && p.uzak.iliski_id === h.il.id && p.uzak.durum !== 'ret' && p.uzak.durum !== 'ayrildi' && p.uzak.durum !== 'taslak');
+}
 
-export async function danisanGunleri(iliskiId: string, tarihler: string[]): Promise<Record<string, KocKarti[]>> {
-  const programlar = await kocProgramlari(iliskiId);
+/** Programın takvim tabanı: çalışmanın başladığı gün (danışan kabul ettiyse onun), yoksa koçun seçtiği. */
+const taban = (p: ProgramRow) => p.calisma_baslangic ?? p.uzak?.baslangic ?? bugun();
+
+export async function danisanGunleri(h: PlanHedef, tarihler: string[]): Promise<Record<string, KocKarti[]>> {
+  const programlar = await hedefProgramlari(h);
   const sonuc: Record<string, KocKarti[]> = Object.fromEntries(tarihler.map((t) => [t, []]));
   if (!programlar.length) return sonuc;
   const adimlar = await db.program_adim.where('program_id').anyOf(programlar.map((p) => p.id)).toArray();
@@ -60,8 +72,22 @@ export async function danisanGunleri(iliskiId: string, tarihler: string[]): Prom
   return sonuc;
 }
 
+/** Kişisel program: planlanınca çalışır hale gelir (tabanı ilk planlandığı gün); durdurulmuşsa yeniden açılır. */
+async function kisiselPlan(programId: string): Promise<ProgramRow> {
+  const p = await db.program.get(programId);
+  if (!p) throw new Error('Program bulunamadı.');
+  if (p.plan && aktifMi(p) && p.calisma_bitis === null) return p;
+  await programGuncelle(p.id, { plan: true, calisma_baslangic: p.calisma_baslangic ?? bugun(), calisma_bitis: null });
+  const g = (await db.program.get(p.id))!;
+  // Durdurulmuş programın ileri günleri geri gelsin (geçmiş değişmez).
+  if (p.calisma_baslangic) for (const a of await db.program_adim.where('program_id').equals(p.id).toArray()) await calisanaYansit(p.id, a, bugun());
+  return g;
+}
+
 /** Danışanın Ajanda planı — yoksa ilk kartla birlikte oluşturulur ve gönderilir. */
-async function planProgrami(il: IliskiRow): Promise<{ p: ProgramRow; yeni: boolean }> {
+async function planProgrami(h: PlanHedef): Promise<{ p: ProgramRow; yeni: boolean }> {
+  if (h.tur === 'program') return { p: await kisiselPlan(h.programId), yeni: false };
+  const il = h.il;
   const var_ = (await db.program.toArray()).find((p) => p.uzak?.rol === 'koc' && p.uzak.iliski_id === il.id && p.uzak.plan && p.uzak.durum !== 'ret' && p.uzak.durum !== 'ayrildi');
   if (var_) return { p: var_, yeni: false };
   const p: ProgramRow = {
@@ -75,24 +101,24 @@ async function planProgrami(il: IliskiRow): Promise<{ p: ProgramRow; yeni: boole
   return { p, yeni: true };
 }
 
-export interface KocKartTaslak { tip?: TemelTip; ad: string; bloklar: Blok[]; ek?: PaketEk | null }
+export interface KocKartTaslak { tip?: TemelTip; ad: string; bloklar: Blok[]; ek?: PaketEk | null; saatler?: string[] }
 /** Tekrar: kaç gün sürer (null = süresiz) ve haftanın hangi günleri (null = her gün). */
 export interface KocTekrar { gun: number | null; gunler: number[] | null }
 
-export async function kocKartEkle(il: IliskiRow, tarih: string, kart: KocKartTaslak, tekrar: KocTekrar | null = null) {
-  await kocKartlariEkle(il, [{ tarih, kart, tekrar }]);
+export async function kocKartEkle(h: PlanHedef, tarih: string, kart: KocKartTaslak, tekrar: KocTekrar | null = null) {
+  await kocKartlariEkle(h, [{ tarih, kart, tekrar }]);
 }
 
 /** Toplu ekleme (şablon uygula, hafta kopyala): tek plan, değişiklik tek seferde gider. Geçmiş günler atlanır. */
-export async function kocKartlariEkle(il: IliskiRow, liste: { tarih: string; kart: KocKartTaslak; tekrar?: KocTekrar | null }[]): Promise<number> {
+export async function kocKartlariEkle(h: PlanHedef, liste: { tarih: string; kart: KocKartTaslak; tekrar?: KocTekrar | null }[]): Promise<number> {
   const t0 = bugun();
   const gecerli = liste.filter((x) => x.tarih >= t0);
   if (!gecerli.length) { if (liste.length) throw new Error('Geçmiş güne kart eklenmez.'); return 0; }
-  const { p, yeni } = await planProgrami(il);
+  const { p, yeni } = await planProgrami(h);
   for (const { tarih, kart, tekrar } of gecerli) {
     await adimEkle(p.id, {
       tip: kart.tip ?? 'yap', ad: kart.ad.trim(), bloklar: kart.bloklar, ...(kart.ek ? { ek: kart.ek } : {}),
-      basla_gun: gunFarki(taban(p), tarih), sure_gun: tekrar ? tekrar.gun : 1, gunler: tekrar?.gunler ?? null, saatler: [],
+      basla_gun: gunFarki(taban(p), tarih), sure_gun: tekrar ? tekrar.gun : 1, gunler: tekrar?.gunler ?? null, saatler: kart.saatler ?? [],
     });
   }
   if (yeni) await programGonder(p.id);
@@ -113,16 +139,16 @@ export async function kocSeriBitir(k: KocKarti) {
 
 export interface HaftaKarti { gun: number; kart: KocKartTaslak }
 
-const taslak = (a: ProgramAdimRow): KocKartTaslak => ({ tip: a.tip, ad: a.ad, bloklar: a.bloklar, ek: a.ek ?? null });
+const taslak = (a: ProgramAdimRow): KocKartTaslak => ({ tip: a.tip, ad: a.ad, bloklar: a.bloklar, ek: a.ek ?? null, saatler: a.saatler });
 
-export async function haftaKartlari(iliskiId: string, haftaBas: string): Promise<HaftaKarti[]> {
+export async function haftaKartlari(h: PlanHedef, haftaBas: string): Promise<HaftaKarti[]> {
   const gunler = Array.from({ length: 7 }, (_, i) => tarihEkle(haftaBas, i));
-  const v = await danisanGunleri(iliskiId, gunler);
+  const v = await danisanGunleri(h, gunler);
   return gunler.flatMap((t, i) => v[t].map((k) => ({ gun: i, kart: taslak(k.adim) })));
 }
 
-export async function haftaSablonKaydet(il: IliskiRow, haftaBas: string, ad: string): Promise<number> {
-  const kartlar = await haftaKartlari(il.id, haftaBas);
+export async function haftaSablonKaydet(h: PlanHedef, haftaBas: string, ad: string): Promise<number> {
+  const kartlar = await haftaKartlari(h, haftaBas);
   if (!kartlar.length) throw new Error('Bu haftada kart yok.');
   const id = crypto.randomUUID();
   const simdi = Date.now();
@@ -130,11 +156,11 @@ export async function haftaSablonKaydet(il: IliskiRow, haftaBas: string, ad: str
     await db.program.add({
       id, ad: ad.trim() || 'Hafta şablonu', amac: '', dikkat: '', kriterler: [], hedef: '', klasor_id: null, home_goster: false,
       degerlendirme_acik: false, degerlendirme: null, calisma_baslangic: null, calisma_bitis: null,
-      sablon: true, sablon_disiplin: il.disiplin, uzak: null, guncellendi: simdi,
+      sablon: true, sablon_disiplin: hedefGrubu(h), uzak: null, guncellendi: simdi,
     });
     await db.program_adim.bulkAdd(kartlar.map((x, i) => ({
       id: crypto.randomUUID(), program_id: id, sira: i + 1, tip: x.kart.tip ?? 'yap', ad: x.kart.ad, bloklar: x.kart.bloklar,
-      ...(x.kart.ek ? { ek: x.kart.ek } : {}), basla_gun: x.gun, sure_gun: 1, gunler: null, saatler: [], guncellendi: simdi,
+      ...(x.kart.ek ? { ek: x.kart.ek } : {}), basla_gun: x.gun, sure_gun: 1, gunler: null, saatler: x.kart.saatler ?? [], guncellendi: simdi,
     })));
   });
   return kartlar.length;
@@ -152,10 +178,10 @@ export async function sablonKartlari(sablonId: string): Promise<HaftaKarti[]> {
 }
 
 /** Şablonu (ya da başka bir haftayı) bu haftadan itibaren N hafta uygula. */
-export async function haftaUygula(il: IliskiRow, kaynak: HaftaKarti[], haftaBas: string, haftaSayisi = 1): Promise<number> {
+export async function haftaUygula(h: PlanHedef, kaynak: HaftaKarti[], haftaBas: string, haftaSayisi = 1): Promise<number> {
   const liste = [];
   for (let h = 0; h < haftaSayisi; h++) for (const x of kaynak) liste.push({ tarih: tarihEkle(haftaBas, h * 7 + x.gun), kart: x.kart });
-  return kocKartlariEkle(il, liste);
+  return kocKartlariEkle(h, liste);
 }
 
 
@@ -167,7 +193,7 @@ export async function kocKartTasi(k: KocKarti, yeniTarih: string) {
   await adimGuncelle(k.adim.id, { basla_gun: gunFarki(taban(k.program), yeniTarih) }, etkin);
 }
 
-export async function kocKartGuncelle(k: KocKarti, patch: { ad: string; bloklar: Blok[] }) {
+export async function kocKartGuncelle(k: KocKarti, patch: { ad: string; bloklar: Blok[]; saatler?: string[] }) {
   await adimGuncelle(k.adim.id, patch, k.tarih < bugun() ? bugun() : k.tarih);
 }
 

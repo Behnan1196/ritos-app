@@ -537,3 +537,4 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-sablon-gunler{display:flex;flex-direction:column;gap:4px;margin:8px 0;}
 .rt-sablon-gun{display:flex;gap:10px;font-size:13px;border-bottom:1px dashed var(--line);padding:4px 0;}
 .rt-sablon-gun b{flex:0 0 34px;}
+.rt-plan-satiri{display:flex;align-items:center;gap:10px;justify-content:space-between;border:1px dashed var(--line);border-radius:12px;padding:8px 10px;margin:6px 0;}

@@ -63,7 +63,7 @@ export async function calisanaYansit(programId: string, adim: ProgramAdimRow, et
 
 /** Koçun Ajanda planı (uzak.plan) kendiliğinden bitmez: koç ileriki haftalara kart ekledikçe akar. */
 export function programBitisi(p: ProgramRow | null | undefined, adimlar: ProgramAdimRow[], baslangic: string): string | null {
-  return p?.uzak?.plan ? null : calismaBitisi(adimlar, baslangic);
+  return p?.uzak?.plan || p?.plan ? null : calismaBitisi(adimlar, baslangic);
 }
 
 export function calismaBitisi(adimlar: ProgramAdimRow[], baslangic: string): string | null {
@@ -93,7 +93,11 @@ function adimPaketi(p: ProgramRow, a: ProgramAdimRow, baslangic: string): KartPa
 export async function adimSil(adimId: string) {
   const a = await db.program_adim.get(adimId);
   await db.program_adim.delete(adimId);
-  if (a && kocProgrami(await db.program.get(a.program_id))) programKancalari.degisti?.(a.program_id, bugun());
+  if (!a) return;
+  const p = await db.program.get(a.program_id);
+  if (kocProgrami(p)) programKancalari.degisti?.(a.program_id, bugun());
+  // Kişisel çalışan program: adımın bugünden sonraki kartları Ajanda'dan kalkar (geçmiş kalır).
+  else if (p?.calisma_baslangic) await kaynaktanCek(`${a.program_id}/${a.id}`, bugun());
 }
 
 // Program aktif mi? Arka planda iş çalıştırmadan, tarihlerden türetilir:
@@ -119,6 +123,12 @@ export async function baslat(programId: string, baslangic = bugun()) {
   const p = await db.program.get(programId);
   if (!p || aktifMi(p) || kocProgrami(p) || p.sablon) return; // atanan program ve şablon koçun Ajanda'sına düşmez
   const adimlar = await db.program_adim.where('program_id').equals(programId).sortBy('sira');
+  // Ajanda'dan planlanan program yeniden açılınca tabanı (mutlak tarihleri) korunur; ileri günler geri gelir.
+  if (p.plan && p.calisma_baslangic) {
+    await programGuncelle(programId, { calisma_bitis: null });
+    for (const a of adimlar) await yenidenTeslim(`${programId}/${a.id}`, bugun(), adimPaketi(p, a, p.calisma_baslangic));
+    return;
+  }
   // V1: görev planı olmadan da "aktif" olunur (başka yerde yürüyen bir program — Kişisel Gelişim haritası için).
   if (adimlar.length === 0) { await programGuncelle(programId, { calisma_baslangic: baslangic, calisma_bitis: null }); return; }
 

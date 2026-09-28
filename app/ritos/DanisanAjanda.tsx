@@ -5,7 +5,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { useCanli } from '@/lib/canli';
-import { danisanGunleri, haftaKartlari, haftaSablonKaydet, haftaUygula, kocKartEkle, kocKartGuncelle, kocKartSil, kocKartTasi, kocSeriBitir, sablonKartlari, type KocKarti, type KocKartTaslak, type KocTekrar } from '@/lib/danisanAjanda';
+import { hedefGrubu, danisanGunleri, haftaKartlari, haftaSablonKaydet, haftaUygula, kocKartEkle, kocKartGuncelle, kocKartSil, kocKartTasi, kocSeriBitir, sablonKartlari, type KocKarti, type KocKartTaslak, type KocTekrar, type PlanHedef } from '@/lib/danisanAjanda';
+import { KartEditor } from './KartEditor';
+import type { AjandaKartRow } from '@/lib/db';
 import { disiplinAdi } from '@/lib/danismanlik';
 import { OLC_ONEK, olcuBlok, olcuBloklari, olculer } from '@/lib/olcum';
 import { GUN_KISA, bugun, tarihEkle, tarihParse, type Blok } from '@/lib/paket';
@@ -17,9 +19,12 @@ import { BlokGoster, Kap, Modal, OnayKutusu, degerMetni } from './ortak';
 
 const olcumKarti = (b: Blok[]) => olcuBloklari(b).length > 0;
 
-export function DanisanAjandasi({ il, tarih, hafta, haftaBas, onGun }: { il: IliskiRow; tarih: string; hafta: boolean; haftaBas: string; onGun: (t: string) => void }) {
+const hedefKey = (h: PlanHedef) => (h.tur === 'danisan' ? h.il.id : h.programId);
+
+/** Plan odaklı Ajanda: danışanın (koç) ya da kişisel bir programın kartları. */
+export function DanisanAjandasi({ h, baslik, tarih, hafta, haftaBas, onGun }: { h: PlanHedef; baslik: React.ReactNode; tarih: string; hafta: boolean; haftaBas: string; onGun: (t: string) => void }) {
   const gunler = hafta ? Array.from({ length: 7 }, (_, i) => tarihEkle(haftaBas, i)) : [tarih];
-  const veri = useCanli(() => danisanGunleri(il.id, gunler), [il.id, gunler[0], gunler.length], {} as Record<string, KocKarti[]>);
+  const veri = useCanli(() => danisanGunleri(h, gunler), [hedefKey(h), gunler[0], gunler.length], {} as Record<string, KocKarti[]>);
   const [ekle, setEkle] = useState<string | null>(null);
   const [detay, setDetay] = useState<KocKarti | null>(null);
   const [surukle, setSurukle] = useState<KocKarti | null>(null);
@@ -30,9 +35,9 @@ export function DanisanAjandasi({ il, tarih, hafta, haftaBas, onGun }: { il: Ili
   async function gecenHafta() {
     setHata(null); setBilgi(null);
     try {
-      const kaynak = await haftaKartlari(il.id, tarihEkle(haftaBas, -7));
+      const kaynak = await haftaKartlari(h, tarihEkle(haftaBas, -7));
       if (!kaynak.length) { setHata('Geçen haftada kart yok.'); return; }
-      const n = await haftaUygula(il, kaynak, haftaBas);
+      const n = await haftaUygula(h, kaynak, haftaBas);
       setBilgi(`Geçen haftadan ${n} kart kopyalandı${n < kaynak.length ? ' (geçmiş günler atlandı)' : ''}.`);
     } catch (e) { setHata((e as Error).message); }
   }
@@ -71,7 +76,7 @@ export function DanisanAjandasi({ il, tarih, hafta, haftaBas, onGun }: { il: Ili
 
   return (
     <div className="rt-danisan-ajanda">
-      <p className="rt-muted rt-danisan-not">🤝 <b>{il.danisan_ad}</b> · {disiplinAdi(il.disiplin)} — yalnız senin atadığın kartlar görünür.</p>
+      <p className="rt-muted rt-danisan-not">{baslik}</p>
       {hafta && (
         <div className="rt-hafta-is">
           <button type="button" className="rt-chip" onClick={gecenHafta}>⧉ Geçen haftayı kopyala</button>
@@ -89,10 +94,10 @@ export function DanisanAjandasi({ il, tarih, hafta, haftaBas, onGun }: { il: Ili
           <div className="rt-liste">{(veri[tarih] ?? []).map((k) => <KocKartSatiri key={k.adim.id} k={k} onAc={() => setDetay(k)} />)}</div>
         </Kap>
       )}
-      {ekle && <KocKartFormu il={il} tarih={ekle} onKapat={() => setEkle(null)} />}
-      {haftaIs === 'uygula' && <SablonUygulaModal il={il} haftaBas={haftaBas} onKapat={() => setHaftaIs(null)} onTamam={(m) => { setHaftaIs(null); setBilgi(m); }} />}
-      {haftaIs === 'kaydet' && <SablonKaydetModal il={il} haftaBas={haftaBas} onKapat={() => setHaftaIs(null)} onTamam={(m) => { setHaftaIs(null); setBilgi(m); }} />}
-      {detay && <KocKartDetay il={il} k={detay} onKapat={() => setDetay(null)} />}
+      {ekle && <KocKartFormu h={h} tarih={ekle} onKapat={() => setEkle(null)} />}
+      {haftaIs === 'uygula' && <SablonUygulaModal h={h} haftaBas={haftaBas} onKapat={() => setHaftaIs(null)} onTamam={(m) => { setHaftaIs(null); setBilgi(m); }} />}
+      {haftaIs === 'kaydet' && <SablonKaydetModal h={h} haftaBas={haftaBas} onKapat={() => setHaftaIs(null)} onTamam={(m) => { setHaftaIs(null); setBilgi(m); }} />}
+      {detay && <KocKartDetay h={h} k={detay} onKapat={() => setDetay(null)} />}
     </div>
   );
 }
@@ -107,7 +112,7 @@ function KocKartSatiri({ k, onAc, onSurukle, suruklenen }: { k: KocKarti; onAc: 
         <button type="button" className="rt-kart-ad" onClick={onAc}>
           <span className="t">{olcumKarti(k.adim.bloklar) ? '📏 ' : ''}{k.adim.ad}</span>
           {deger && <span className="m">✓ {deger}</span>}
-          {!k.tekGun && <span className="m">🔁 {k.program.uzak?.plan ? 'tekrar' : k.program.ad}</span>}
+          {!k.tekGun && <span className="m">🔁 {k.program.uzak?.plan || k.program.plan ? 'tekrar' : k.program.ad}</span>}
         </button>
         {onSurukle && <span className="rt-tutamac" aria-label="Başka güne sürükle" onPointerDown={(e) => { e.preventDefault(); onSurukle(); }}>⋮⋮</span>}
       </div>
@@ -115,13 +120,13 @@ function KocKartSatiri({ k, onAc, onSurukle, suruklenen }: { k: KocKarti; onAc: 
   );
 }
 
-function KocKartDetay({ il, k, onKapat }: { il: IliskiRow; k: KocKarti; onKapat: () => void }) {
+function KocKartDetay({ h, k, onKapat }: { h: PlanHedef; k: KocKarti; onKapat: () => void }) {
   const gecmis = k.tarih < bugun();
   const [duzenle, setDuzenle] = useState(false);
   const [yeniTarih, setYeniTarih] = useState(k.tarih);
   const [sil, setSil] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
-  if (duzenle) return <KocKartFormu il={il} tarih={k.tarih} k={k} onKapat={onKapat} />;
+  if (duzenle) return <KocKartFormu h={h} tarih={k.tarih} k={k} onKapat={onKapat} />;
   const calis = async (f: () => Promise<void>) => { try { await f(); onKapat(); } catch (e) { setHata((e as Error).message); } };
   return (
     <Modal baslik={k.adim.ad} onKapat={onKapat}>
@@ -133,7 +138,7 @@ function KocKartDetay({ il, k, onKapat }: { il: IliskiRow; k: KocKarti; onKapat:
         {k.degerler && <> · {degerMetni(k.degerler, k.adim.bloklar)}</>}
       </p>
       {hata && <p className="rt-hata">⚠ {hata}</p>}
-      {!k.tekGun && <p className="rt-muted">Bu kart birden çok güne yayılıyor{k.program.uzak?.plan ? '' : ` (${k.program.ad})`}.</p>}
+      {!k.tekGun && <p className="rt-muted">Bu kart birden çok güne yayılıyor{k.program.uzak?.plan || k.program.plan ? '' : ` (${k.program.ad})`}.</p>}
       {!k.tekGun && !sil && <div className="rt-satir"><button type="button" className="rt-btn tehlike" onClick={() => setSil(true)}>Seriyi bugünden bitir</button></div>}
       {!k.tekGun && sil && <OnayKutusu metin="Seri bugünden itibaren kalksın mı? Yapılmış günler kalır." evet="Bitir" onVazgec={() => setSil(false)} onEvet={() => calis(() => kocSeriBitir(k))} />}
       {k.tekGun && k.yapildi && !gecmis && <p className="rt-muted">Yapılmış kart taşınmaz ve kaldırılmaz; içeriğini düzenleyebilirsin.</p>}
@@ -150,7 +155,7 @@ function KocKartDetay({ il, k, onKapat }: { il: IliskiRow; k: KocKarti; onKapat:
           </div>
         </>
       )}
-      {sil && k.tekGun && <OnayKutusu metin="Kart danışanın Ajanda'sından kaldırılsın mı?" evet="Kaldır" onVazgec={() => setSil(false)} onEvet={() => calis(() => kocKartSil(k))} />}
+      {sil && k.tekGun && <OnayKutusu metin={h.tur === 'danisan' ? "Kart danışanın Ajanda'sından kaldırılsın mı?" : 'Kart kaldırılsın mı?'} evet="Kaldır" onVazgec={() => setSil(false)} onEvet={() => calis(() => kocKartSil(k))} />}
     </Modal>
   );
 }
@@ -160,7 +165,31 @@ function KocKartDetay({ il, k, onKapat }: { il: IliskiRow; k: KocKarti; onKapat:
 type KartTur = 'ogun' | 'kart' | 'olcum' | 'sinav';
 const TEKRAR_SURE: [string, string][] = [['7', '1 hafta'], ['14', '2 hafta'], ['28', '4 hafta'], ['', 'Süresiz']];
 
-function KocKartFormu({ il, tarih, k, onKapat }: { il: IliskiRow; tarih: string; k?: KocKarti; onKapat: () => void }) {
+function KocKartFormu({ h, tarih, k, onKapat }: { h: PlanHedef; tarih: string; k?: KocKarti; onKapat: () => void }) {
+  // Kişisel programda kişinin kendi tek kart editörü (video, süre kaydı, zamanlayıcı…) kullanılır.
+  if (h.tur === 'program') return <ProgramKartFormu h={h} tarih={tarih} k={k} onKapat={onKapat} />;
+  return <DanisanKartFormu il={h.il} h={h} tarih={tarih} k={k} onKapat={onKapat} />;
+}
+
+function ProgramKartFormu({ h, tarih, k, onKapat }: { h: PlanHedef; tarih: string; k?: KocKarti; onKapat: () => void }) {
+  const sahte = k ? ({
+    id: k.adim.id, tip: k.adim.tip, ad: k.adim.ad, bloklar: k.adim.bloklar, baslangic: k.tarih, bitis: k.tarih, gunler: null, saatler: k.adim.saatler,
+  } as unknown as AjandaKartRow) : undefined;
+  return (
+    <KartEditor
+      tarih={tarih}
+      kart={sahte}
+      tekrarYok={!!k}
+      onKapat={onKapat}
+      onPlan={async (kart, tekrar) => {
+        if (k) await kocKartGuncelle(k, { ad: kart.ad, bloklar: kart.bloklar, saatler: kart.saatler });
+        else await kocKartEkle(h, tarih, kart, tekrar);
+      }}
+    />
+  );
+}
+
+function DanisanKartFormu({ il, h, tarih, k, onKapat }: { il: IliskiRow; h: PlanHedef; tarih: string; k?: KocKarti; onKapat: () => void }) {
   const sinavKurulu = useSinavOzeti().kurulu;
   const palet: [KartTur, string][] = il.disiplin === 'beslenme'
     ? [['ogun', '🍽 Öğün'], ['olcum', '📏 Ölçüm'], ['kart', '☑ Kart']]
@@ -198,7 +227,7 @@ function KocKartFormu({ il, tarih, k, onKapat }: { il: IliskiRow; tarih: string;
     if (!kart.ad) { setHata('Kart adı yaz.'); return; }
     const tekrar: KocTekrar | null = tekrarAcik ? { gun: sure ? Number(sure) : null, gunler: gunler.length && gunler.length < 7 ? gunler : null } : null;
     try {
-      if (k) await kocKartGuncelle(k, { ad: kart.ad, bloklar: kart.bloklar }); else await kocKartEkle(il, tarih, kart, tekrar);
+      if (k) await kocKartGuncelle(k, { ad: kart.ad, bloklar: kart.bloklar }); else await kocKartEkle(h, tarih, kart, tekrar);
       onKapat();
     } catch (e) { setHata((e as Error).message); }
   }
@@ -249,8 +278,8 @@ export function useHaftaSablonlari(disiplin: string) {
   return useCanli(() => db.program.filter((p) => !!p.sablon && (!p.sablon_disiplin || p.sablon_disiplin === disiplin)).toArray(), [disiplin], [] as ProgramRow[]);
 }
 
-function SablonUygulaModal({ il, haftaBas, onKapat, onTamam }: { il: IliskiRow; haftaBas: string; onKapat: () => void; onTamam: (m: string) => void }) {
-  const sablonlar = useHaftaSablonlari(il.disiplin);
+function SablonUygulaModal({ h, haftaBas, onKapat, onTamam }: { h: PlanHedef; haftaBas: string; onKapat: () => void; onTamam: (m: string) => void }) {
+  const sablonlar = useHaftaSablonlari(hedefGrubu(h));
   const [secili, setSecili] = useState<string | null>(null);
   const [hafta, setHafta] = useState(1);
   const [hata, setHata] = useState<string | null>(null);
@@ -272,7 +301,7 @@ function SablonUygulaModal({ il, haftaBas, onKapat, onTamam }: { il: IliskiRow; 
       <button type="button" className="rt-btn primary" disabled={!secili} onClick={async () => {
         try {
           const kaynak = await sablonKartlari(secili!);
-          const n = await haftaUygula(il, kaynak, haftaBas, hafta);
+          const n = await haftaUygula(h, kaynak, haftaBas, hafta);
           onTamam(`${n} kart eklendi${n < kaynak.length * hafta ? ' (geçmiş günler atlandı)' : ''}.`);
         } catch (e) { setHata((e as Error).message); }
       }}>Uygula</button>
@@ -280,7 +309,7 @@ function SablonUygulaModal({ il, haftaBas, onKapat, onTamam }: { il: IliskiRow; 
   );
 }
 
-function SablonKaydetModal({ il, haftaBas, onKapat, onTamam }: { il: IliskiRow; haftaBas: string; onKapat: () => void; onTamam: (m: string) => void }) {
+function SablonKaydetModal({ h, haftaBas, onKapat, onTamam }: { h: PlanHedef; haftaBas: string; onKapat: () => void; onTamam: (m: string) => void }) {
   const [ad, setAd] = useState('');
   const [hata, setHata] = useState<string | null>(null);
   return (
@@ -289,7 +318,7 @@ function SablonKaydetModal({ il, haftaBas, onKapat, onTamam }: { il: IliskiRow; 
       <input className="rt-inp" placeholder="Şablon adı (örn. 1500 kcal · 1. hafta)" value={ad} onChange={(e) => setAd(e.target.value)} autoFocus />
       {hata && <p className="rt-hata">⚠ {hata}</p>}
       <button type="button" className="rt-btn primary" disabled={!ad.trim()} onClick={async () => {
-        try { const n = await haftaSablonKaydet(il, haftaBas, ad); onTamam(`"${ad.trim()}" şablonu ${n} kartla kaydedildi.`); } catch (e) { setHata((e as Error).message); }
+        try { const n = await haftaSablonKaydet(h, haftaBas, ad); onTamam(`"${ad.trim()}" şablonu ${n} kartla kaydedildi.`); } catch (e) { setHata((e as Error).message); }
       }}>Kaydet</button>
     </Modal>
   );

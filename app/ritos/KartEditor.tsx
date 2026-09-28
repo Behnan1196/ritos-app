@@ -15,6 +15,7 @@ import type { OlcuTanimRow } from '@/lib/db';
 import { teslimAl, kartGuncelle } from '@/lib/ajanda';
 import { GUN_KISA, PAKET_SURUM, TAM_IZIN, gunFarki, tarihEkle, type Blok, type KartPaketi } from '@/lib/paket';
 import type { AjandaKartRow } from '@/lib/db';
+import type { KocKartTaslak, KocTekrar } from '@/lib/danisanAjanda';
 import { Modal } from './ortak';
 import { GorevFormu, gorevTeslim, useSinavOzeti } from './Sinav';
 import type { GorevTaslak } from '@/lib/sinavGorev';
@@ -41,7 +42,12 @@ const videoMu = (url: string) => /youtu\.?be|vimeo|instagram/.test(url);
 
 const SURE_SECENEK: [string, string][] = [['7', '1 hafta'], ['21', '21 gün'], ['', 'Süresiz']];
 
-export function KartEditor({ tarih, kart, onKapat }: { tarih: string; kart?: AjandaKartRow; onKapat: () => void }) {
+// onPlan verilirse kart Ajanda'ya doğrudan değil, bir plana (kişisel program) adım olarak eklenir;
+// düzenlemede tekrar değiştirilmez (tekrarYok).
+export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok }: {
+  tarih: string; kart?: AjandaKartRow; onKapat: () => void;
+  onPlan?: (kart: KocKartTaslak, tekrar: KocTekrar | null) => Promise<void>; tekrarYok?: boolean;
+}) {
   // V1: sınav görevleri yalnız koçun planında; kişinin kendi Ajanda'sında yok (V2'de açılır).
   const sinavKurulu = V2 && !kart && useSinavOzeti().kurulu; // eslint-disable-line react-hooks/rules-of-hooks
   const [sinav, setSinav] = useState(false);
@@ -58,6 +64,7 @@ export function KartEditor({ tarih, kart, onKapat }: { tarih: string; kart?: Aja
   const sure0 = kart && tekrarli0 && kart.bitis ? String(gunFarki(kart.baslangic, kart.bitis) + 1) : kart && tekrarli0 ? '' : '21';
 
   const [ad, setAd] = useState(kart?.ad ?? '');
+  const [hataM, setHataM] = useState<string | null>(null);
   const [aciklama, setAciklama] = useState(b0.filter((b): b is Extract<Blok, { tur: 'metin' }> => b.tur === 'metin').map((b) => b.metin).join('\n\n'));
   const [videolar, setVideolar] = useState<VideoSatir[]>(
     b0.filter((b): b is Extract<Blok, { tur: 'video' | 'baglanti' }> => b.tur === 'video' || b.tur === 'baglanti')
@@ -143,6 +150,12 @@ export function KartEditor({ tarih, kart, onKapat }: { tarih: string; kart?: Aja
       return;
     }
     if (!ad.trim()) return;
+    if (onPlan) {
+      const n = Number(sure);
+      const tk: KocTekrar | null = tekrar && !tekrarYok ? { gun: sure && n > 0 ? n : null, gunler: gunler.length && gunler.length < 7 ? gunler : null } : null;
+      try { await onPlan({ tip: 'yap', ad: ad.trim(), bloklar: bloklarUret(), saatler: saat ? [saat] : [] }, tk); onKapat(); } catch (e) { setHataM((e as Error).message); }
+      return;
+    }
     if (kart) {
       const z = zamanlama(kart.baslangic);
       await kartGuncelle(kart.id, { tip: 'yap', ad: ad.trim(), bloklar: bloklarUret(), bitis: z.bitis, gunler: z.gunler, saatler: z.saatler });
@@ -216,7 +229,7 @@ export function KartEditor({ tarih, kart, onKapat }: { tarih: string; kart?: Aja
         </>
       ))}
 
-      {bolum('tekrar', '🔁 Tekrar', (
+      {!tekrarYok && bolum('tekrar', '🔁 Tekrar', (
         <>
           <div className="rt-chips">
             <button type="button" className={`rt-chip${!gunler.length ? ' on' : ''}`} onClick={() => setGunler([])}>Her gün</button>
@@ -276,7 +289,7 @@ export function KartEditor({ tarih, kart, onKapat }: { tarih: string; kart?: Aja
       <div className="rt-chips rt-ek-cipler">
         {!sinav && cip('aciklama', '📝 Açıklama')}
         {!sinav && cip('video', '🎬 Video')}
-        {cip('tekrar', '🔁 Tekrar')}
+        {!tekrarYok && cip('tekrar', '🔁 Tekrar')}
         {cip('saat', '🕐 Saat')}
         {!sinav && !dahaFazla && <button type="button" className="rt-chip rt-ek-cip" onClick={() => setDahaFazla(true)}>＋ Daha fazla</button>}
         {!sinav && dahaFazla && cip('sure', '⏱ Süre kaydı')}
@@ -284,6 +297,7 @@ export function KartEditor({ tarih, kart, onKapat }: { tarih: string; kart?: Aja
         {!sinav && dahaFazla && cip('olcum', '📏 Ölçüm')}
       </div>
 
+      {hataM && <p className="rt-hata">⚠ {hataM}</p>}
       <button type="button" className="rt-btn primary" disabled={sinav ? !gorev : !ad.trim() || (acik.has('olcum') && !seciliOlcu.length && !(eskiDeg && eskiDegKalsin))} onClick={kaydet}>{kart ? 'Kaydet' : 'Ekle'}</button>
     </Modal>
   );
