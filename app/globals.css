@@ -469,3 +469,25 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-hafta .rt-oynat{width:24px;height:24px;font-size:10px;}
 .rt-hafta-bos{text-align:center;margin:4px 0;}
 .rt-sekme-rozet.nokta{width:8px;height:8px;padding:0;border-radius:50%;background:#d9822b;}
+
+/* Bölme ayırıcısı dokunmatikte (iPad) de sürüklenebilsin: parmak için geniş görünmez alan + tutamaç */
+.split-divider{touch-action:none;z-index:3;}
+.split-divider::before{content:'';position:absolute;top:0;bottom:0;left:-10px;right:-10px;}
+@media (pointer:coarse){
+  .split-divider{width:12px;}
+  .split-divider::after{left:5px;}
+  .split-divider span,.split-divider::after{pointer-events:none;}
+  .split-divider{background:linear-gradient(var(--line),var(--line)) center/4px 44px no-repeat;}
+}
+
+/* ---------- Ölçümlerim (28 eylül) ---------- */
+.rt-olcumler{display:flex;flex-direction:column;gap:6px;}
+.rt-olcu{border:1px solid var(--line);border-radius:12px;background:#fff;}
+.rt-olcu-ust{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;font:inherit;color:var(--ink);padding:9px 11px;cursor:pointer;text-align:left;}
+.rt-olcu-ust .ad{flex:1;min-width:0;font-size:13.5px;font-weight:700;}
+.rt-olcu-ust .deger{text-align:right;font-size:13px;white-space:nowrap;display:flex;flex-direction:column;align-items:flex-end;}
+.rt-olcu-ust .fark{font-size:11px;color:var(--muted);}
+.rt-cizgi{color:var(--green);flex:0 0 auto;}
+.rt-olcu-gecmis{list-style:none;margin:0;padding:0 11px 8px;font-size:12.5px;}
+.rt-olcu-gecmis li{display:flex;justify-content:space-between;border-top:1px dashed var(--line);padding:4px 0;}
+.wrow.tool.olc .t::after{display:none;}

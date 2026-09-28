@@ -81,9 +81,10 @@ export function degerMetni(d: Record<string, unknown>, bloklar?: Blok[]): string
   return Object.entries(d)
     .filter(([, v]) => v !== '' && v !== null && v !== undefined)
     .map(([k, v]) => {
-      if (k === 'sure_dk') return `${v} dk`;
+      const m = typeof v === 'number' ? v.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) : String(v);
+      if (k === 'sure_dk') return `${m} dk`;
       const b = bloklar?.find((x) => 'anahtar' in x && x.anahtar === k);
-      return b && b.tur === 'sayi' && b.birim ? `${v} ${b.birim}` : String(v);
+      return b && b.tur === 'sayi' && b.birim ? `${m} ${b.birim}` : m;
     })
     .join(' · ');
 }

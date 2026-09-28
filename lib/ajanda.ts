@@ -6,6 +6,7 @@
 // ————————————————————————————————————————————————————————————————
 
 import { db, type AjandaKartRow, type AjandaKayitRow, type GeriBildirimRow } from './db';
+import { olcumSil, olcumYaz } from './olcum';
 import { gunAktif, gunFarki, tarihEkle, type GeriBildirimOlay, type KartPaketi } from './paket';
 
 function paketToRow(p: KartPaketi, sira: number): AjandaKartRow {
@@ -105,6 +106,7 @@ export async function yapildiAyarla(kartId: string, tarih: string, yapildi: bool
     await kayitYaz(kartId, tarih, { yapildi });
     await yayinla(kart, tarih, yapildi ? 'yapildi' : 'geri_alindi', null);
   });
+  if (!yapildi) await olcumSil(kartId, tarih);
 }
 
 // A9 — Kaydet kartında değer gir (kaydedince yapıldı sayılır).
@@ -115,6 +117,7 @@ export async function degerKaydet(kartId: string, tarih: string, degerler: Recor
     await kayitYaz(kartId, tarih, { yapildi: true, degerler });
     await yayinla(kart, tarih, 'deger', degerler);
   });
+  await olcumYaz(kart, tarih, degerler);
 }
 
 // A7 — bağımsız kartı kaldır. Tekrar edende: "yalnız bu gün" (o gün atlanır) ya da

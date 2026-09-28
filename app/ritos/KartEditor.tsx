@@ -9,6 +9,9 @@
 // ————————————————————————————————————————————————————————————————
 
 import React, { useState } from 'react';
+import { useCanli } from '@/lib/canli';
+import { OLC_ONEK, olcuBlok, olcuEkle, olculer } from '@/lib/olcum';
+import type { OlcuTanimRow } from '@/lib/db';
 import { teslimAl, kartGuncelle } from '@/lib/ajanda';
 import { GUN_KISA, PAKET_SURUM, TAM_IZIN, gunFarki, tarihEkle, type Blok, type KartPaketi } from '@/lib/paket';
 import type { AjandaKartRow } from '@/lib/db';
@@ -17,7 +20,7 @@ import { GorevFormu, gorevTeslim, useSinavOzeti } from './Sinav';
 import type { GorevTaslak } from '@/lib/sinavGorev';
 import { V2 } from '@/lib/surum';
 
-type Ek = 'aciklama' | 'video' | 'tekrar' | 'saat' | 'sure' | 'deger' | 'zamanlayici';
+type Ek = 'aciklama' | 'video' | 'tekrar' | 'saat' | 'sure' | 'olcum' | 'zamanlayici';
 interface VideoSatir { url: string; baslik: string; bas: string; bit: string }
 
 export const SURE_ANAHTAR = 'sure_dk';
@@ -47,7 +50,9 @@ export function KartEditor({ tarih, kart, onKapat }: { tarih: string; kart?: Aja
   const b0 = kart?.bloklar ?? [];
   const sayilar = b0.filter((b): b is Extract<Blok, { tur: 'sayi' }> => b.tur === 'sayi');
   const surB = sayilar.find((b) => b.anahtar === SURE_ANAHTAR);
-  const degB = sayilar.find((b) => b.anahtar !== SURE_ANAHTAR);
+  // Eski "Değer kaydı" (anahtar 'deger') kartları olduğu gibi korunur; yeni kartlar ölçü kullanır.
+  const eskiDeg = sayilar.find((b) => b.anahtar === 'deger');
+  const olc0 = sayilar.filter((b) => b.anahtar.startsWith(OLC_ONEK));
   const zamB = b0.find((b): b is Extract<Blok, { tur: 'zamanlayici' }> => b.tur === 'zamanlayici');
   const tekrarli0 = !!kart && kart.bitis !== kart.baslangic;
   const sure0 = kart && tekrarli0 && kart.bitis ? String(gunFarki(kart.baslangic, kart.bitis) + 1) : kart && tekrarli0 ? '' : '21';
@@ -63,11 +68,14 @@ export function KartEditor({ tarih, kart, onKapat }: { tarih: string; kart?: Aja
   const [sure, setSure] = useState(sure0);
   const [saat, setSaat] = useState(kart?.saatler[0] ?? '');
   const [sureKaydi, setSureKaydi] = useState(!!surB || !!zamB);
-  const [degerEtiket, setDegerEtiket] = useState(degB?.etiket ?? '');
-  const [degerBirim, setDegerBirim] = useState(degB?.birim ?? '');
+  const tanimlar = useCanli(olculer, [], [] as OlcuTanimRow[]);
+  const [seciliOlcu, setSeciliOlcu] = useState<Pick<OlcuTanimRow, 'id' | 'ad' | 'birim'>[]>(
+    olc0.map((b) => ({ id: b.anahtar.slice(OLC_ONEK.length), ad: b.etiket, birim: b.birim ?? '' })),
+  );
+  const [eskiDegKalsin, setEskiDegKalsin] = useState(!!eskiDeg);
+  const [yeniOlcu, setYeniOlcu] = useState<{ ad: string; birim: string } | null>(null);
   const [zamanDk, setZamanDk] = useState(zamB ? (zamB.dakika > 0 ? String(zamB.dakika) : '') : '');
   const [zamanlayici, setZamanlayici] = useState(!!zamB);
-  const [degerKaydi, setDegerKaydi] = useState(!!degB);
 
   // Hangi ek bölümleri açık: doluysa açık gelir, yoksa çipe dokununca açılır.
   const [acik, setAcik] = useState<Set<Ek>>(() => {
@@ -77,17 +85,16 @@ export function KartEditor({ tarih, kart, onKapat }: { tarih: string; kart?: Aja
     if (tekrarli0) s.add('tekrar');
     if (kart?.saatler.length) s.add('saat');
     if (surB || zamB) s.add('sure');
-    if (degB) s.add('deger');
+    if (olc0.length || eskiDeg) s.add('olcum');
     if (zamB) s.add('zamanlayici');
     return s;
   });
-  const [dahaFazla, setDahaFazla] = useState(!!(surB || degB || zamB));
+  const [dahaFazla, setDahaFazla] = useState(!!(surB || olc0.length || eskiDeg || zamB));
   const ac = (e: Ek) => {
     setAcik((s) => new Set(s).add(e));
     if (e === 'tekrar') setTekrar(true);
     if (e === 'video' && !videolar.length) setVideolar([{ url: '', baslik: '', bas: '', bit: '' }]);
     if (e === 'sure') setSureKaydi(true);
-    if (e === 'deger') setDegerKaydi(true);
     if (e === 'zamanlayici') { setZamanlayici(true); setSureKaydi(true); setAcik((s) => new Set(s).add('sure')); }
   };
   const kapat = (e: Ek) => {
@@ -97,7 +104,7 @@ export function KartEditor({ tarih, kart, onKapat }: { tarih: string; kart?: Aja
     if (e === 'tekrar') { setTekrar(false); setGunler([]); }
     if (e === 'saat') setSaat('');
     if (e === 'sure') { setSureKaydi(false); setZamanlayici(false); setAcik((s) => { const n = new Set(s); n.delete('zamanlayici'); return n; }); }
-    if (e === 'deger') { setDegerKaydi(false); setDegerEtiket(''); setDegerBirim(''); }
+    if (e === 'olcum') { setSeciliOlcu([]); setEskiDegKalsin(false); setYeniOlcu(null); }
     if (e === 'zamanlayici') setZamanlayici(false);
   };
 
@@ -111,7 +118,8 @@ export function KartEditor({ tarih, kart, onKapat }: { tarih: string; kart?: Aja
       else b.push({ tur: 'baglanti', url, ...(v.baslik.trim() ? { baslik: v.baslik.trim() } : {}) });
     }
     if (sureKaydi) b.push({ tur: 'sayi', anahtar: SURE_ANAHTAR, etiket: 'Kaç dakika?', birim: 'dk' });
-    if (degerKaydi && degerEtiket.trim()) b.push({ tur: 'sayi', anahtar: 'deger', etiket: degerEtiket.trim(), ...(degerBirim.trim() ? { birim: degerBirim.trim() } : {}) });
+    if (eskiDeg && eskiDegKalsin) b.push(eskiDeg);
+    for (const o of seciliOlcu) b.push(olcuBlok(o));
     if (zamanlayici) b.push({ tur: 'zamanlayici', dakika: Number(zamanDk) || 0 });
     return b;
   }
@@ -238,11 +246,31 @@ export function KartEditor({ tarih, kart, onKapat }: { tarih: string; kart?: Aja
         <input className="rt-inp" inputMode="numeric" placeholder="Dakika — boş bırakırsan serbest süre" value={zamanDk} onChange={(e) => setZamanDk(e.target.value.replace(/\D/g, ''))} />
       ))}
 
-      {!sinav && bolum('deger', '🔢 Değer kaydı', (
-        <div className="rt-satir">
-          <input className="rt-inp" placeholder="Ne kaydedilecek (örn. Uyku)" value={degerEtiket} onChange={(e) => setDegerEtiket(e.target.value)} />
-          <input className="rt-inp rt-kisa" placeholder="Birim" value={degerBirim} onChange={(e) => setDegerBirim(e.target.value)} />
-        </div>
+      {!sinav && bolum('olcum', '📏 Ölçüm', (
+        <>
+          <div className="rt-chips">
+            {eskiDeg && (
+              <button type="button" className={`rt-chip${eskiDegKalsin ? ' on' : ''}`} onClick={() => setEskiDegKalsin(!eskiDegKalsin)}>{eskiDeg.etiket}{eskiDeg.birim ? ` (${eskiDeg.birim})` : ''}</button>
+            )}
+            {[...tanimlar, ...seciliOlcu.filter((o) => !tanimlar.some((t) => t.id === o.id))].map((t) => {
+              const on = seciliOlcu.some((o) => o.id === t.id);
+              return (
+                <button key={t.id} type="button" className={`rt-chip${on ? ' on' : ''}`} onClick={() => setSeciliOlcu(on ? seciliOlcu.filter((o) => o.id !== t.id) : [...seciliOlcu, { id: t.id, ad: t.ad, birim: t.birim }])}>
+                  {t.ad}{t.birim ? ` (${t.birim})` : ''}
+                </button>
+              );
+            })}
+            {!yeniOlcu && <button type="button" className="rt-chip rt-ek-cip" onClick={() => setYeniOlcu({ ad: '', birim: '' })}>＋ Yeni ölçü</button>}
+          </div>
+          {yeniOlcu && (
+            <div className="rt-satir">
+              <input className="rt-inp" placeholder="Ölçü adı (örn. Tansiyon)" value={yeniOlcu.ad} onChange={(e) => setYeniOlcu({ ...yeniOlcu, ad: e.target.value })} autoFocus />
+              <input className="rt-inp rt-kisa" placeholder="Birim" value={yeniOlcu.birim} onChange={(e) => setYeniOlcu({ ...yeniOlcu, birim: e.target.value })} />
+              <button type="button" className="rt-btn" disabled={!yeniOlcu.ad.trim()} onClick={async () => { const t = await olcuEkle(yeniOlcu.ad, yeniOlcu.birim); setSeciliOlcu([...seciliOlcu, t]); setYeniOlcu(null); }}>Ekle</button>
+            </div>
+          )}
+          <p className="rt-muted">İşaretlerken seçtiğin ölçüler sorulur; değerler Ölçümlerim'de birikir.</p>
+        </>
       ))}
 
       <div className="rt-chips rt-ek-cipler">
@@ -253,10 +281,10 @@ export function KartEditor({ tarih, kart, onKapat }: { tarih: string; kart?: Aja
         {!sinav && !dahaFazla && <button type="button" className="rt-chip rt-ek-cip" onClick={() => setDahaFazla(true)}>＋ Daha fazla</button>}
         {!sinav && dahaFazla && cip('sure', '⏱ Süre kaydı')}
         {!sinav && dahaFazla && cip('zamanlayici', '⏲ Zamanlayıcı')}
-        {!sinav && dahaFazla && cip('deger', '🔢 Değer kaydı')}
+        {!sinav && dahaFazla && cip('olcum', '📏 Ölçüm')}
       </div>
 
-      <button type="button" className="rt-btn primary" disabled={sinav ? !gorev : !ad.trim() || (degerKaydi && !degerEtiket.trim())} onClick={kaydet}>{kart ? 'Kaydet' : 'Ekle'}</button>
+      <button type="button" className="rt-btn primary" disabled={sinav ? !gorev : !ad.trim() || (acik.has('olcum') && !seciliOlcu.length && !(eskiDeg && eskiDegKalsin))} onClick={kaydet}>{kart ? 'Kaydet' : 'Ekle'}</button>
     </Modal>
   );
 }

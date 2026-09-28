@@ -15,6 +15,7 @@ import { SinavTool, useSinavOzeti } from './ritos/Sinav';
 import { DanismanlikTool, DavetKarsilama, KoclarimSatiri, useDanismanlikOzeti } from './ritos/Danismanlik';
 import { SenkronIsareti, useGelenSenkron } from './ritos/Paylasim';
 import { SohbetEkrani, useSohbetOzeti } from './ritos/Sohbet';
+import { OlcumlerSatiri } from './ritos/Olcum';
 import { AyarlarPane, GirisEkrani, SifreSifirlaEkrani, useKurtarmaHatirlat } from './ritos/Hesap';
 import { useHesapBaslat, useOturum } from '@/lib/hesap';
 import { useDanismanlik } from '@/lib/danismanlik';
@@ -131,7 +132,8 @@ function SplitPane({
 
   useEffect(() => {
     if (!dragging) return;
-    function onMove(e: MouseEvent) {
+    // Pointer olayları: fare + dokunmatik (iPad) + kalem aynı yoldan (28 eylül).
+    function onMove(e: PointerEvent) {
       const el = containerRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
@@ -140,18 +142,20 @@ function SplitPane({
       setRatio(pct);
     }
     function onUp() { setDragging(false); }
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
     return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
     };
   }, [dragging, min, max, setRatio]);
 
   return (
     <div className="split" ref={containerRef}>
       <div className="split-main" style={{ width: ratio + '%' }}>{left}</div>
-      <div className={`split-divider${dragging ? ' dragging' : ''}`} onMouseDown={() => setDragging(true)} />
+      <div className={`split-divider${dragging ? ' dragging' : ''}`} onPointerDown={(e) => { e.preventDefault(); setDragging(true); }} />
       <div className="split-side" style={{ width: 100 - ratio + '%' }}>{right}</div>
     </div>
   );
@@ -168,6 +172,7 @@ function HomeEkrani({ onOpenTool, onGelisim, onSohbet }: { onOpenTool: (t: ToolI
     <div className="fixed-widgets">
       <OdakAlanlari onAc={onGelisim} />
       <KoclarimSatiri />
+      <OlcumlerSatiri />
       {(sohbet.toplam > 0 || sohbet.davet > 0) && (
         <button type="button" className="wrow tool" onClick={onSohbet}>
           <span className="ic">💬</span>

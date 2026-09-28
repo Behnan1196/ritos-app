@@ -249,7 +249,7 @@ function DegerGir({ bloklar, ilk, onKaydet, onSadeceIsaretle }: { bloklar: Blok[
       ))}
       <div className="rt-satir">
         {onSadeceIsaretle && <button type="button" className="rt-btn" onClick={onSadeceIsaretle}>Değer girmeden işaretle</button>}
-        <button type="button" className="rt-btn primary" onClick={() => onKaydet(Object.fromEntries(alanlar.map((a) => [a.anahtar, a.tur === 'sayi' && d[a.anahtar] !== '' ? Number(d[a.anahtar]) : d[a.anahtar]])))}>Kaydet</button>
+        <button type="button" className="rt-btn primary" onClick={() => onKaydet(Object.fromEntries(alanlar.map((a) => [a.anahtar, a.tur === 'sayi' && d[a.anahtar] !== '' ? Number(d[a.anahtar].replace(',', '.')) : d[a.anahtar]])))}>Kaydet</button>
       </div>
     </div>
   );
