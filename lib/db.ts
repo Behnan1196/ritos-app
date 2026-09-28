@@ -121,6 +121,7 @@ export interface UzakProgram {
   baslangic: string;             // koçun seçtiği başlangıç (YYYY-MM-DD)
   izinler: Izinler;              // danışanın Ajanda'sındaki kart izinleri (D9 varsayılanı)
   surum: number;                 // her gönderimde artar — eski güncelleme yenisini ezmesin
+  plan?: boolean;                // 28 eylül — koçun Ajanda'dan yönettiği plan: takvim tarihleri mutlak, kendiliğinden bitmez
 }
 
 export interface ProgramAdimRow {

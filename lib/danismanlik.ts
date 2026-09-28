@@ -19,7 +19,7 @@ import { supabase } from './supabase';
 import { b64, b64Coz, coz, dekUret, rastgele, sifrele } from './sifre';
 import { ciftAc, ciftUret, iliskiAnahtariTuret, ozelSifrele, type AnahtarCifti } from './iliskiAnahtar';
 import { bugun, tarihEkle, type Izinler } from './paket';
-import { aktifMi, baslat, calisanaYansit, calismaBitisi, durdur, programKancalari } from './program';
+import { aktifMi, baslat, calisanaYansit, programBitisi, durdur, programKancalari } from './program';
 import { ajandaKancalari, kaynaktanCek } from './ajanda';
 import { senkronKancalari } from './senkron';
 
@@ -275,6 +275,7 @@ async function iliskiAnahtari(il: IliskiRow): Promise<CryptoKey | null> {
 export interface ProgramOzeti {
   id: string; ad: string; amac: string; dikkat: string; kriterler: string[]; hedef: string;
   baslangic: string; izinler: Izinler; surum: number; disiplin: string;
+  plan?: boolean;
   adimlar: Omit<ProgramAdimRow, 'program_id'>[];
 }
 
@@ -368,7 +369,7 @@ async function mesajIsle(il: IliskiRow, m: MesajIcerik) {
     const adimlar = await db.program_adim.where('program_id').equals(p.id).toArray();
     await db.program.update(p.id, {
       uzak: { ...p.uzak, durum: 'kabul' }, calisma_baslangic: m.baslangic,
-      calisma_bitis: calismaBitisi(adimlar, m.baslangic), guncellendi: Date.now(),
+      calisma_bitis: programBitisi(p, adimlar, m.baslangic), guncellendi: Date.now(),
     });
     return;
   }
@@ -394,10 +395,11 @@ async function programGeldi(il: IliskiRow, s: ProgramOzeti, etkin: string) {
 }
 
 async function kocPlaniniKur(il: IliskiRow, s: ProgramOzeti) {
-  const bas = s.baslangic > bugun() ? s.baslangic : bugun();
+  // Ajanda planında tarihler mutlaktır (koçun takvimi = danışanın takvimi); geç açılan cihaz kaydırmaz.
+  const bas = s.plan || s.baslangic > bugun() ? s.baslangic : bugun();
   const uzak: UzakProgram = {
     iliski_id: il.id, rol: 'danisan', karsi_id: il.koc, karsi_ad: il.koc_ad, disiplin: il.disiplin,
-    durum: 'kabul', baslangic: s.baslangic, izinler: s.izinler, surum: s.surum,
+    durum: 'kabul', baslangic: s.baslangic, izinler: s.izinler, surum: s.surum, ...(s.plan ? { plan: true } : {}),
   };
   await db.transaction('rw', db.program, db.program_adim, async () => {
     await db.program.put({
@@ -462,7 +464,8 @@ async function programUygula(p: ProgramRow, s: ProgramOzeti, etkin: string) {
     await db.program_adim.put({ ...a, program_id: p.id });
     if (degisti && calisiyor) {
       await calisanaYansit(p.id, { ...a, program_id: p.id }, e);
-      await db.ajanda_kart.where('kaynak_ref').equals(`${p.id}/${a.id}`).modify({ isaret: Date.now() });
+      // "güncellendi" rozeti yalnız var olan kart değiştiğinde — yeni eklenen kart için değil.
+      if (o) await db.ajanda_kart.where('kaynak_ref').equals(`${p.id}/${a.id}`).modify({ isaret: Date.now() });
     }
   }
   for (const o of eski) {
@@ -609,6 +612,7 @@ export async function programOzeti(p: ProgramRow): Promise<ProgramOzeti> {
   return {
     id: p.id, ad: p.ad, amac: p.amac, dikkat: p.dikkat, kriterler: p.kriterler, hedef: p.hedef,
     baslangic: p.uzak!.baslangic, izinler: p.uzak!.izinler, surum: p.uzak!.surum, disiplin: p.uzak!.disiplin,
+    ...(p.uzak!.plan ? { plan: true } : {}),
     adimlar: adimlar.map(({ program_id: _, ...a }) => a),
   };
 }
@@ -624,7 +628,7 @@ export async function programGonder(programId: string, etkin = bugun()) {
   const adimlar = await db.program_adim.where('program_id').equals(programId).toArray();
   await db.program.update(programId, {
     uzak, guncellendi: Date.now(),
-    ...(p.calisma_baslangic ? { calisma_bitis: calismaBitisi(adimlar, p.calisma_baslangic) } : {}),
+    ...(p.calisma_baslangic ? { calisma_bitis: programBitisi(p, adimlar, p.calisma_baslangic) } : {}),
   });
   await kuyruk(il.id, il.danisan, { tur: 'program', program: await programOzeti(guncel), etkin });
   tetikle();

@@ -58,7 +58,12 @@ export async function calisanaYansit(programId: string, adim: ProgramAdimRow, et
   if (!p || !p.calisma_baslangic || !aktifMi(p) || p.calisma_bitis === bugun()) return; // durdurulmuş programa yansımaz
   await yenidenTeslim(`${programId}/${adim.id}`, etkin, adimPaketi(p, adim, p.calisma_baslangic));
   const adimlar = await db.program_adim.where('program_id').equals(programId).toArray();
-  await programGuncelle(programId, { calisma_bitis: calismaBitisi(adimlar, p.calisma_baslangic) });
+  await programGuncelle(programId, { calisma_bitis: programBitisi(p, adimlar, p.calisma_baslangic) });
+}
+
+/** Koçun Ajanda planı (uzak.plan) kendiliğinden bitmez: koç ileriki haftalara kart ekledikçe akar. */
+export function programBitisi(p: ProgramRow | null | undefined, adimlar: ProgramAdimRow[], baslangic: string): string | null {
+  return p?.uzak?.plan ? null : calismaBitisi(adimlar, baslangic);
 }
 
 export function calismaBitisi(adimlar: ProgramAdimRow[], baslangic: string): string | null {
@@ -118,7 +123,7 @@ export async function baslat(programId: string, baslangic = bugun()) {
   if (adimlar.length === 0) { await programGuncelle(programId, { calisma_baslangic: baslangic, calisma_bitis: null }); return; }
 
   const paketler = adimlar.map((a) => adimPaketi(p, a, baslangic));
-  const calismaBitis = calismaBitisi(adimlar, baslangic);
+  const calismaBitis = programBitisi(p, adimlar, baslangic);
 
   await teslimAl(paketler);
   await programGuncelle(programId, { calisma_baslangic: baslangic, calisma_bitis: calismaBitis });

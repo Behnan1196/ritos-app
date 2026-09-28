@@ -491,3 +491,16 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-olcu-gecmis{list-style:none;margin:0;padding:0 11px 8px;font-size:12.5px;}
 .rt-olcu-gecmis li{display:flex;justify-content:space-between;border-top:1px dashed var(--line);padding:4px 0;}
 .wrow.tool.olc .t::after{display:none;}
+
+/* ---------- Koçun danışan Ajanda'sı (28 eylül) ---------- */
+.rt-kisi-sec{display:flex;align-items:center;gap:8px;margin:0 0 8px;}
+.rt-kisi-sec select{flex:1;min-width:0;border:1px solid var(--line);border-radius:10px;background:#fff;font:inherit;font-size:13.5px;font-weight:700;padding:7px 10px;color:var(--ink);}
+.rt-kisi-sec.danisan select{border-color:var(--green);background:var(--green2);}
+.rt-danisan-not{margin:0 0 8px;}
+.rt-durum{flex:0 0 auto;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;}
+.rt-durum.on{background:var(--green);border-color:var(--green);}
+.rt-durum.kacti{border-style:dashed;color:var(--muted);}
+.rt-hafta .rt-durum{width:18px;height:18px;font-size:10px;}
+.rt-hafta.suruklu .rt-hafta-gun.hedef{outline:2px dashed var(--green);outline-offset:-2px;}
+.rt-suruklenen-kart{opacity:.5;}
+.rt-hafta .rt-tutamac{touch-action:none;}

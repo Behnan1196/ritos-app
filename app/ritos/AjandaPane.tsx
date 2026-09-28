@@ -13,6 +13,9 @@ import { sinavOzeti } from '@/lib/sinavGorev';
 import { kartPaketi } from '@/lib/paylasim';
 import { PaylasDugmesi } from './Sohbet';
 import { KartEditor } from './KartEditor';
+import { DanisanAjandasi } from './DanisanAjanda';
+import { useDanismanlik } from '@/lib/danismanlik';
+import { db, type IliskiRow } from '@/lib/db';
 
 // A1–A9 (ilk dilim). Ajanda yalnızca kart satırlarını bilir; kaynağın içini bilmez.
 const GORUNUM_ANAH = 'ritos-ajanda-gorunum';
@@ -42,9 +45,26 @@ export default function AjandaPane() {
   const hafta = gorunum === 'hafta';
   const adim = hafta ? 7 : 1;
   const bugunGorunur = hafta ? haftaBasi(tarih) === haftaBasi(t0) : tarih === t0;
+  // Koç: Ajanda'nın başında "kimin ajandası" seçimi (28 eylül). Danışan seçilince aynı gün/hafta
+  // görünümünde o danışana atadığın kartlar ve durumları görünür.
+  const dn = useDanismanlik();
+  const danisanlar = useCanli(async () => (await db.iliski.toArray()).filter((i) => i.durum === 'aktif' && i.koc === dn.uid), [dn.uid], [] as IliskiRow[]);
+  // Seçim oturum boyunca korunur (iPad döndürülünce/yerleşim değişince Ajanda yeniden kurulur).
+  const [kisi, setKisiS] = useState<string>('');
+  useEffect(() => { try { setKisiS(sessionStorage.getItem('ritos-ajanda-kisi') ?? ''); } catch { /* yok say */ } }, []);
+  const setKisi = (v: string) => { setKisiS(v); try { sessionStorage.setItem('ritos-ajanda-kisi', v); } catch { /* yok say */ } };
+  const secili = danisanlar.find((i) => i.id === kisi) ?? null;
 
   return (
     <div className="rt-ajanda">
+      {dn.profil?.koc && danisanlar.length > 0 && (
+        <div className={`rt-kisi-sec${secili ? ' danisan' : ''}`}>
+          <select value={secili ? kisi : ''} onChange={(e) => setKisi(e.target.value)} aria-label="Kimin ajandası">
+            <option value="">📅 Benim ajandam</option>
+            {danisanlar.map((i) => <option key={i.id} value={i.id}>🤝 {i.danisan_ad}</option>)}
+          </select>
+        </div>
+      )}
       <div className="rt-daterow">
         <button className="arrow" onClick={() => setTarih(tarihEkle(tarih, -adim))} aria-label={hafta ? 'Önceki hafta' : 'Önceki gün'}>‹</button>
         <button className="rt-dlabel" onClick={() => setAyAcik(true)}>
@@ -58,7 +78,9 @@ export default function AjandaPane() {
         </div>
       </div>
 
-      {hafta ? (
+      {secili ? (
+        <DanisanAjandasi il={secili} tarih={tarih} hafta={hafta} haftaBas={haftaBasi(tarih)} onGun={(t) => { setTarih(t); setGorunum('gun'); }} />
+      ) : hafta ? (
         <HaftaGorunumu bas={haftaBasi(tarih)} onAc={(satir, t) => setDetay({ satir, tarih: t })} onEkle={setEkle} onGun={(t) => { setTarih(t); setGorunum('gun'); }} />
       ) : (
         <Kap
