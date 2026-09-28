@@ -16,6 +16,7 @@ import { KartEditor } from './KartEditor';
 import { DanisanAjandasi } from './DanisanAjanda';
 import { useDanismanlik } from '@/lib/danismanlik';
 import { db, type IliskiRow } from '@/lib/db';
+import { useSeciliDanisan } from '@/lib/seciliDanisan';
 
 // A1–A9 (ilk dilim). Ajanda yalnızca kart satırlarını bilir; kaynağın içini bilmez.
 const GORUNUM_ANAH = 'ritos-ajanda-gorunum';
@@ -49,10 +50,8 @@ export default function AjandaPane() {
   // görünümünde o danışana atadığın kartlar ve durumları görünür.
   const dn = useDanismanlik();
   const danisanlar = useCanli(async () => (await db.iliski.toArray()).filter((i) => i.durum === 'aktif' && i.koc === dn.uid), [dn.uid], [] as IliskiRow[]);
-  // Seçim oturum boyunca korunur (iPad döndürülünce/yerleşim değişince Ajanda yeniden kurulur).
-  const [kisi, setKisiS] = useState<string>('');
-  useEffect(() => { try { setKisiS(sessionStorage.getItem('ritos-ajanda-kisi') ?? ''); } catch { /* yok say */ } }, []);
-  const setKisi = (v: string) => { setKisiS(v); try { sessionStorage.setItem('ritos-ajanda-kisi', v); } catch { /* yok say */ } };
+  // Seçim danışmanlık ekranıyla ortak ve oturum boyunca korunur (lib/seciliDanisan).
+  const [kisi, setKisi] = useSeciliDanisan();
   const secili = danisanlar.find((i) => i.id === kisi) ?? null;
 
   return (

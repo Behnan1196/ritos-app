@@ -504,3 +504,31 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-hafta.suruklu .rt-hafta-gun.hedef{outline:2px dashed var(--green);outline-offset:-2px;}
 .rt-suruklenen-kart{opacity:.5;}
 .rt-hafta .rt-tutamac{touch-action:none;}
+
+/* ---------- Danışmanlık tek kapı (28 eylül) ---------- */
+.rt-dan-satir{display:flex;gap:8px;overflow-x:auto;padding:2px 0 6px;margin-bottom:6px;}
+.rt-dan-widget{flex:0 0 auto;min-width:140px;max-width:190px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:var(--green2);border:none;border-radius:14px;padding:10px 12px;font:inherit;color:var(--ink);cursor:pointer;}
+.rt-dan-widget .ic{font-size:20px;}
+.rt-dan-widget .t{font-size:13px;font-weight:800;line-height:1.25;}
+.rt-dan-widget .s{font-size:11.5px;color:var(--muted);}
+.rt-dan-widget.ekle{min-width:56px;align-items:center;justify-content:center;background:transparent;border:1.5px dashed var(--line);color:var(--muted);}
+.rt-dan-widget.ekle.tek{min-width:160px;align-items:flex-start;}
+.rt-dan-secim{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px;}
+.rt-dan-ekran{display:flex;flex-direction:column;gap:10px;}
+.rt-dan-bas{display:flex;align-items:center;gap:10px;}
+.rt-dan-bas .rt-geri{margin:0;}
+.rt-dan-liste{display:flex;flex-direction:column;gap:4px;margin-bottom:6px;}
+.rt-gelen.secili{outline:2px solid var(--green);outline-offset:-2px;background:var(--green2);}
+.rt-dan-dosya{border:1px solid var(--line);border-radius:14px;background:var(--card);padding:10px;display:flex;flex-direction:column;gap:8px;}
+.rt-dan-kart{display:flex;align-items:center;gap:10px;}
+.rt-dan-kart .av{width:36px;height:36px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;}
+.rt-dan-kart .tx{flex:1;display:flex;flex-direction:column;}
+.rt-alt-sekme{display:flex;gap:4px;border-bottom:1px solid var(--line);}
+.rt-alt-sekme button{border:none;background:none;font:inherit;font-size:12.5px;font-weight:700;color:var(--muted);padding:6px 8px;border-bottom:2px solid transparent;cursor:pointer;}
+.rt-alt-sekme button.on{color:var(--green);border-bottom-color:var(--green);}
+.rt-yer-tutucu{border:1.5px dashed var(--line);border-radius:10px;padding:14px;color:var(--muted);font-size:13px;text-align:center;}
+.rt-dan-alt summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);padding:4px 0;}
+.rt-dan-liste .rt-gelen{display:flex;align-items:center;gap:10px;border-radius:10px;padding:6px 8px;}
+.rt-dan-liste .rt-gelen .ic{flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#efe8da;color:#6b6250;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;}
+.rt-dan-liste .rt-gelen.secili .ic{background:var(--green);color:#fff;}
+.rt-dan-ekran .rt-linkbtn{font-size:12.5px;align-self:flex-start;}

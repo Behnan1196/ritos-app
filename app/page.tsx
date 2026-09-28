@@ -12,7 +12,8 @@ import React, { useEffect, useRef, useState, type ReactNode } from 'react';
 import AjandaPane from './ritos/AjandaPane';
 import KisiselGelisim, { OdakAlanlari } from './ritos/KisiselGelisim';
 import { SinavTool, useSinavOzeti } from './ritos/Sinav';
-import { DanismanlikTool, DavetKarsilama, KoclarimSatiri, useDanismanlikOzeti } from './ritos/Danismanlik';
+import { DavetKarsilama, KoclarimSatiri } from './ritos/Danismanlik';
+import { DanismanlikEkrani, DanismanlikSatiri, danismanlikBaslik, DISIPLIN_IKON } from './ritos/DanismanlikEkrani';
 import { SenkronIsareti, useGelenSenkron } from './ritos/Paylasim';
 import { SohbetEkrani, useSohbetOzeti } from './ritos/Sohbet';
 import { OlcumlerSatiri } from './ritos/Olcum';
@@ -24,12 +25,11 @@ const NARROW_BREAKPOINT = 760;
 // Testte (NEXT_PUBLIC_RITOS_TEST=1 ile derlenmiş sürüm) giriş kapısı atlanır; gerçek sürümde yok.
 const TEST = process.env.NEXT_PUBLIC_RITOS_TEST === '1';
 
-type ToolId = 'danismanlik' | 'sinav';
+type ToolId = 'sinav';
 type Sekme = 'home' | 'ajanda' | 'gelisim' | 'sohbet' | 'ayarlar';
 
 const TOOL_META: Record<ToolId, { icon: string; title: string }> = {
-  danismanlik: { icon: '🤝', title: 'Danışmanlık' },
-  sinav: { icon: '📚', title: 'Sınav hazırlığı' },
+  sinav: { icon: '📚', title: 'Sınav paketi' },
 };
 
 export default function RitosLab() {
@@ -49,6 +49,9 @@ function RitosUygulama() {
   const [ratio, setRatio] = useState(58);
   const [sekme, setSekme] = useState<Sekme>('ajanda');
   const [activeTool, setActiveTool] = useState<ToolId | null>(null);
+  // Açık danışmanlık alanı: geniş ekranda sağ bölmede, telefonda tam ekran (28 eylül).
+  const [danismanlik, setDanismanlik] = useState<string | null>(null);
+  const sinav = useSinavOzeti();
 
   useEffect(() => {
     function onResize() { setIsNarrow(window.innerWidth < NARROW_BREAKPOINT); }
@@ -57,7 +60,25 @@ function RitosUygulama() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const home = <HomeEkrani onOpenTool={setActiveTool} onGelisim={() => setSekme('gelisim')} onSohbet={() => setSekme('sohbet')} />;
+  const home = <HomeEkrani onDanismanlik={(k) => { setDanismanlik(k); if (isNarrow) return; setSekme('home'); }} onGelisim={() => setSekme('gelisim')} onSohbet={() => setSekme('sohbet')} />;
+  const danEkrani = (dar: boolean) => danismanlik && (
+    <DanismanlikEkrani
+      disiplin={danismanlik}
+      dar={dar}
+      onKapat={() => setDanismanlik(null)}
+      onAjanda={() => { setDanismanlik(null); setSekme('ajanda'); }}
+      onSinavPaketi={sinav.kurulu ? () => setActiveTool('sinav') : undefined}
+    />
+  );
+  const danOverlay = isNarrow && danismanlik && (
+    <div className="tool-overlay">
+      <div className="tool-topbar">
+        <button className="tool-back" onClick={() => setDanismanlik(null)}>‹ Geri</button>
+        <b>{DISIPLIN_IKON[danismanlik] ?? '🤝'} {danismanlikBaslik(danismanlik)}</b>
+      </div>
+      <div className="tool-body"><div className="side-content" style={{ height: '100%', overflowY: 'auto' }}>{danEkrani(true)}</div></div>
+    </div>
+  );
   const sohbet = useSohbetOzeti();
   const kurtarma = useKurtarmaHatirlat();
   const rozet = (k: Sekme) => (
@@ -77,7 +98,7 @@ function RitosUygulama() {
         <button className="tool-back" onClick={() => setActiveTool(null)}>‹ Geri</button>
         <b>{TOOL_META[activeTool].icon} {TOOL_META[activeTool].title}</b>
       </div>
-      <div className="tool-body">{activeTool === 'sinav' ? <SinavTool /> : <DanismanlikTool />}</div>
+      <div className="tool-body"><SinavTool /></div>
     </div>
   );
 
@@ -93,6 +114,7 @@ function RitosUygulama() {
               <button key={k} className={sekme === k ? 'on' : ''} onClick={() => setSekme(k)}><span className="ic">{ic}{rozet(k)}</span>{ad}</button>
             ))}
           </div>
+          {danOverlay}
           {arac}
         </div>
       ) : (
@@ -104,10 +126,10 @@ function RitosUygulama() {
             left={<AjandaPane />}
             right={(
               <>
-                <div className="side-content">{sagSekme(sekme === 'ajanda' ? 'home' : sekme)}</div>
+                <div className="side-content">{danismanlik && (sekme === 'home' || sekme === 'ajanda') ? danEkrani(false) : sagSekme(sekme === 'ajanda' ? 'home' : sekme)}</div>
                 <div className="side-tabs">
                   {([['home', '🏠', 'Home'], ['gelisim', '🌱', 'Kişisel Gelişim'], ['sohbet', '💬', 'Sohbet'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sekme, string, string][]).map(([k, ic, ad]) => (
-                    <button key={k} className={(sekme === 'ajanda' ? 'home' : sekme) === k ? 'on' : ''} onClick={() => setSekme(k)}><span>{ic}{rozet(k)}</span>{ad}</button>
+                    <button key={k} className={(sekme === 'ajanda' ? 'home' : sekme) === k ? 'on' : ''} onClick={() => { if (k === 'home') setDanismanlik(null); setSekme(k); }}><span>{ic}{rozet(k)}</span>{ad}</button>
                   ))}
                 </div>
               </>
@@ -163,11 +185,8 @@ function SplitPane({
 
 // ———————————————————————————————————— Home (V1: bizim tasarladığımız sabit düzen) ————————————————————————————————————
 
-function HomeEkrani({ onOpenTool, onGelisim, onSohbet }: { onOpenTool: (t: ToolId) => void; onGelisim: () => void; onSohbet: () => void }) {
+function HomeEkrani({ onDanismanlik, onGelisim, onSohbet }: { onDanismanlik: (disiplin: string) => void; onGelisim: () => void; onSohbet: () => void }) {
   const sohbet = useSohbetOzeti();
-  const d = useDanismanlik();
-  const sinav = useSinavOzeti();
-  const danismanlik = useDanismanlikOzeti();
   return (
     <div className="fixed-widgets">
       <OdakAlanlari onAc={onGelisim} />
@@ -180,20 +199,8 @@ function HomeEkrani({ onOpenTool, onGelisim, onSohbet }: { onOpenTool: (t: ToolI
           <span className="chev">›</span>
         </button>
       )}
-      {danismanlik.goster && (
-        <button type="button" className="wrow tool" onClick={() => onOpenTool('danismanlik')}>
-          <span className="ic">🤝</span>
-          <span className="tx"><span className="t">Danışmanlık</span><span className="s">{danismanlik.ozet}</span></span>
-          <span className="chev">›</span>
-        </button>
-      )}
-      {d.profil?.koc && sinav.kurulu && (
-        <button type="button" className="wrow tool" onClick={() => onOpenTool('sinav')}>
-          <span className="ic">📚</span>
-          <span className="tx"><span className="t">Sınav hazırlığı</span><span className="s">{sinav.ozet}</span></span>
-          <span className="chev">›</span>
-        </button>
-      )}
+      {/* Danışmanlık — tek kapı (28 eylül): her alan bir widget, ＋ ile yeni alan. */}
+      <DanismanlikSatiri onAc={onDanismanlik} />
     </div>
   );
 }
