@@ -277,7 +277,7 @@ function ProgramDetay({ p, klasorler, onGeri }: { p: ProgramRow; klasorler: Klas
         </>}
       >
         {durdurSor && <OnayKutusu metin={il?.adimlar.length ? 'Program durdurulsun mu? Geçmiş kayıtlar korunur; bugün son gün olur.' : 'Program bitti olarak işaretlensin mi?'} evet={il?.adimlar.length ? 'Durdur' : 'Bitti'} onVazgec={() => setDurdurSor(false)} onEvet={async () => { await durdur(p.id); setDurdurSor(false); }} />}
-        <ProgramDanismanlik p={p} adimVar={!!il?.adimlar.length} />
+        {V2 && <ProgramDanismanlik p={p} adimVar={!!il?.adimlar.length} />}
         {aktif && il?.gunN != null && <p className="rt-gun">Gün {il.gunN}{il.gunM ? `/${il.gunM}` : ' · süregelen'}</p>}
 
         {duzenlenir ? (
@@ -300,7 +300,9 @@ function ProgramDetay({ p, klasorler, onGeri }: { p: ProgramRow; klasorler: Klas
         {klasorler.length > 0 && !koc && !p.sablon && <YerSecici deger={p.klasor_id} klasorler={klasorler} onSec={(id) => programTasi(p.id, id)} />}
       </Kap>
 
-      <Kap baslik="Görev planı" eylemler={duzenlenir ? <button type="button" className="rt-ikon" onClick={() => setAdimAcik(true)} aria-label="Adım ekle">＋</button> : null}>
+      {/* V1 (28 eylül): program kimlik kartıdır (ad, amaç, kimden, aktif/bitti); plan Ajanda'da kurulur.
+          Adım editörü V2'de; eski programların adımları yalnız okunur listelenir. */}
+      {(V2 || !!il?.adimlar.length) && <Kap baslik="Görev planı" eylemler={V2 && duzenlenir ? <button type="button" className="rt-ikon" onClick={() => setAdimAcik(true)} aria-label="Adım ekle">＋</button> : null}>
         {!il?.adimlar.length && <p className="rt-muted">Görev planı yok. İstersen ＋ ile Ajanda&apos;ya düşecek adımlar ekle.</p>}
         {il?.adimlar.map(({ adim, planli, yapildi, sonDegerler }) => (
           <div key={adim.id} className="rt-adim">
@@ -316,7 +318,7 @@ function ProgramDetay({ p, klasorler, onGeri }: { p: ProgramRow; klasorler: Klas
                 {sonDegerler && <span className="rt-muted"> · son: {degerMetni(sonDegerler)}</span>}
               </div>
             )}
-            {duzenlenir && (
+            {V2 && duzenlenir && (
               <span className="rt-mini">
                 <button type="button" onClick={() => setDuzenle(adim)}>düzenle</button>
                 {(!aktif || koc) && <button type="button" onClick={() => adimSil(adim.id)}>kaldır</button>}
@@ -324,7 +326,8 @@ function ProgramDetay({ p, klasorler, onGeri }: { p: ProgramRow; klasorler: Klas
             )}
           </div>
         ))}
-      </Kap>
+      </Kap>}
+      {!V2 && !il?.adimlar.length && !p.uzak && <p className="rt-muted">Bu programın kartlarını Ajanda&apos;da kurarsın; burada adı, amacı ve aktif olup olmadığı durur.</p>}
 
       {adimAcik && <AdimForm programId={p.id} sinavIzinli={koc || !!p.sablon} yansir={yansir} onKapat={() => setAdimAcik(false)} />}
       {duzenle && <AdimForm programId={p.id} sinavIzinli={koc || !!p.sablon} adim={duzenle} yansir={yansir} onKapat={() => setDuzenle(null)} />}

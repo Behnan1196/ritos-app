@@ -532,3 +532,8 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-dan-liste .rt-gelen .ic{flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#efe8da;color:#6b6250;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;}
 .rt-dan-liste .rt-gelen.secili .ic{background:var(--green);color:#fff;}
 .rt-dan-ekran .rt-linkbtn{font-size:12.5px;align-self:flex-start;}
+.rt-hafta-is{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px;}
+.rt-prog.secili{outline:2px solid var(--green);outline-offset:-2px;background:var(--green2);}
+.rt-sablon-gunler{display:flex;flex-direction:column;gap:4px;margin:8px 0;}
+.rt-sablon-gun{display:flex;gap:10px;font-size:13px;border-bottom:1px dashed var(--line);padding:4px 0;}
+.rt-sablon-gun b{flex:0 0 34px;}

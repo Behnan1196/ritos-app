@@ -13,7 +13,8 @@ import React, { useEffect, useState } from 'react';
 import { DISIPLINLER, disiplinAdi, kocOl, useDanismanlik } from '@/lib/danismanlik';
 import { useSeciliDanisan } from '@/lib/seciliDanisan';
 import { Kap, Modal } from './ortak';
-import { DanisanDosyasi, DanisanSatiri, Davetler, DavetModal, KocProgramGorunumu, Sablonlar, SonlandirModal, useDanisanlar } from './Danismanlik';
+import { DanisanSatiri, Davetler, DavetModal, SonlandirModal, useDanisanlar } from './Danismanlik';
+import { HaftaSablonlari } from './DanisanAjanda';
 
 export const DISIPLIN_IKON: Record<string, string> = { beslenme: '🥗', sinav: '📚', genel: '🧭' };
 const ikon = (d: string) => DISIPLIN_IKON[d] ?? '🤝';
@@ -75,7 +76,7 @@ function AlanEkleModal({ onKapat, onEklendi }: { onKapat: () => void; onEklendi:
   );
 }
 
-type AltSekme = 'plan' | 'ozet' | 'olcum' | 'program';
+type AltSekme = 'plan' | 'ozet' | 'olcum';
 
 export function DanismanlikEkrani({ disiplin, dar, onKapat, onAjanda, onSinavPaketi }: {
   disiplin: string; dar: boolean; onKapat: () => void; onAjanda: () => void; onSinavPaketi?: () => void;
@@ -88,7 +89,6 @@ export function DanismanlikEkrani({ disiplin, dar, onKapat, onAjanda, onSinavPak
   const [davet, setDavet] = useState(false);
   const [sonlananAcik, setSonlananAcik] = useState(false);
   const [sekme, setSekme] = useState<AltSekme>('plan');
-  const [program, setProgram] = useState<string | null>(null);
   const [bitir, setBitir] = useState(false);
   const [kaldir, setKaldir] = useState(false);
   const il = hepsi.find((x) => x.id === secili) ?? null;
@@ -97,12 +97,6 @@ export function DanismanlikEkrani({ disiplin, dar, onKapat, onAjanda, onSinavPak
   useEffect(() => {
     if (!dar && !il && aktifler.length) setSecili(aktifler[0].id);
   }, [dar, il, aktifler.length]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (program) return (
-    <div className="rt-dan-ekran">
-      <KocProgramGorunumu programId={program} onGeri={() => setProgram(null)} />
-    </div>
-  );
 
   return (
     <div className="rt-dan-ekran">
@@ -138,7 +132,7 @@ export function DanismanlikEkrani({ disiplin, dar, onKapat, onAjanda, onSinavPak
             {dar && il.durum === 'aktif' && <button type="button" className="rt-btn primary" onClick={onAjanda}>📅 Ajandası</button>}
           </div>
           <div className="rt-alt-sekme">
-            {([['plan', 'Plan'], ['ozet', 'Özet'], ['olcum', 'Ölçümler'], ['program', 'Programlar']] as [AltSekme, string][]).map(([k, ad]) => (
+            {([['plan', 'Plan'], ['ozet', 'Özet'], ['olcum', 'Ölçümler']] as [AltSekme, string][]).map(([k, ad]) => (
               <button key={k} type="button" className={sekme === k ? 'on' : ''} onClick={() => setSekme(k)}>{ad}</button>
             ))}
           </div>
@@ -148,7 +142,6 @@ export function DanismanlikEkrani({ disiplin, dar, onKapat, onAjanda, onSinavPak
             )}
             {sekme === 'ozet' && <p className="rt-yer-tutucu">Yakında: hedefler, son hafta uyumu, son ölçümler ve notların tek bakışta.</p>}
             {sekme === 'olcum' && <p className="rt-yer-tutucu">Yakında: danışanın gönderdiği ölçümler seri ve grafik olarak.</p>}
-            {sekme === 'program' && <DanisanDosyasi il={il} onProgram={setProgram} sade />}
           </div>
           {il.durum === 'aktif' && <button type="button" className="rt-linkbtn" onClick={() => setBitir(true)}>Danışmanlığı sonlandır</button>}
         </div>
@@ -156,7 +149,7 @@ export function DanismanlikEkrani({ disiplin, dar, onKapat, onAjanda, onSinavPak
 
       <details className="rt-dan-alt">
         <summary>Şablonlar</summary>
-        <Sablonlar disiplin={disiplin} onProgram={setProgram} />
+        <HaftaSablonlari disiplin={disiplin} />
       </details>
       {disiplin === 'sinav' && onSinavPaketi && (
         <button type="button" className="rt-btn" onClick={onSinavPaketi}>📚 Sınav paketi (katalog, kaynaklar)</button>

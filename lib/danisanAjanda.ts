@@ -12,7 +12,7 @@
 import { db, type GeriBildirimRow, type IliskiRow, type ProgramAdimRow, type ProgramRow } from './db';
 import { adimEkle, adimGuncelle, adimSil, adimZamanlama } from './program';
 import { disiplinAdi, danisanIzinleri, programGonder } from './danismanlik';
-import { bugun, gunAktif, gunFarki, type Blok } from './paket';
+import { bugun, gunAktif, gunFarki, tarihEkle, type Blok, type PaketEk, type TemelTip } from './paket';
 
 export interface KocKarti {
   adim: ProgramAdimRow;
@@ -75,12 +75,89 @@ async function planProgrami(il: IliskiRow): Promise<{ p: ProgramRow; yeni: boole
   return { p, yeni: true };
 }
 
-export async function kocKartEkle(il: IliskiRow, tarih: string, kart: { ad: string; bloklar: Blok[] }) {
-  if (tarih < bugun()) throw new Error('Geçmiş güne kart eklenmez.');
-  const { p, yeni } = await planProgrami(il);
-  await adimEkle(p.id, { tip: 'yap', ad: kart.ad.trim(), bloklar: kart.bloklar, basla_gun: gunFarki(taban(p), tarih), sure_gun: 1, gunler: null, saatler: [] });
-  if (yeni) await programGonder(p.id);
+export interface KocKartTaslak { tip?: TemelTip; ad: string; bloklar: Blok[]; ek?: PaketEk | null }
+/** Tekrar: kaç gün sürer (null = süresiz) ve haftanın hangi günleri (null = her gün). */
+export interface KocTekrar { gun: number | null; gunler: number[] | null }
+
+export async function kocKartEkle(il: IliskiRow, tarih: string, kart: KocKartTaslak, tekrar: KocTekrar | null = null) {
+  await kocKartlariEkle(il, [{ tarih, kart, tekrar }]);
 }
+
+/** Toplu ekleme (şablon uygula, hafta kopyala): tek plan, değişiklik tek seferde gider. Geçmiş günler atlanır. */
+export async function kocKartlariEkle(il: IliskiRow, liste: { tarih: string; kart: KocKartTaslak; tekrar?: KocTekrar | null }[]): Promise<number> {
+  const t0 = bugun();
+  const gecerli = liste.filter((x) => x.tarih >= t0);
+  if (!gecerli.length) { if (liste.length) throw new Error('Geçmiş güne kart eklenmez.'); return 0; }
+  const { p, yeni } = await planProgrami(il);
+  for (const { tarih, kart, tekrar } of gecerli) {
+    await adimEkle(p.id, {
+      tip: kart.tip ?? 'yap', ad: kart.ad.trim(), bloklar: kart.bloklar, ...(kart.ek ? { ek: kart.ek } : {}),
+      basla_gun: gunFarki(taban(p), tarih), sure_gun: tekrar ? tekrar.gun : 1, gunler: tekrar?.gunler ?? null, saatler: [],
+    });
+  }
+  if (yeni) await programGonder(p.id);
+  return gecerli.length;
+}
+
+/** Birden çok güne yayılan kart: bugünden itibaren biter (henüz başlamadıysa tamamen kalkar); yapılmış günler kalır. */
+export async function kocSeriBitir(k: KocKarti) {
+  const bas = tarihEkle(taban(k.program), k.adim.basla_gun);
+  const t0 = bugun();
+  if (bas >= t0) { await adimSil(k.adim.id); return; }
+  await adimGuncelle(k.adim.id, { sure_gun: gunFarki(bas, tarihEkle(t0, -1)) + 1 }, t0);
+}
+
+// ———————————————— hafta şablonları (28 eylül) ————————————————
+// Şablon bir haftadır: gün (0 = Pazartesi … 6 = Pazar) + kart. Koçun cihazında ProgramRow (sablon)
+// + tek günlük adımlar olarak durur; danışana gitmez. Uygulanınca danışanın planına kart olarak eklenir.
+
+export interface HaftaKarti { gun: number; kart: KocKartTaslak }
+
+const taslak = (a: ProgramAdimRow): KocKartTaslak => ({ tip: a.tip, ad: a.ad, bloklar: a.bloklar, ek: a.ek ?? null });
+
+export async function haftaKartlari(iliskiId: string, haftaBas: string): Promise<HaftaKarti[]> {
+  const gunler = Array.from({ length: 7 }, (_, i) => tarihEkle(haftaBas, i));
+  const v = await danisanGunleri(iliskiId, gunler);
+  return gunler.flatMap((t, i) => v[t].map((k) => ({ gun: i, kart: taslak(k.adim) })));
+}
+
+export async function haftaSablonKaydet(il: IliskiRow, haftaBas: string, ad: string): Promise<number> {
+  const kartlar = await haftaKartlari(il.id, haftaBas);
+  if (!kartlar.length) throw new Error('Bu haftada kart yok.');
+  const id = crypto.randomUUID();
+  const simdi = Date.now();
+  await db.transaction('rw', db.program, db.program_adim, async () => {
+    await db.program.add({
+      id, ad: ad.trim() || 'Hafta şablonu', amac: '', dikkat: '', kriterler: [], hedef: '', klasor_id: null, home_goster: false,
+      degerlendirme_acik: false, degerlendirme: null, calisma_baslangic: null, calisma_bitis: null,
+      sablon: true, sablon_disiplin: il.disiplin, uzak: null, guncellendi: simdi,
+    });
+    await db.program_adim.bulkAdd(kartlar.map((x, i) => ({
+      id: crypto.randomUUID(), program_id: id, sira: i + 1, tip: x.kart.tip ?? 'yap', ad: x.kart.ad, bloklar: x.kart.bloklar,
+      ...(x.kart.ek ? { ek: x.kart.ek } : {}), basla_gun: x.gun, sure_gun: 1, gunler: null, saatler: [], guncellendi: simdi,
+    })));
+  });
+  return kartlar.length;
+}
+
+export async function sablonKartlari(sablonId: string): Promise<HaftaKarti[]> {
+  const adimlar = await db.program_adim.where('program_id').equals(sablonId).sortBy('sira');
+  // Eski (adım tabanlı) şablonlar da uygulanabilsin: ilk haftaya düşen günler alınır.
+  return adimlar.flatMap((a) => {
+    const son = a.sure_gun === null ? 6 : Math.min(6, a.basla_gun + a.sure_gun - 1);
+    const out: HaftaKarti[] = [];
+    for (let g = a.basla_gun; g <= son; g++) if (!a.gunler?.length || a.gunler.includes((g + 1) % 7)) out.push({ gun: g, kart: taslak(a) });
+    return out;
+  });
+}
+
+/** Şablonu (ya da başka bir haftayı) bu haftadan itibaren N hafta uygula. */
+export async function haftaUygula(il: IliskiRow, kaynak: HaftaKarti[], haftaBas: string, haftaSayisi = 1): Promise<number> {
+  const liste = [];
+  for (let h = 0; h < haftaSayisi; h++) for (const x of kaynak) liste.push({ tarih: tarihEkle(haftaBas, h * 7 + x.gun), kart: x.kart });
+  return kocKartlariEkle(il, liste);
+}
+
 
 export async function kocKartTasi(k: KocKarti, yeniTarih: string) {
   if (!k.tekGun || yeniTarih === k.tarih) return;
