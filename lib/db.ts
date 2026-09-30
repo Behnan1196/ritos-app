@@ -13,7 +13,7 @@
 // ————————————————————————————————————————————————————————————————
 
 import Dexie, { type EntityTable } from 'dexie';
-import type { Blok, GeriBildirimOlay, Izinler, KaynakModul, PaketEk, TemelTip } from './paket';
+import type { Blok, GeriBildirimOlay, Hatirlatma, Izinler, KaynakModul, PaketEk, TemelTip } from './paket';
 
 export type CustomWidgetType = 'pomodoro' | 'foto' | 'sayac';
 
@@ -62,6 +62,7 @@ export interface AjandaKartRow {
   sira: number;                  // gün listesindeki sıra — kart düzeyinde (A7)
   ek?: PaketEk | null;           // alan paketi bilgisi (26 eylül) — indekssiz
   isaret?: number | null;        // D8 — koç güncelledi (zaman); kartta kısa süre "güncellendi" görünür
+  hatirlatma?: Hatirlatma | null; // bildirim ayarı (30 eylül) — indekssiz
   atla?: string[];               // tekrar eden kartın "yalnız bu gün" kaldırılan günleri (A7) — indekssiz, göç gerektirmez
   guncellendi: number;
 }

@@ -46,6 +46,16 @@ export interface Zamanlama {
   bitis: string | null;     // null = süregelen
   gunler: number[] | null;  // JS getDay (0=Paz..6=Cmt); null = her gün
   saatler: string[];        // "HH:MM" — sırayı değiştirmez, yalnız bilgi + hatırlatma
+  hatirlatma?: Hatirlatma | null;
+}
+
+// Bildirim (30 eylül) — kartın gününden `gun` gün önce. Aynı gün (gun 0) + saatli kartta
+// saatten `dk` dakika önce; diğer durumlarda `saat`te. Şimdilik yalnız saklanır; bildirim
+// altyapısı geldiğinde buradan okunur.
+export interface Hatirlatma {
+  gun: number;
+  dk?: number | null;
+  saat?: string | null;
 }
 
 export type KaynakModul = 'ajanda' | 'program' | 'hatirlatici' | 'gelenler' | 'danismanlik';

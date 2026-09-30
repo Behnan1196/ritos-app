@@ -19,6 +19,7 @@ function paketToRow(p: KartPaketi, sira: number): AjandaKartRow {
     bitis: p.zamanlama.bitis,
     gunler: p.zamanlama.gunler,
     saatler: p.zamanlama.saatler,
+    hatirlatma: p.zamanlama.hatirlatma ?? null,
     kaynak_modul: p.kaynak.modul,
     kaynak_ref: p.kaynak.ref,
     kaynak_etiket: p.kaynak.etiket,
@@ -32,7 +33,7 @@ function paketToRow(p: KartPaketi, sira: number): AjandaKartRow {
 }
 
 export function rowZamanlama(k: AjandaKartRow) {
-  return { baslangic: k.baslangic, bitis: k.bitis, gunler: k.gunler, saatler: k.saatler };
+  return { baslangic: k.baslangic, bitis: k.bitis, gunler: k.gunler, saatler: k.saatler, hatirlatma: k.hatirlatma ?? null };
 }
 
 // Kart o gün listede görünür mü: zamanlama + "yalnız bu gün" kaldırılan günler.
@@ -254,7 +255,7 @@ export async function yenidenTeslim(ref: string, etkin: string, paket: KartPaket
 // Geçmiş kayıtlar (yapıldı / değerler) yerinde kalır.
 export async function kartGuncelle(
   kartId: string,
-  patch: Partial<Pick<AjandaKartRow, 'tip' | 'ad' | 'bloklar' | 'bitis' | 'gunler' | 'saatler'>>,
+  patch: Partial<Pick<AjandaKartRow, 'tip' | 'ad' | 'bloklar' | 'bitis' | 'gunler' | 'saatler' | 'hatirlatma'>>,
 ) {
   const kart = await db.ajanda_kart.get(kartId);
   if (!kart || !kart.izinler.duzenle || kart.geri_bildirim !== 'yok') return;

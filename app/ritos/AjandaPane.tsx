@@ -12,8 +12,7 @@ import { DenemeGir } from './Sinav';
 import { sinavOzeti } from '@/lib/sinavGorev';
 import { kartPaketi } from '@/lib/paylasim';
 import { PaylasDugmesi } from './Sohbet';
-import { KartEditor } from './KartEditor';
-import { BelgeGoster } from './Belge';
+import { KartEditor, SURE_ANAHTAR } from './KartEditor';
 import { gorevler, type BDugum } from '@/lib/belge';
 import { KlasorSecModal } from './Kutuphane';
 import { ajandadanKaydet } from '@/lib/kutuphane';
@@ -216,14 +215,14 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
   const [degerAcik, setDegerAcik] = useState(false);
   const [uygulaAcik, setUygulaAcik] = useState(false);
   const uzak = kart.geri_bildirim === 'uzak';
-  const meta = [kart.saatler.join(' · '), bagli && kart.kaynak_etiket ? `${uzak ? '🤝' : '🌱'} ${kart.kaynak_etiket}` : ''].filter(Boolean).join(' · ');
+  const meta = [kart.saatler.join(' · ') + (kart.hatirlatma ? ' 🔔' : ''), bagli && kart.kaynak_etiket ? `${uzak ? '🤝' : '🌱'} ${kart.kaynak_etiket}` : ''].filter(Boolean).join(' · ');
   const yeniGuncel = !!kart.isaret && Date.now() - kart.isaret < 3 * 86400000;
   // A9 — değer düzeltme süresi (koçun izni): süre geçtiyse yapılmış kart değiştirilemez.
   const kilitli = !!kayit?.yapildi && kart.izinler.duzeltme_gun !== null && gunFarki(tarih, bugun()) > kart.izinler.duzeltme_gun;
   // Tek kart + ekler (28 eylül): yapılacak kartına kayıt eki takılıysa işaretlerken değer sorulur,
   // zamanlayıcı takılıysa ▶ ile başlatılır; video sayısı satırda rozet olarak görünür.
   const kayitBl = kart.tip === 'yap' ? degerBloklari(kart.bloklar) : [];
-  const zamanli = kart.tip === 'yap' && kart.bloklar.some((b) => b.tur === 'zamanlayici');
+  const zamanli = kart.tip === 'yap' && kart.bloklar.some((b) => b.tur === 'zamanlayici' || (b.tur === 'sayi' && b.anahtar === SURE_ANAHTAR));
   const videoSay = kart.bloklar.filter((b) => b.tur === 'video').length;
   const belge = kart.bloklar.find((b): b is Extract<Blok, { tur: 'belge' }> => b.tur === 'belge');
   const gorevSay = belge ? gorevler(belge.belge as BDugum).length : 0;
@@ -310,6 +309,7 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
   const [tekSil, setTekSil] = useState(false);
   const [duzenle, setDuzenle] = useState(false);
   const [kutKaydet, setKutKaydet] = useState(false);
+  const [uygula, setUygula] = useState(false);
   // Checklist işaretleri o günün kaydında; detay açıkken canlı izlenir.
   const kayitCanli = useCanli(() => db.ajanda_kayit.get(`${kart.id}|${tarih}`), [kart.id, tarih], satir.kayit ?? undefined);
   const kilitliDetay = !!kayitCanli?.yapildi && kart.izinler.duzeltme_gun !== null && gunFarki(tarih, bugun()) > kart.izinler.duzeltme_gun;
@@ -319,19 +319,31 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
   const duzenlenir = !bagli && kart.kaynak_modul === 'ajanda' && kart.izinler.duzenle && (kart.tip === 'yap' || kart.tip === 'oku');
 
   if (duzenle) return <KartEditor tarih={tarih} kart={kart} onKapat={onKapat} />;
+  // Kayıt bloğunun kart içindeki yeri: süre varsa ⏱ Başlat, ölçüler varsa bitince sorulacaklar.
+  const hedefDk = kart.bloklar.find((b): b is Extract<Blok, { tur: 'zamanlayici' }> => b.tur === 'zamanlayici')?.dakika ?? 0;
+  const sureli = kart.bloklar.some((b) => b.tur === 'zamanlayici' || (b.tur === 'sayi' && b.anahtar === SURE_ANAHTAR));
+  const olcular = kart.bloklar.filter((b): b is Extract<Blok, { tur: 'sayi' }> => b.tur === 'sayi' && b.anahtar !== SURE_ANAHTAR);
+  const baslatilir = sureli && !kayitCanli?.yapildi && !kilitliDetay && kart.izinler.ac;
+  const kayitAlani = baslatilir || olcular.length ? (
+    <div className="rt-kayit-kutu">
+      {baslatilir && <button type="button" className="rt-btn primary" onClick={() => setUygula(true)}>⏱ Başlat{hedefDk > 0 ? ` · ${hedefDk} dk` : ''}</button>}
+      {olcular.length > 0 && <p className="rt-muted">📏 Bitince sorulur: {olcular.map((o) => o.etiket + (o.birim ? ` (${o.birim})` : '')).join(', ')}</p>}
+    </div>
+  ) : null;
+
+  if (uygula) return <Uygula satir={satir} tarih={tarih} onKapat={onKapat} />;
   if (kutKaydet) return <KlasorSecModal baslik="📚 Kütüphaneye kaydet" onKapat={onKapat} onSec={async (kl) => { await ajandadanKaydet(kart, kl); }} />;
 
   return (
     <Modal baslik={kart.ad} onKapat={onKapat}>
-      <BlokGoster bloklar={kart.bloklar.filter((b) => b.tur !== 'belge')} bosMetin={kart.bloklar.some((b) => b.tur === 'belge') ? null : undefined} />
-      {kart.bloklar.filter((b): b is Extract<Blok, { tur: 'belge' }> => b.tur === 'belge').map((b, i) => (
-        <BelgeGoster
-          key={i}
-          belge={b.belge}
-          isaretler={kart.tip === 'yap' ? ((kayitCanli?.degerler as { liste?: number[] } | null)?.liste ?? []) : undefined}
-          onIsaret={kart.tip === 'yap' && !kilitliDetay ? (sira, acik) => listeIsaretle(kart.id, tarih, sira, acik, gorevler(b.belge as BDugum).length) : undefined}
-        />
-      ))}
+      <BlokGoster
+        bloklar={kart.bloklar}
+        kayit={kart.tip === 'yap' ? kayitAlani : undefined}
+        belgeIsaret={kart.tip === 'yap' ? {
+          isaretler: (kayitCanli?.degerler as { liste?: number[] } | null)?.liste ?? [],
+          onIsaret: kilitliDetay ? undefined : (sira, acik, belge) => listeIsaretle(kart.id, tarih, sira, acik, gorevler(belge as BDugum).length),
+        } : undefined}
+      />
       {bagli && (kart.geri_bildirim === 'uzak'
         ? <p className="rt-muted">🤝 Koçunun kartı · <b>{kart.kaynak_etiket}</b>. İşaretin ve girdiğin değerler yalnız koçuna gider.</p>
         : <p className="rt-muted">Bu kart <b>{kart.kaynak_etiket}</b> programından geliyor; içeriği ve günü programdan yönetilir.</p>)}
@@ -424,7 +436,7 @@ function Uygula({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string; on
   }, [calisiyor]);
 
   useEffect(() => {
-    if (hedefSn !== null && gecen >= hedefSn && calisiyor) setCalisiyor(false);
+    if (hedefSn !== null && gecen >= hedefSn && calisiyor) { setCalisiyor(false); bitisUyarisi(); }
   }, [gecen, hedefSn, calisiyor]);
 
   const goster = hedefSn !== null ? Math.max(0, hedefSn - gecen) : gecen;
@@ -433,12 +445,36 @@ function Uygula({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string; on
 
   return (
     <Modal baslik={kart.ad} onKapat={onKapat}>
-      <BlokGoster bloklar={kart.bloklar.filter((b) => b.tur !== 'zamanlayici')} />
+      <BlokGoster bloklar={kart.bloklar} kayit={null} />
       <div className={`rt-sayac${bitti ? ' bitti' : ''}`}>{mmss}</div>
       <div className="rt-satir">
-        {!bitti && <button type="button" className="rt-btn" onClick={() => setCalisiyor((c) => !c)}>{calisiyor ? 'Duraklat' : gecen ? 'Devam' : 'Başla'}</button>}
+        {!bitti && <button type="button" className="rt-btn" onClick={() => { sesAc(); setCalisiyor((c) => !c); }}>{calisiyor ? 'Duraklat' : gecen ? 'Devam' : 'Başla'}</button>}
         <button type="button" className="rt-btn primary" disabled={gecen === 0} onClick={async () => { await degerKaydet(kart.id, tarih, { ...(satir.kayit?.degerler ?? {}), sure_dk: Math.max(1, Math.round(gecen / 60)) }); onKapat(); }}>Bitir ve kaydet</button>
       </div>
     </Modal>
   );
+}
+
+// Hedef süre dolunca: kısa titreşim (destekleyen cihazda) + üç kısa bip. iOS sesi yalnız bir
+// dokunuşla açılan ses bağlamında çalar — bağlam "Başla"ya basınca açılır (sesAc).
+let sesBaglami: AudioContext | null = null;
+function sesAc() {
+  try {
+    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!sesBaglami) sesBaglami = new Ctx();
+    void sesBaglami.resume();
+  } catch { /* ses yok */ }
+}
+function bitisUyarisi() {
+  try { navigator.vibrate?.([200, 100, 200]); } catch { /* yok */ }
+  try {
+    const ctx = sesBaglami;
+    if (!ctx) return;
+    [0, 0.35, 0.7].forEach((t) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(0.25, ctx.currentTime + t); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.25);
+      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.26);
+    });
+  } catch { /* ses yok */ }
 }
