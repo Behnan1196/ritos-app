@@ -561,3 +561,42 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-kut-menu{display:flex;flex-direction:column;gap:6px;}
 .rt-kut-secler{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;max-height:50vh;overflow:auto;}
 .rt-kut-sec{background:none;border:none;border-bottom:1px solid #f1ece2;font:inherit;font-size:14px;text-align:left;padding:9px 8px;cursor:pointer;color:var(--ink);}
+
+/* ---------- Notlar (30 eylül) ---------- */
+.rt-notlar-w{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:4px;margin-bottom:10px;}
+.rt-notlar-hd{display:flex;align-items:center;gap:8px;}
+.rt-notlar-hd b{flex:1;font-size:14px;}
+.rt-notlar-hizli{margin:2px 0 4px;}
+.rt-not-satir{display:flex;flex-direction:column;align-items:flex-start;gap:1px;background:none;border:none;border-top:1px solid #f1ece2;font:inherit;text-align:left;padding:7px 2px;cursor:pointer;color:var(--ink);width:100%;}
+.rt-not-satir .t{font-size:14px;font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rt-not-satir .m{font-size:12px;color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rt-not-ekran{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);}
+.rt-not-ust{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);min-height:52px;}
+.rt-not-ust b,.rt-not-ust .rt-muted{flex:1;}
+.rt-not-ust .rt-ikon.on{background:var(--green2);border-color:var(--green);}
+.rt-not-govde{flex:1;overflow:auto;padding:10px 14px;display:flex;flex-direction:column;gap:6px;max-width:760px;width:100%;margin:0 auto;}
+.rt-not-govde:has(.rt-not-edit){overflow:hidden;}
+.rt-not-edit{display:flex;flex-direction:column;flex:1;min-height:0;}
+.rt-not-arac{display:flex;flex-wrap:wrap;gap:2px;padding:4px;border:1px solid var(--line);border-radius:10px;background:#fff;position:sticky;top:0;z-index:2;}
+.rt-not-arac button{min-width:34px;height:32px;border:none;background:none;border-radius:7px;font:inherit;font-size:14px;cursor:pointer;color:var(--ink);}
+.rt-not-arac button.on{background:var(--green2);color:var(--green);}
+.rt-not-arac button mark{background:#fde68a;padding:0 3px;border-radius:3px;}
+.rt-not-arac .ayrac{width:1px;background:var(--line);margin:4px 3px;}
+.rt-not-icerik{flex:1;overflow:auto;padding:10px 2px 40px;}
+.rt-not-icerik .tiptap{outline:none;font-size:15.5px;line-height:1.55;min-height:60vh;}
+.rt-not-icerik .tiptap > *:first-child{font-size:20px;font-weight:800;margin-top:0;}
+.rt-not-icerik .tiptap h1{font-size:21px;margin:14px 0 6px;}
+.rt-not-icerik .tiptap h2{font-size:17px;margin:12px 0 4px;}
+.rt-not-icerik .tiptap p{margin:4px 0;}
+.rt-not-icerik .tiptap ul,.rt-not-icerik .tiptap ol{padding-left:22px;margin:4px 0;}
+.rt-not-icerik .tiptap blockquote{border-left:3px solid var(--green);margin:6px 0;padding:2px 10px;color:#5b5446;}
+.rt-not-icerik .tiptap hr{border:none;border-top:1px solid var(--line);margin:12px 0;}
+.rt-not-icerik .tiptap mark{background:#fde68a;border-radius:3px;padding:0 2px;}
+.rt-not-icerik .tiptap a{color:var(--green);}
+.rt-not-icerik .tiptap ul[data-type="taskList"]{list-style:none;padding-left:2px;}
+.rt-not-icerik .tiptap ul[data-type="taskList"] li{display:flex;gap:8px;align-items:flex-start;}
+.rt-not-icerik .tiptap ul[data-type="taskList"] li > label{flex:0 0 auto;margin-top:3px;}
+.rt-not-icerik .tiptap ul[data-type="taskList"] li > label input{width:17px;height:17px;accent-color:var(--green);}
+.rt-not-icerik .tiptap ul[data-type="taskList"] li > div{flex:1;}
+.rt-not-icerik .tiptap ul[data-type="taskList"] li[data-checked="true"] > div{color:var(--muted);text-decoration:line-through;}
+.rt-not-icerik .tiptap p.is-editor-empty:first-child::before,.rt-not-icerik .tiptap .is-empty::before{content:attr(data-placeholder);color:#b5ad9c;float:left;height:0;pointer-events:none;font-weight:400;}

@@ -19,6 +19,7 @@ import { DanismanlikEkrani, DanismanlikSatiri, danismanlikBaslik, DISIPLIN_IKON 
 import { SenkronIsareti, useGelenSenkron } from './ritos/Paylasim';
 import { SohbetEkrani, useSohbetOzeti } from './ritos/Sohbet';
 import { OlcumlerSatiri } from './ritos/Olcum';
+import { NotlarWidget } from './ritos/Notlar';
 import { AyarlarPane, GirisEkrani, SifreSifirlaEkrani, useKurtarmaHatirlat } from './ritos/Hesap';
 import { useHesapBaslat, useOturum } from '@/lib/hesap';
 import { useDanismanlik } from '@/lib/danismanlik';
@@ -199,6 +200,7 @@ function HomeEkrani({ onDanismanlik, onGelisim, onSohbet }: { onDanismanlik: (di
   const sohbet = useSohbetOzeti();
   return (
     <div className="fixed-widgets">
+      <NotlarWidget />
       {/* 30 eylül: alanlar V1'de yok (ileride üst klasörler alanlara karşılık gelebilir). */}
       {V2 && <OdakAlanlari onAc={onGelisim} />}
       <KoclarimSatiri />

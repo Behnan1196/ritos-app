@@ -319,6 +319,17 @@ export interface KutuphaneKartRow {
   guncellendi: number;
 }
 
+// Notlar (30 eylül) — stilli hızlı notlar (Tiptap belgesi, JSON). Uçtan uca şifreli senkronlanır.
+export interface NotRow {
+  id: string;
+  belge: unknown;                // Tiptap JSON belgesi
+  baslik: string;                // ilk satır (liste ve arama için)
+  metin: string;                 // düz metin (önizleme ve arama)
+  sabit: boolean;                // 📌 üstte
+  olusturuldu: number;
+  guncellendi: number;
+}
+
 export interface AileUyesi { uye: string; ad: string; rol: 'yonetici' | 'uye'; durum: 'davet' | 'aktif' | 'ayrildi' }
 export interface AileRow {
   id: string;
@@ -366,6 +377,7 @@ export class RitosDB extends Dexie {
   olcu_tanim!: EntityTable<OlcuTanimRow, 'id'>;
   olcum!: EntityTable<OlcumRow, 'id'>;
   kutuphane_kart!: EntityTable<KutuphaneKartRow, 'id'>;
+  not!: EntityTable<NotRow, 'id'>;
 
   /** Sunucudan gelen değişiklik uygulanırken true — kancalar bunu yerel değişiklik saymaz. */
   uzaktan = false;
@@ -601,6 +613,36 @@ export class RitosDB extends Dexie {
       olcum: 'id, olcu_id, tarih, kart_id',
       kutuphane_kart: 'id, klasor_id',
     });
+    // v13 (30 eylül): notlar.
+    this.version(13).stores({
+      home_widget: 'id, type',
+      ayar: 'anahtar',
+      ajanda_kart: 'id, kaynak_modul, kaynak_ref, baslangic',
+      ajanda_kayit: 'id, kart_id, tarih',
+      geri_bildirim: 'id, kart_id, kaynak_ref, zaman',
+      program: 'id, klasor_id',
+      program_adim: 'id, program_id',
+      klasor: 'id, ust_id',
+      gelen: 'id, gelis, alindi',
+      kisi: 'id, son',
+      bekleyen: 'anahtar, zaman',
+      alan_degerlendirme: 'id, alan_id, zaman',
+      katalog: 'kod, paket',
+      paket_kurulum: 'id',
+      katalog_duzen: 'id, sinav',
+      kaynak: 'id',
+      konu_durum: 'id',
+      iliski: 'id, durum',
+      giden: 'id, zaman',
+      iliski_ayar: 'id',
+      mesaj: 'id, konusma, zaman',
+      konusma_okundu: 'id',
+      aile: 'id',
+      olcu_tanim: 'id',
+      olcum: 'id, olcu_id, tarih, kart_id',
+      kutuphane_kart: 'id, klasor_id',
+      not: 'id, guncellendi',
+    });
 
     // Senkronlanan tablolardaki her yerel değişikliği "bekleyen"e işaretle.
     // Kanca transaction içinde çalışır; bekleyen'e yazmayı transaction dışına erteleriz.
@@ -645,7 +687,7 @@ export class RitosDB extends Dexie {
 // Hesapsız kullanımın verisi 'ritos' (misafir) veritabanında; her hesabın kendi veritabanı var.
 // Hangisinin açık olduğu cihazda küçük bir işarette tutulur; değişince sayfa yeniden yüklenir.
 
-export const SENKRON_TABLOLARI = ['home_widget', 'ajanda_kart', 'ajanda_kayit', 'geri_bildirim', 'program', 'program_adim', 'klasor', 'gelen', 'kisi', 'alan_degerlendirme', 'paket_kurulum', 'katalog_duzen', 'kaynak', 'konu_durum', 'iliski_ayar', 'mesaj', 'konusma_okundu', 'olcu_tanim', 'olcum', 'kutuphane_kart'] as const;
+export const SENKRON_TABLOLARI = ['home_widget', 'ajanda_kart', 'ajanda_kayit', 'geri_bildirim', 'program', 'program_adim', 'klasor', 'gelen', 'kisi', 'alan_degerlendirme', 'paket_kurulum', 'katalog_duzen', 'kaynak', 'konu_durum', 'iliski_ayar', 'mesaj', 'konusma_okundu', 'olcu_tanim', 'olcum', 'kutuphane_kart', 'not'] as const;
 export type SenkronTablo = (typeof SENKRON_TABLOLARI)[number];
 
 export const MISAFIR_DB = 'ritos';
