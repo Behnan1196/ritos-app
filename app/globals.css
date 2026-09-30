@@ -538,3 +538,26 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-sablon-gun{display:flex;gap:10px;font-size:13px;border-bottom:1px dashed var(--line);padding:4px 0;}
 .rt-sablon-gun b{flex:0 0 34px;}
 .rt-plan-satiri{display:flex;align-items:center;gap:10px;justify-content:space-between;border:1px dashed var(--line);border-radius:12px;padding:8px 10px;margin:6px 0;}
+
+/* ---------- Kütüphane (30 eylül) ---------- */
+.rt-kut-bas{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.rt-kut-bas h4{flex:1;margin:0;}
+.rt-kut-kes{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#fff7e6;border:1px solid #f0d9a8;border-radius:10px;padding:8px 10px;margin-bottom:8px;font-size:13px;}
+.rt-kut-kes span{flex:1;min-width:180px;}
+.rt-kut-giris{border:1.5px dashed var(--line);border-radius:12px;padding:12px;}
+.rt-kut-agac{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px 0;}
+.rt-kut-satir{display:flex;align-items:center;gap:4px;min-height:36px;padding-right:6px;border-bottom:1px solid #f1ece2;}
+.rt-kut-satir:last-child{border-bottom:none;}
+.rt-kut-satir .ad{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:none;border:none;font:inherit;font-size:14px;color:var(--ink);text-align:left;cursor:pointer;padding:6px 0;}
+.rt-kut-satir.klasor .ad{font-weight:700;}
+.rt-kut-satir .ok{width:12px;color:var(--muted);font-size:11px;}
+.rt-kut-satir .iko{flex:0 0 auto;}
+.rt-kut-satir .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rt-kut-satir .say{font-size:11px;color:var(--muted);font-weight:600;}
+.rt-kut-satir.kesik{opacity:.45;}
+.rt-kut-meta{margin-left:auto;font-size:11px;color:var(--muted);white-space:nowrap;padding-left:6px;}
+.rt-kut-yap{border:1px solid var(--green);background:var(--green2);color:var(--green);border-radius:8px;font:inherit;font-size:12px;font-weight:700;padding:3px 8px;cursor:pointer;}
+.rt-kut-bos{margin:4px 0;font-size:12px;}
+.rt-kut-menu{display:flex;flex-direction:column;gap:6px;}
+.rt-kut-secler{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;max-height:50vh;overflow:auto;}
+.rt-kut-sec{background:none;border:none;border-bottom:1px solid #f1ece2;font:inherit;font-size:14px;text-align:left;padding:9px 8px;cursor:pointer;color:var(--ink);}

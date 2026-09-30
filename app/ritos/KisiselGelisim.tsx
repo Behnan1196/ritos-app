@@ -461,7 +461,7 @@ function AdimForm({ programId, adim, yansir, sinavIzinli, onKapat }: { programId
 }
 
 // Koç panelinden (Home > Danışmanlık) program açılınca aynı ekran kullanılır.
-function ProgramEkrani({ programId, onGeri }: { programId: string; onGeri: () => void }) {
+export function ProgramEkrani({ programId, onGeri }: { programId: string; onGeri: () => void }) {
   const p = useCanli(() => db.program.get(programId), [programId], undefined as ProgramRow | undefined);
   const klasorler = useCanli(() => db.klasor.toArray(), [], [] as KlasorRow[]);
   return p ? <ProgramDetay p={p} klasorler={klasorler} onGeri={onGeri} /> : null;

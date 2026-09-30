@@ -10,7 +10,9 @@
 
 import React, { useEffect, useRef, useState, type ReactNode } from 'react';
 import AjandaPane from './ritos/AjandaPane';
-import KisiselGelisim, { OdakAlanlari } from './ritos/KisiselGelisim';
+import { OdakAlanlari } from './ritos/KisiselGelisim';
+import Kutuphane from './ritos/Kutuphane';
+import { V2 } from '@/lib/surum';
 import { SinavTool, useSinavOzeti } from './ritos/Sinav';
 import { DavetKarsilama, KoclarimSatiri } from './ritos/Danismanlik';
 import { DanismanlikEkrani, DanismanlikSatiri, danismanlikBaslik, DISIPLIN_IKON } from './ritos/DanismanlikEkrani';
@@ -95,7 +97,7 @@ function RitosUygulama() {
       : null
   );
   const sagSekme = (s: Sekme) => (
-    s === 'gelisim' ? <KisiselGelisim />
+    s === 'gelisim' ? <Kutuphane />
       : s === 'sohbet' ? <SohbetEkrani />
       : s === 'ayarlar' ? <AyarlarPane />
       : home
@@ -118,7 +120,7 @@ function RitosUygulama() {
           <div className="mobile-hd"><b>Ritos</b><SenkronIsareti /></div>
           <div className="mobile-main">{sekme === 'ajanda' ? <AjandaPane /> : sagSekme(sekme)}</div>
           <div className="mobile-nav">
-            {([['home', '🏠', 'Home'], ['ajanda', '📅', 'Ajanda'], ['gelisim', '🌱', 'Gelişim'], ['sohbet', '💬', 'Sohbet'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sekme, string, string][]).map(([k, ic, ad]) => (
+            {([['home', '🏠', 'Home'], ['ajanda', '📅', 'Ajanda'], ['gelisim', '📚', 'Kütüphane'], ['sohbet', '💬', 'Sohbet'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sekme, string, string][]).map(([k, ic, ad]) => (
               <button key={k} className={sekme === k ? 'on' : ''} onClick={() => setSekme(k)}><span className="ic">{ic}{rozet(k)}</span>{ad}</button>
             ))}
           </div>
@@ -136,7 +138,7 @@ function RitosUygulama() {
               <>
                 <div className="side-content">{danismanlik && (sekme === 'home' || sekme === 'ajanda') ? danEkrani(false) : sagSekme(sekme === 'ajanda' ? 'home' : sekme)}</div>
                 <div className="side-tabs">
-                  {([['home', '🏠', 'Home'], ['gelisim', '🌱', 'Kişisel Gelişim'], ['sohbet', '💬', 'Sohbet'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sekme, string, string][]).map(([k, ic, ad]) => (
+                  {([['home', '🏠', 'Home'], ['gelisim', '📚', 'Kütüphane'], ['sohbet', '💬', 'Sohbet'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sekme, string, string][]).map(([k, ic, ad]) => (
                     <button key={k} className={(sekme === 'ajanda' ? 'home' : sekme) === k ? 'on' : ''} onClick={() => { if (k === 'home') setDanismanlik(null); setSekme(k); }}><span>{ic}{rozet(k)}</span>{ad}</button>
                   ))}
                 </div>
@@ -197,7 +199,8 @@ function HomeEkrani({ onDanismanlik, onGelisim, onSohbet }: { onDanismanlik: (di
   const sohbet = useSohbetOzeti();
   return (
     <div className="fixed-widgets">
-      <OdakAlanlari onAc={onGelisim} />
+      {/* 30 eylül: alanlar V1'de yok (ileride üst klasörler alanlara karşılık gelebilir). */}
+      {V2 && <OdakAlanlari onAc={onGelisim} />}
       <KoclarimSatiri />
       <OlcumlerSatiri />
       {(sohbet.toplam > 0 || sohbet.davet > 0) && (

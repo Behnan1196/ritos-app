@@ -13,6 +13,8 @@ import { sinavOzeti } from '@/lib/sinavGorev';
 import { kartPaketi } from '@/lib/paylasim';
 import { PaylasDugmesi } from './Sohbet';
 import { KartEditor } from './KartEditor';
+import { KlasorSecModal } from './Kutuphane';
+import { ajandadanKaydet } from '@/lib/kutuphane';
 import { DanisanAjandasi } from './DanisanAjanda';
 import { useDanismanlik } from '@/lib/danismanlik';
 import { db, type IliskiRow, type ProgramRow } from '@/lib/db';
@@ -302,10 +304,14 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
   const [silAcik, setSilAcik] = useState(false);
   const [tekSil, setTekSil] = useState(false);
   const [duzenle, setDuzenle] = useState(false);
+  const [kutKaydet, setKutKaydet] = useState(false);
+  // Kütüphaneye yalnız kendi (ya da kendi programının) kartı kaydedilir; koçun kartı danışanın olmaz.
+  const kaydedilir = kart.geri_bildirim !== 'uzak';
   // Kendi kartı (Ajanda'dan eklenen, bağımsız) her zaman düzenlenebilir.
   const duzenlenir = !bagli && kart.kaynak_modul === 'ajanda' && kart.izinler.duzenle && (kart.tip === 'yap' || kart.tip === 'oku');
 
   if (duzenle) return <KartEditor tarih={tarih} kart={kart} onKapat={onKapat} />;
+  if (kutKaydet) return <KlasorSecModal baslik="📚 Kütüphaneye kaydet" onKapat={onKapat} onSec={async (kl) => { await ajandadanKaydet(kart, kl); }} />;
 
   return (
     <Modal baslik={kart.ad} onKapat={onKapat}>
@@ -314,6 +320,7 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
         ? <p className="rt-muted">🤝 Koçunun kartı · <b>{kart.kaynak_etiket}</b>. İşaretin ve girdiğin değerler yalnız koçuna gider.</p>
         : <p className="rt-muted">Bu kart <b>{kart.kaynak_etiket}</b> programından geliyor; içeriği ve günü programdan yönetilir.</p>)}
 
+      {kaydedilir && !tasiAcik && !silAcik && !tekSil && <div className="rt-satir"><button type="button" className="rt-btn" onClick={() => setKutKaydet(true)}>📚 Kütüphaneye kaydet</button></div>}
       {tekSil && <OnayKutusu metin="Kart silinsin mi?" evet="Sil" onVazgec={() => setTekSil(false)} onEvet={() => kartKaldir(kart.id, tarih, 'tamamen').then(onKapat)} />}
       {bagli && kart.geri_bildirim === 'uzak' && kart.izinler.gun_degistir && !tasiAcik && (
         <div className="rt-satir"><button type="button" className="rt-btn" onClick={() => setTasiAcik(true)}>Başka güne taşı</button></div>

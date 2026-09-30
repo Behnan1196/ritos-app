@@ -44,10 +44,12 @@ const SURE_SECENEK: [string, string][] = [['7', '1 hafta'], ['21', '21 gün'], [
 
 // onPlan verilirse kart Ajanda'ya doğrudan değil, bir plana (kişisel program) adım olarak eklenir;
 // düzenlemede tekrar değiştirilmez (tekrarYok).
-export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok }: {
+// tarihsiz: kütüphane kartı — tekrar ve saat yok (onlar "Ajandaya al"da seçilir).
+export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, baslik }: {
   tarih: string; kart?: AjandaKartRow; onKapat: () => void;
-  onPlan?: (kart: KocKartTaslak, tekrar: KocTekrar | null) => Promise<void>; tekrarYok?: boolean;
+  onPlan?: (kart: KocKartTaslak, tekrar: KocTekrar | null) => Promise<void>; tekrarYok?: boolean; tarihsiz?: boolean; baslik?: string;
 }) {
+  if (tarihsiz) tekrarYok = true;
   // V1: sınav görevleri yalnız koçun planında; kişinin kendi Ajanda'sında yok (V2'de açılır).
   const sinavKurulu = V2 && !kart && useSinavOzeti().kurulu; // eslint-disable-line react-hooks/rules-of-hooks
   const [sinav, setSinav] = useState(false);
@@ -188,7 +190,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok }: {
   );
 
   return (
-    <Modal baslik={kart ? 'Kartı düzenle' : 'Kart ekle'} onKapat={onKapat}>
+    <Modal baslik={baslik ?? (kart ? 'Kartı düzenle' : 'Kart ekle')} onKapat={onKapat}>
       {sinavKurulu && (
         <div className="rt-chips">
           <button type="button" className={`rt-chip${!sinav ? ' on' : ''}`} onClick={() => setSinav(false)}>Kart</button>
@@ -247,7 +249,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok }: {
         </>
       ))}
 
-      {bolum('saat', '🕐 Saat', (
+      {!tarihsiz && bolum('saat', '🕐 Saat', (
         <input className="rt-inp" type="time" value={saat} onChange={(e) => setSaat(e.target.value)} />
       ))}
 
@@ -290,7 +292,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok }: {
         {!sinav && cip('aciklama', '📝 Açıklama')}
         {!sinav && cip('video', '🎬 Video')}
         {!tekrarYok && cip('tekrar', '🔁 Tekrar')}
-        {cip('saat', '🕐 Saat')}
+        {!tarihsiz && cip('saat', '🕐 Saat')}
         {!sinav && !dahaFazla && <button type="button" className="rt-chip rt-ek-cip" onClick={() => setDahaFazla(true)}>＋ Daha fazla</button>}
         {!sinav && dahaFazla && cip('sure', '⏱ Süre kaydı')}
         {!sinav && dahaFazla && cip('zamanlayici', '⏲ Zamanlayıcı')}
