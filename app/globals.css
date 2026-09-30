@@ -600,3 +600,6 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-not-icerik .tiptap ul[data-type="taskList"] li > div{flex:1;}
 .rt-not-icerik .tiptap ul[data-type="taskList"] li[data-checked="true"] > div{color:var(--muted);text-decoration:line-through;}
 .rt-not-icerik .tiptap p.is-editor-empty:first-child::before,.rt-not-icerik .tiptap .is-empty::before{content:attr(data-placeholder);color:#b5ad9c;float:left;height:0;pointer-events:none;font-weight:400;}
+/* Geniş ekranda not ekranı tam ekran değil, sağ bölmede (Home'un yerinde) açılır. */
+.split-side{position:relative;}
+.split-side .rt-not-ekran{position:absolute;inset:0;z-index:20;padding-top:0;padding-bottom:0;}
