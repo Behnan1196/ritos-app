@@ -260,3 +260,22 @@ export async function kartGuncelle(
   if (!kart || !kart.izinler.duzenle || kart.geri_bildirim !== 'yok') return;
   await db.ajanda_kart.update(kartId, { ...patch, guncellendi: Date.now() });
 }
+
+// Kart içindeki checklist (30 eylül) — işaretler günlüktür: o günün kaydında (degerler.liste)
+// madde sıraları tutulur; tekrarlanan kartta her gün sıfırdan başlar. Hepsi işaretlenince kart
+// yapıldı sayılır; biri kaldırılırsa yapıldı geri alınır.
+export async function listeIsaretle(kartId: string, tarih: string, sira: number, acik: boolean, toplam: number) {
+  const kart = await db.ajanda_kart.get(kartId);
+  if (!kart) return;
+  const id = `${kartId}|${tarih}`;
+  const mevcut = await db.ajanda_kayit.get(id);
+  const once = new Set<number>(((mevcut?.degerler as { liste?: number[] } | null)?.liste) ?? []);
+  if (acik) once.add(sira); else once.delete(sira);
+  const liste = Array.from(once).sort((a, b) => a - b);
+  const hepsi = toplam > 0 && liste.length >= toplam;
+  const yapildi = hepsi ? true : mevcut?.yapildi && !acik && once.size < toplam ? false : mevcut?.yapildi ?? false;
+  await db.transaction('rw', db.ajanda_kayit, db.geri_bildirim, async () => {
+    await kayitYaz(kartId, tarih, { degerler: { ...(mevcut?.degerler ?? {}), liste }, yapildi });
+    if (yapildi !== (mevcut?.yapildi ?? false)) await yayinla(kart, tarih, yapildi ? 'yapildi' : 'geri_alindi', null);
+  });
+}

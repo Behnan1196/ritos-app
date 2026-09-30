@@ -34,40 +34,57 @@ const DUGMELER: (Dugme | '|')[] = [
   { etiket: '↷', baslik: 'Yinele', calis: (e) => e.chain().focus().redo().run() },
 ];
 
-export default function NotEditor({ not, yeni }: { not: NotRow; yeni?: boolean }) {
-  const zaman = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const bekleyen = useRef<(() => Promise<void>) | null>(null);
+// Kartın açıklaması için sade araç çubuğu.
+const KOMPAKT = new Set(['Kalın', 'Vurgula', 'Madde listesi', 'Numaralı liste', 'Yapılacaklar listesi']);
+
+/** Genel stilli editör — not ve kart açıklaması aynı editörü kullanır. */
+export function ZenginEditor({ icerik, onDegis, kompakt, placeholder, autofocus, ilkSatirBaslik }: {
+  icerik: unknown; onDegis: (belge: object, metin: string) => void; kompakt?: boolean; placeholder?: string; autofocus?: boolean; ilkSatirBaslik?: boolean;
+}) {
+  const degis = useRef(onDegis);
+  degis.current = onDegis;
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ link: { openOnClick: true, autolink: true } }),
+      StarterKit.configure({ link: { openOnClick: true, autolink: true }, ...(kompakt ? { heading: false, blockquote: false, horizontalRule: false, codeBlock: false } : {}) }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Highlight,
-      Placeholder.configure({ placeholder: ({ pos }) => (pos === 0 ? 'Başlık…' : 'Yaz… ( - madde, [ ] yapılacak, # başlık )') }),
+      Placeholder.configure({ placeholder: ({ pos }) => (ilkSatirBaslik && pos === 0 ? 'Başlık…' : placeholder ?? 'Yaz… ( - madde, [ ] yapılacak, # başlık )') }),
     ],
-    content: (not.belge as object) ?? '',
+    content: (icerik as object) ?? '',
     immediatelyRender: false,
     shouldRerenderOnTransaction: true,
-    autofocus: yeni ? 'end' : false,
-    onUpdate: ({ editor: e }) => {
-      const belge = e.getJSON();
-      const metin = e.getText({ blockSeparator: '\n' });
-      bekleyen.current = () => notKaydet(not.id, belge, metin);
-      if (zaman.current) clearTimeout(zaman.current);
-      zaman.current = setTimeout(() => { bekleyen.current?.(); bekleyen.current = null; }, 400);
-    },
+    autofocus: autofocus ? 'end' : false,
+    onUpdate: ({ editor: e }) => degis.current(e.getJSON(), e.getText({ blockSeparator: '\n' })),
   });
-  // Kapanırken bekleyen kaydı yaz.
-  useEffect(() => () => { if (zaman.current) clearTimeout(zaman.current); bekleyen.current?.(); }, []);
-
+  const dugmeler = kompakt ? DUGMELER.filter((d) => d !== '|' && KOMPAKT.has(d.baslik)) : DUGMELER;
   return (
-    <div className="rt-not-edit">
+    <div className={`rt-not-edit${kompakt ? ' kompakt' : ''}`}>
       <div className="rt-not-arac" role="toolbar" aria-label="Biçim">
-        {DUGMELER.map((d, i) => d === '|'
+        {dugmeler.map((d, i) => d === '|'
           ? <span key={i} className="ayrac" />
           : <button key={i} type="button" title={d.baslik} aria-label={d.baslik} className={editor && d.aktif?.(editor) ? 'on' : ''} onMouseDown={(e) => e.preventDefault()} onClick={() => editor && d.calis(editor)}>{d.etiket}</button>)}
       </div>
-      <EditorContent editor={editor} className="rt-not-icerik" />
+      <EditorContent editor={editor} className={`rt-not-icerik${ilkSatirBaslik ? ' baslikli' : ''}`} />
     </div>
+  );
+}
+
+export default function NotEditor({ not, yeni }: { not: NotRow; yeni?: boolean }) {
+  const zaman = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bekleyen = useRef<(() => Promise<void>) | null>(null);
+  // Kapanırken bekleyen kaydı yaz.
+  useEffect(() => () => { if (zaman.current) clearTimeout(zaman.current); bekleyen.current?.(); }, []);
+  return (
+    <ZenginEditor
+      icerik={not.belge}
+      autofocus={yeni}
+      ilkSatirBaslik
+      onDegis={(belge, metin) => {
+        bekleyen.current = () => notKaydet(not.id, belge, metin);
+        if (zaman.current) clearTimeout(zaman.current);
+        zaman.current = setTimeout(() => { bekleyen.current?.(); bekleyen.current = null; }, 400);
+      }}
+    />
   );
 }

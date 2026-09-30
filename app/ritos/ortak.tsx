@@ -2,6 +2,7 @@
 
 import React, { type ReactNode } from 'react';
 import type { Blok } from '@/lib/paket';
+import { BelgeGoster } from './Belge';
 
 // Modal — formlar ekranda sabit durmaz, modal ile açılır.
 export function Modal({ baslik, onKapat, children }: { baslik: string; onKapat: () => void; children: ReactNode }) {
@@ -42,12 +43,13 @@ export function Chips<T extends string | number>({ secenekler, deger, onSec }: {
 }
 
 // Blok çizici — tüm kart tiplerinin içeriği bu tek bileşenden çizilir.
-export function BlokGoster({ bloklar }: { bloklar: Blok[] }) {
-  if (!bloklar.length) return <p className="rt-muted">İçerik yok.</p>;
+export function BlokGoster({ bloklar, bosMetin }: { bloklar: Blok[]; bosMetin?: string | null }) {
+  if (!bloklar.length) return bosMetin === null ? null : <p className="rt-muted">{bosMetin ?? 'İçerik yok.'}</p>;
   return (
     <div className="rt-bloklar">
       {bloklar.map((b, i) => {
         if (b.tur === 'metin') return <p key={i} className="rt-metin">{b.metin}</p>;
+        if (b.tur === 'belge') return <BelgeGoster key={i} belge={b.belge} />;
         if (b.tur === 'video') {
           const id = youtubeId(b.url);
           if (id) {
@@ -79,7 +81,7 @@ export function youtubeId(url: string): string | null {
 // Girilen değerlerin kısa metni (sure_dk → "12 dk"). Bloklar verilirse birim de eklenir.
 export function degerMetni(d: Record<string, unknown>, bloklar?: Blok[]): string {
   return Object.entries(d)
-    .filter(([, v]) => v !== '' && v !== null && v !== undefined)
+    .filter(([k, v]) => k !== 'liste' && v !== '' && v !== null && v !== undefined)
     .map(([k, v]) => {
       const m = typeof v === 'number' ? v.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) : String(v);
       if (k === 'sure_dk') return `${m} dk`;

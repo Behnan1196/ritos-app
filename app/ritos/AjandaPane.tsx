@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ayOzeti, degerKaydet, gununKartlari, kartKaldir, kartTasi, siraDegistir, yapildiAyarla, type GunSatiri } from '@/lib/ajanda';
+import { ayOzeti, degerKaydet, gununKartlari, kartKaldir, kartTasi, listeIsaretle, siraDegistir, yapildiAyarla, type GunSatiri } from '@/lib/ajanda';
 import { useCanli } from '@/lib/canli';
 import {
   bugun, degerBloklari, gunFarki, tarihEkle, tarihEtiket, tarihParse, tarihStr,
@@ -13,6 +13,8 @@ import { sinavOzeti } from '@/lib/sinavGorev';
 import { kartPaketi } from '@/lib/paylasim';
 import { PaylasDugmesi } from './Sohbet';
 import { KartEditor } from './KartEditor';
+import { BelgeGoster } from './Belge';
+import { gorevler, type BDugum } from '@/lib/belge';
 import { KlasorSecModal } from './Kutuphane';
 import { ajandadanKaydet } from '@/lib/kutuphane';
 import { DanisanAjandasi } from './DanisanAjanda';
@@ -223,7 +225,10 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
   const kayitBl = kart.tip === 'yap' ? degerBloklari(kart.bloklar) : [];
   const zamanli = kart.tip === 'yap' && kart.bloklar.some((b) => b.tur === 'zamanlayici');
   const videoSay = kart.bloklar.filter((b) => b.tur === 'video').length;
-  const ekMeta = [videoSay ? `🎬 ${videoSay}` : ''].filter(Boolean).join(' ');
+  const belge = kart.bloklar.find((b): b is Extract<Blok, { tur: 'belge' }> => b.tur === 'belge');
+  const gorevSay = belge ? gorevler(belge.belge as BDugum).length : 0;
+  const isaretli = ((kayit?.degerler as { liste?: number[] } | null)?.liste ?? []).length;
+  const ekMeta = [videoSay ? `🎬 ${videoSay}` : '', gorevSay ? `☑ ${isaretli}/${gorevSay}` : ''].filter(Boolean).join(' ');
   function isaretle() {
     if (yapildi) { yapildiAyarla(kart.id, tarih, false); setDegerAcik(false); return; }
     if (kayitBl.length) setDegerAcik((v) => !v);
@@ -305,6 +310,9 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
   const [tekSil, setTekSil] = useState(false);
   const [duzenle, setDuzenle] = useState(false);
   const [kutKaydet, setKutKaydet] = useState(false);
+  // Checklist işaretleri o günün kaydında; detay açıkken canlı izlenir.
+  const kayitCanli = useCanli(() => db.ajanda_kayit.get(`${kart.id}|${tarih}`), [kart.id, tarih], satir.kayit ?? undefined);
+  const kilitliDetay = !!kayitCanli?.yapildi && kart.izinler.duzeltme_gun !== null && gunFarki(tarih, bugun()) > kart.izinler.duzeltme_gun;
   // Kütüphaneye yalnız kendi (ya da kendi programının) kartı kaydedilir; koçun kartı danışanın olmaz.
   const kaydedilir = kart.geri_bildirim !== 'uzak';
   // Kendi kartı (Ajanda'dan eklenen, bağımsız) her zaman düzenlenebilir.
@@ -315,7 +323,15 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
 
   return (
     <Modal baslik={kart.ad} onKapat={onKapat}>
-      <BlokGoster bloklar={kart.bloklar} />
+      <BlokGoster bloklar={kart.bloklar.filter((b) => b.tur !== 'belge')} bosMetin={kart.bloklar.some((b) => b.tur === 'belge') ? null : undefined} />
+      {kart.bloklar.filter((b): b is Extract<Blok, { tur: 'belge' }> => b.tur === 'belge').map((b, i) => (
+        <BelgeGoster
+          key={i}
+          belge={b.belge}
+          isaretler={kart.tip === 'yap' ? ((kayitCanli?.degerler as { liste?: number[] } | null)?.liste ?? []) : undefined}
+          onIsaret={kart.tip === 'yap' && !kilitliDetay ? (sira, acik) => listeIsaretle(kart.id, tarih, sira, acik, gorevler(b.belge as BDugum).length) : undefined}
+        />
+      ))}
       {bagli && (kart.geri_bildirim === 'uzak'
         ? <p className="rt-muted">🤝 Koçunun kartı · <b>{kart.kaynak_etiket}</b>. İşaretin ve girdiğin değerler yalnız koçuna gider.</p>
         : <p className="rt-muted">Bu kart <b>{kart.kaynak_etiket}</b> programından geliyor; içeriği ve günü programdan yönetilir.</p>)}

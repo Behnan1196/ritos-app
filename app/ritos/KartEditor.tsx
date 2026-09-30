@@ -9,6 +9,8 @@
 // ————————————————————————————————————————————————————————————————
 
 import React, { useState } from 'react';
+import dynamic from 'next/dynamic';
+import { belgeBos, metindenBelge } from '@/lib/belge';
 import { useCanli } from '@/lib/canli';
 import { OLC_ONEK, olcuBlok, olcuEkle, olculer } from '@/lib/olcum';
 import type { OlcuTanimRow } from '@/lib/db';
@@ -20,6 +22,9 @@ import { Modal } from './ortak';
 import { GorevFormu, gorevTeslim, useSinavOzeti } from './Sinav';
 import type { GorevTaslak } from '@/lib/sinavGorev';
 import { V2 } from '@/lib/surum';
+
+// Açıklama stilli (Tiptap, sade araç çubuğu) — madde, numaralı liste, checklist, kalın, vurgu.
+const ZenginEditor = dynamic(() => import('./NotEditor').then((m) => m.ZenginEditor), { ssr: false, loading: () => <p className="rt-muted">…</p> });
 
 type Ek = 'aciklama' | 'video' | 'tekrar' | 'saat' | 'sure' | 'olcum' | 'zamanlayici';
 interface VideoSatir { url: string; baslik: string; bas: string; bit: string }
@@ -67,7 +72,12 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
 
   const [ad, setAd] = useState(kart?.ad ?? '');
   const [hataM, setHataM] = useState<string | null>(null);
-  const [aciklama, setAciklama] = useState(b0.filter((b): b is Extract<Blok, { tur: 'metin' }> => b.tur === 'metin').map((b) => b.metin).join('\n\n'));
+  const [aciklama, setAciklama] = useState<object | null>(() => {
+    const bb = b0.find((b): b is Extract<Blok, { tur: 'belge' }> => b.tur === 'belge');
+    if (bb) return bb.belge as object;
+    const m = b0.filter((b): b is Extract<Blok, { tur: 'metin' }> => b.tur === 'metin').map((b) => b.metin).join('\n\n');
+    return m ? metindenBelge(m) : null;   // eski düz açıklama belgeye çevrilir
+  });
   const [videolar, setVideolar] = useState<VideoSatir[]>(
     b0.filter((b): b is Extract<Blok, { tur: 'video' | 'baglanti' }> => b.tur === 'video' || b.tur === 'baglanti')
       .map((b) => ({ url: b.url, baslik: b.baslik ?? '', bas: b.tur === 'video' ? snMetin(b.bas) : '', bit: b.tur === 'video' ? snMetin(b.bit) : '' })),
@@ -89,7 +99,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
   // Hangi ek bölümleri açık: doluysa açık gelir, yoksa çipe dokununca açılır.
   const [acik, setAcik] = useState<Set<Ek>>(() => {
     const s = new Set<Ek>();
-    if (aciklama) s.add('aciklama');
+    if (aciklama && !belgeBos(aciklama)) s.add('aciklama');
     if (videolar.length) s.add('video');
     if (tekrarli0) s.add('tekrar');
     if (kart?.saatler.length) s.add('saat');
@@ -108,7 +118,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
   };
   const kapat = (e: Ek) => {
     setAcik((s) => { const n = new Set(s); n.delete(e); return n; });
-    if (e === 'aciklama') setAciklama('');
+    if (e === 'aciklama') setAciklama(null);
     if (e === 'video') setVideolar([]);
     if (e === 'tekrar') { setTekrar(false); setGunler([]); }
     if (e === 'saat') setSaat('');
@@ -119,7 +129,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
 
   function bloklarUret(): Blok[] {
     const b: Blok[] = [];
-    if (aciklama.trim()) b.push({ tur: 'metin', metin: aciklama.trim() });
+    if (aciklama && !belgeBos(aciklama)) b.push({ tur: 'belge', belge: aciklama });
     for (const v of videolar) {
       const url = v.url.trim();
       if (!url) continue;
@@ -202,7 +212,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
       )}
 
       {!sinav && bolum('aciklama', '📝 Açıklama', (
-        <textarea className="rt-inp" rows={3} value={aciklama} onChange={(e) => setAciklama(e.target.value)} placeholder="Notun, adımlar…" />
+        <ZenginEditor icerik={aciklama} kompakt placeholder="Notun, adımlar… ( - madde, [ ] yapılacak )" onDegis={(b) => setAciklama(b)} />
       ))}
 
       {!sinav && bolum('video', '🎬 Video / bağlantı', (

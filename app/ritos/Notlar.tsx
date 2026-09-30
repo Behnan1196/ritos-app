@@ -6,8 +6,9 @@ import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useCanli } from '@/lib/canli';
 import { db, type NotRow } from '@/lib/db';
-import { hizliNot, notlar, notSabitle, notSil } from '@/lib/notlar';
-import { OnayKutusu } from './ortak';
+import { hizliNot, notlar, notSabitle, notSil, notuAjandaya } from '@/lib/notlar';
+import { bugun } from '@/lib/paket';
+import { Modal, OnayKutusu } from './ortak';
 
 const NotEditor = dynamic(() => import('./NotEditor'), { ssr: false, loading: () => <p className="rt-muted">Yükleniyor…</p> });
 
@@ -79,6 +80,7 @@ function NotListesi({ onKapat, onAc }: { onKapat: () => void; onAc: (id: string,
 function NotEkrani({ id, yeni, onKapat }: { id: string; yeni?: boolean; onKapat: () => void }) {
   const n = useCanli(() => db.not.get(id), [id], undefined as NotRow | undefined);
   const [sil, setSil] = useState(false);
+  const [aktar, setAktar] = useState(false);
   // Hiç yazılmadan kapatılan yeni not tutulmaz.
   const kapat = async () => { const son = await db.not.get(id); if (son && !son.metin.trim()) await notSil(id); onKapat(); };
   return (
@@ -87,10 +89,37 @@ function NotEkrani({ id, yeni, onKapat }: { id: string; yeni?: boolean; onKapat:
         <button type="button" className="tool-back" onClick={kapat}>‹ Notlar</button>
         <span className="rt-muted">{n ? zamanMetni(n.guncellendi) : ''}</span>
         {n && <button type="button" className={`rt-ikon${n.sabit ? ' on' : ''}`} aria-label={n.sabit ? 'Sabitlemeyi kaldır' : 'Sabitle'} onClick={() => notSabitle(n)}>📌</button>}
+        {n && n.metin.trim() && <button type="button" className="rt-ikon" aria-label="Ajandaya aktar" title="Ajandaya aktar" onClick={() => setAktar(true)}>📅</button>}
         <button type="button" className="rt-ikon" aria-label="Notu sil" onClick={() => setSil(true)}>🗑</button>
       </div>
       {sil && <div className="rt-not-govde"><OnayKutusu metin="Not silinsin mi?" evet="Sil" onVazgec={() => setSil(false)} onEvet={async () => { await notSil(id); onKapat(); }} /></div>}
+      {aktar && n && <AktarModal n={n} onKapat={() => setAktar(false)} />}
       <div className="rt-not-govde">{n ? <NotEditor key={id} not={n} yeni={yeni} /> : null}</div>
     </div>
+  );
+}
+
+function AktarModal({ n, onKapat }: { n: NotRow; onKapat: () => void }) {
+  const [tarih, setTarih] = useState(bugun());
+  const [saat, setSaat] = useState('');
+  const [tamam, setTamam] = useState(false);
+  return (
+    <Modal baslik="📅 Ajandaya aktar" onKapat={onKapat}>
+      {tamam ? (
+        <>
+          <p className="rt-tamam">&quot;{n.baslik || 'Not'}&quot; Ajanda&apos;na kart olarak eklendi. Not burada da duruyor.</p>
+          <button type="button" className="rt-btn" onClick={onKapat}>Tamam</button>
+        </>
+      ) : (
+        <>
+          <p className="rt-muted">İlk satır kartın adı olur; geri kalanı (listeler, yapılacaklar) kartın açıklamasına geçer.</p>
+          <div className="rt-satir">
+            <label className="rt-alan"><span>Gün</span><input className="rt-inp" type="date" value={tarih} onChange={(e) => setTarih(e.target.value)} /></label>
+            <label className="rt-alan"><span>Saat (isteğe bağlı)</span><input className="rt-inp" type="time" value={saat} onChange={(e) => setSaat(e.target.value)} /></label>
+          </div>
+          <button type="button" className="rt-btn primary" disabled={!tarih} onClick={async () => { await notuAjandaya(n, tarih, saat); setTamam(true); }}>Aktar</button>
+        </>
+      )}
+    </Modal>
   );
 }

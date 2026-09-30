@@ -26,6 +26,7 @@ export const TIP_ETIKET: Record<TemelTip, string> = {
 // yeni blok ancak gerçekten yeni bir etkileşim gerekiyorsa eklenir.
 export type Blok =
   | { tur: 'metin'; metin: string }
+  | { tur: 'belge'; belge: unknown }   // 30 eylül — stilli açıklama (Tiptap JSON): listeler, checklist, vurgu
   | { tur: 'video'; url: string; baslik?: string; bas?: number; bit?: number }
   | { tur: 'baglanti'; url: string; baslik?: string }
   | { tur: 'sayi'; anahtar: string; etiket: string; birim?: string; hedef?: number }

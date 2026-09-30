@@ -584,7 +584,7 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-not-arac .ayrac{width:1px;background:var(--line);margin:4px 3px;}
 .rt-not-icerik{flex:1;overflow:auto;padding:10px 2px 40px;}
 .rt-not-icerik .tiptap{outline:none;font-size:15.5px;line-height:1.55;min-height:60vh;}
-.rt-not-icerik .tiptap > *:first-child{font-size:20px;font-weight:800;margin-top:0;}
+.rt-not-icerik.baslikli .tiptap > *:first-child{font-size:20px;font-weight:800;margin-top:0;}
 .rt-not-icerik .tiptap h1{font-size:21px;margin:14px 0 6px;}
 .rt-not-icerik .tiptap h2{font-size:17px;margin:12px 0 4px;}
 .rt-not-icerik .tiptap p{margin:4px 0;}
@@ -603,3 +603,20 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 /* Geniş ekranda not ekranı tam ekran değil, sağ bölmede (Home'un yerinde) açılır. */
 .split-side{position:relative;}
 .split-side .rt-not-ekran{position:absolute;inset:0;z-index:20;padding-top:0;padding-bottom:0;}
+/* Kart açıklaması: sade stilli editör ve belge görünümü (30 eylül) */
+.rt-not-edit.kompakt .rt-not-arac{position:static;}
+.rt-not-edit.kompakt .rt-not-icerik{padding:6px 2px;}
+.rt-not-edit.kompakt .rt-not-icerik .tiptap{min-height:70px;font-size:14.5px;}
+.rt-belge{font-size:14.5px;line-height:1.5;}
+.rt-belge p{margin:3px 0;}
+.rt-belge h3{font-size:16px;margin:8px 0 4px;}
+.rt-belge h4{font-size:14.5px;margin:6px 0 3px;}
+.rt-belge ul,.rt-belge ol{padding-left:22px;margin:4px 0;}
+.rt-belge ul.gorev{list-style:none;padding-left:2px;}
+.rt-belge ul.gorev li{display:flex;gap:8px;align-items:flex-start;padding:2px 0;}
+.rt-belge ul.gorev li input{width:19px;height:19px;margin-top:1px;accent-color:var(--green);flex:0 0 auto;}
+.rt-belge ul.gorev li.on > div{color:var(--muted);text-decoration:line-through;}
+.rt-belge ul.gorev li > div p{margin:0;}
+.rt-belge blockquote{border-left:3px solid var(--green);margin:6px 0;padding:2px 10px;color:#5b5446;}
+.rt-belge mark{background:#fde68a;border-radius:3px;padding:0 2px;}
+.rt-belge hr{border:none;border-top:1px solid var(--line);margin:10px 0;}
