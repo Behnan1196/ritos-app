@@ -9,6 +9,7 @@ import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
 import Highlight from '@tiptap/extension-highlight';
+import { TableKit } from '@tiptap/extension-table';
 import { Placeholder } from '@tiptap/extensions';
 import type { NotRow } from '@/lib/db';
 import { notKaydet } from '@/lib/notlar';
@@ -29,13 +30,24 @@ const DUGMELER: (Dugme | '|')[] = [
   { etiket: '☑', baslik: 'Yapılacaklar listesi', aktif: (e) => e.isActive('taskList'), calis: (e) => e.chain().focus().toggleTaskList().run() },
   { etiket: '❝', baslik: 'Alıntı', aktif: (e) => e.isActive('blockquote'), calis: (e) => e.chain().focus().toggleBlockquote().run() },
   { etiket: '―', baslik: 'Ayraç', calis: (e) => e.chain().focus().setHorizontalRule().run() },
+  { etiket: '▦', baslik: 'Tablo', aktif: (e) => e.isActive('table'), calis: (e) => { if (!e.isActive('table')) e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); } },
   '|',
   { etiket: '↶', baslik: 'Geri al', calis: (e) => e.chain().focus().undo().run() },
   { etiket: '↷', baslik: 'Yinele', calis: (e) => e.chain().focus().redo().run() },
 ];
 
 // Kartın açıklaması için sade araç çubuğu.
-const KOMPAKT = new Set(['Kalın', 'Vurgula', 'Madde listesi', 'Numaralı liste', 'Yapılacaklar listesi']);
+const KOMPAKT = new Set(['Kalın', 'Vurgula', 'Madde listesi', 'Numaralı liste', 'Yapılacaklar listesi', 'Tablo']);
+
+// İmleç tablodayken çıkan ikinci satır: satır/sütun ekle-sil, başlık satırı, tabloyu sil.
+const TABLO: Dugme[] = [
+  { etiket: '＋ Satır', baslik: 'Alta satır ekle', calis: (e) => e.chain().focus().addRowAfter().run() },
+  { etiket: '－ Satır', baslik: 'Satırı sil', calis: (e) => e.chain().focus().deleteRow().run() },
+  { etiket: '＋ Sütun', baslik: 'Sağa sütun ekle', calis: (e) => e.chain().focus().addColumnAfter().run() },
+  { etiket: '－ Sütun', baslik: 'Sütunu sil', calis: (e) => e.chain().focus().deleteColumn().run() },
+  { etiket: 'Başlık', baslik: 'Başlık satırı aç/kapat', calis: (e) => e.chain().focus().toggleHeaderRow().run() },
+  { etiket: '🗑 Tablo', baslik: 'Tabloyu sil', calis: (e) => e.chain().focus().deleteTable().run() },
+];
 
 /** Genel stilli editör — not ve kart açıklaması aynı editörü kullanır. */
 export function ZenginEditor({ icerik, onDegis, kompakt, placeholder, autofocus, ilkSatirBaslik }: {
@@ -49,6 +61,7 @@ export function ZenginEditor({ icerik, onDegis, kompakt, placeholder, autofocus,
       TaskList,
       TaskItem.configure({ nested: true }),
       Highlight,
+      TableKit.configure({ table: { resizable: false } }),
       Placeholder.configure({ placeholder: ({ pos }) => (ilkSatirBaslik && pos === 0 ? 'Başlık…' : placeholder ?? 'Yaz… ( - madde, [ ] yapılacak, # başlık )') }),
     ],
     content: (icerik as object) ?? '',
@@ -65,6 +78,11 @@ export function ZenginEditor({ icerik, onDegis, kompakt, placeholder, autofocus,
           ? <span key={i} className="ayrac" />
           : <button key={i} type="button" title={d.baslik} aria-label={d.baslik} className={editor && d.aktif?.(editor) ? 'on' : ''} onMouseDown={(e) => e.preventDefault()} onClick={() => editor && d.calis(editor)}>{d.etiket}</button>)}
       </div>
+      {editor?.isActive('table') && (
+        <div className="rt-not-arac tablo" role="toolbar" aria-label="Tablo">
+          {TABLO.map((d, i) => <button key={i} type="button" title={d.baslik} aria-label={d.baslik} onMouseDown={(e) => e.preventDefault()} onClick={() => d.calis(editor)}>{d.etiket}</button>)}
+        </div>
+      )}
       <EditorContent editor={editor} className={`rt-not-icerik${ilkSatirBaslik ? ' baslikli' : ''}`} />
     </div>
   );

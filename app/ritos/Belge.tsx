@@ -36,6 +36,10 @@ export function BelgeGoster({ belge, isaretler, onIsaret }: { belge: unknown; is
       case 'listItem': return <li key={k}>{ic()}</li>;
       case 'blockquote': return <blockquote key={k}>{ic()}</blockquote>;
       case 'horizontalRule': return <hr key={k} />;
+      case 'table': return <div key={k} className="rt-tablo"><table><tbody>{ic()}</tbody></table></div>;
+      case 'tableRow': return <tr key={k}>{ic()}</tr>;
+      case 'tableHeader': return <th key={k}>{ic()}</th>;
+      case 'tableCell': return <td key={k}>{ic()}</td>;
       case 'taskList': return <ul key={k} className="gorev">{ic()}</ul>;
       case 'taskItem': {
         const i = sayac++;

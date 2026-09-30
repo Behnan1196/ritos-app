@@ -16,6 +16,7 @@ export function belgeMetni(d: BDugum | object | null | undefined): string {
   if (!n) return '';
   if (n.type === 'text') return n.text ?? '';
   const ic = (n.content ?? []).map(belgeMetni);
+  if (n.type === 'tableRow') return ic.map((x) => x.trim()).join(' | ') + '\n';
   const blok = ['paragraph', 'heading', 'listItem', 'taskItem', 'blockquote'].includes(n.type);
   return blok ? ic.join('') + '\n' : ic.join('');
 }
