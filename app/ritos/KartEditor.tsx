@@ -27,6 +27,7 @@ import { GUN_KISA, PAKET_SURUM, TAM_IZIN, bugun, gunFarki, tarihEkle, tarihParse
 import type { AjandaKartRow } from '@/lib/db';
 import type { KocKartTaslak, KocTekrar } from '@/lib/danisanAjanda';
 import { Modal, youtubeId } from './ortak';
+import { YansitDugmesi } from './Yansit';
 import { GorevFormu, gorevTeslim, useSinavOzeti } from './Sinav';
 import type { GorevTaslak } from '@/lib/sinavGorev';
 import { V2 } from '@/lib/surum';
@@ -129,9 +130,10 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
   const [olcumAcik, setOlcumAcik] = useState(olc0.length > 0 || !!eskiDeg);
   const [yeniOlcu, setYeniOlcu] = useState<{ ad: string; birim: string } | null>(null);
   const [menu, setMenu] = useState<Icerik | null>(null);
-  // İzlerken not al: video bloğu pencerenin üstüne yapışır, altında açıklama yazılır.
+  // 📌 Sabitle: video bloğu pencerenin üstüne yapışır; izlerken açıklamaya not alınabilir.
   const [izle, setIzle] = useState(false);
-  const [notOdak, setNotOdak] = useState(false);
+  // ⚙️ Video ayarı (bağlantı, ad, başla/bitir, kaldır) — yeni eklenen videoda açık gelir.
+  const [vayar, setVayar] = useState(false);
   const [geri, setGeri] = useState<{ t: Icerik; i: number; veri: Record<string, unknown> } | null>(null);
   useEffect(() => {
     if (!geri) return;
@@ -155,19 +157,15 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
   function ekle(t: Icerik) {
     setSira([...sira, t]);
     setMenu(null);
-    if (t === 'video' && !videolar.length) { setVideolar([{ ...BOS_VIDEO }]); setVsec(0); }
+    if (t === 'video' && !videolar.length) { setVideolar([{ ...BOS_VIDEO }]); setVsec(0); setVayar(true); }
     if (t === 'kayit' && !sureKaydi && !seciliOlcu.length && !eskiDegKalsin) setSureKaydi(true);
   }
-  function izleNotAl() {
+  function sabitle() {
     if (izle) { setIzle(false); return; }
-    // Video açıklamanın üstünde olmalı ki yapışınca not alanı altında kalsın.
-    let n: Icerik[] = sira.filter((x) => x !== 'aciklama');
-    const vi = n.indexOf('video');
-    n = [...n.slice(0, vi + 1), 'aciklama', ...n.slice(vi + 1)];
-    if (!sira.includes('aciklama')) setNotOdak(true);
-    setSira(n);
-    setIzle(true);
-    setMenu(null);
+    // Açıklama videonun üstündeyse video öne alınır — yapışınca not alanı altında kalsın.
+    const ai = sira.indexOf('aciklama'), vi = sira.indexOf('video');
+    if (ai >= 0 && ai < vi) { const n: Icerik[] = sira.filter((x) => x !== 'video'); n.splice(ai, 0, 'video'); setSira(n); }
+    setIzle(true); setVayar(false); setMenu(null);
   }
   function tasi(t: Icerik, yon: -1 | 1) {
     const i = sira.indexOf(t), j = i + yon;
@@ -278,25 +276,29 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
   const vGuncelle = (p: Partial<VideoSatir>) => setVideolar(videolar.map((x, j) => (j === vsec ? { ...x, ...p } : x)));
 
   function icerikGovde(t: Icerik) {
-    if (t === 'aciklama') return <ZenginEditor icerik={aciklama} kompakt autofocus={notOdak} placeholder={izle ? 'İzlerken notların…' : 'Notun, adımlar… ( - madde, [ ] yapılacak )'} onDegis={(b) => setAciklama(b)} />;
+    if (t === 'aciklama') return <ZenginEditor icerik={aciklama} kompakt placeholder={izle ? 'İzlerken notların…' : 'Notun, adımlar… ( - madde, [ ] yapılacak )'} onDegis={(b) => setAciklama(b)} />;
     if (t === 'video') {
       const vid = v ? youtubeId(v.url) : null;
       const bs = v ? sn(v.bas) : undefined, bt = v ? sn(v.bit) : undefined;
       const q = [bs !== undefined ? `start=${bs}` : '', bt !== undefined ? `end=${bt}` : '', 'rel=0', 'playsinline=1'].filter(Boolean).join('&');
       return (
         <>
-          {(videolar.length > 1 || !izle) && (
+          {videolar.length > 1 && (
             <div className="rt-chips">
               {videolar.map((x, i) => (
                 <button key={i} type="button" className={`rt-chip${i === vsec ? ' on' : ''}`} onClick={() => setVsec(i)}>{x.baslik.trim() || `Video ${i + 1}`}</button>
               ))}
-              {!izle && <button type="button" className="rt-chip rt-ek-cip" onClick={() => { setVideolar([...videolar, { ...BOS_VIDEO }]); setVsec(videolar.length); }}>＋ Video ekle</button>}
             </div>
           )}
           {vid && <div className="rt-video-kutu"><iframe key={`${vid}-${vsec}`} src={`https://www.youtube-nocookie.com/embed/${vid}?${q}`} title={v?.baslik || 'Video'} allow="encrypted-media; picture-in-picture; fullscreen" /></div>}
-          {vid && <button type="button" className="rt-btn sm rt-izle" onClick={izleNotAl}>{izle ? '📌 Bırak' : '📝 İzlerken not al'}</button>}
-          {v && !izle && (
-            <>
+          <div className="rt-video-alt">
+            {vid && <YansitDugmesi videoId={vid} bas={bs} />}
+            {vid && <button type="button" className={`rt-btn sm${izle ? ' on' : ''}`} onClick={sabitle} title="İzlerken üstte tut">{izle ? '📌 Bırak' : '📌 Sabitle'}</button>}
+            {!izle && <button type="button" className={`rt-btn sm${vayar || !vid ? ' on' : ''}`} onClick={() => setVayar(!vayar)} aria-label="Videoyu ayarla" title="Bağlantı, başla/bitir, kaldır">⚙️</button>}
+            {!izle && <button type="button" className="rt-btn sm" onClick={() => { setVideolar([...videolar, { ...BOS_VIDEO }]); setVsec(videolar.length); setVayar(true); }}>＋ Video ekle</button>}
+          </div>
+          {v && !izle && (vayar || !vid) && (
+            <div className="rt-video-ayar">
               <input className="rt-inp" placeholder="YouTube ya da bağlantı" value={v.url} onChange={(e) => vGuncelle({ url: e.target.value })} />
               <input className="rt-inp" placeholder={videolar.length > 1 ? 'Sekme adı (örn. 2. bölüm)' : 'Başlık (isteğe bağlı)'} value={v.baslik} onChange={(e) => vGuncelle({ baslik: e.target.value })} />
               {videoMu(v.url) && (
@@ -305,10 +307,12 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
                   <span className="rt-muted">Bitir</span><input className="rt-inp rt-kisa" placeholder="son" value={v.bit} onChange={(e) => vGuncelle({ bit: e.target.value })} />
                 </div>
               )}
-            </>
+              <button type="button" className="rt-link-btn tehlike" onClick={() => {
+                if (videolar.length > 1) { setVideolar(videolar.filter((_, j) => j !== vsec)); setVsec(Math.max(0, vsec - 1)); } else sil('video');
+              }}>Bu videoyu kaldır</button>
+              <p className="rt-muted">Birden fazla video kartta sekme olarak görünür: alternatifler, bir serinin bölümleri ya da bir oynatma listesi.</p>
+            </div>
           )}
-          {!izle && videolar.length > 1 && <button type="button" className="rt-link-btn tehlike" onClick={() => { setVideolar(videolar.filter((_, j) => j !== vsec)); setVsec(Math.max(0, vsec - 1)); }}>Bu videoyu kaldır</button>}
-          {!izle && <p className="rt-muted">Birden fazla video kartta sekme olarak görünür: alternatifler, bir serinin bölümleri ya da bir oynatma listesi.</p>}
         </>
       );
     }
@@ -521,13 +525,20 @@ function TarihSaatSecici({ tarih, saat, onTarih, onSaat, onKapat, not }: {
   const bosluk = (ay.getDay() + 6) % 7; // Pazartesi başlangıç
   const gunler = Array.from({ length: gunSayisi }, (_, i) => tarihStr(new Date(ay.getFullYear(), ay.getMonth(), i + 1)));
   const sec = (t: string) => { onTarih(t); const d = tarihParse(t); setAy(new Date(d.getFullYear(), d.getMonth(), 1)); };
+  const gunSec = (t: string) => { sec(t); onKapat(); };
   return (
-    <div className="rt-ts">
+    <div className="rt-ts-bg" onClick={onKapat}>
+    <div className="rt-ts" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Tarih ve saat seç">
+      <div className="rt-ts-saat">
+        <span className="rt-muted">🕐 Saat</span>
+        <input className="rt-inp rt-orta" type="time" value={saat} onChange={(e) => onSaat(e.target.value)} aria-label="Saat" />
+        {saat ? <button type="button" className="rt-link-btn tehlike" onClick={() => { onSaat(''); if (!tarih) onKapat(); }}>Saati kaldır</button> : <span className="rt-muted">saatsiz</span>}
+      </div>
       {tarih && (
         <>
           <div className="rt-chips">
-            <button type="button" className={`rt-chip${tarih === t0 ? ' on' : ''}`} onClick={() => sec(t0)}>Bugün</button>
-            <button type="button" className={`rt-chip${tarih === tarihEkle(t0, 1) ? ' on' : ''}`} onClick={() => sec(tarihEkle(t0, 1))}>Yarın</button>
+            <button type="button" className={`rt-chip${tarih === t0 ? ' on' : ''}`} onClick={() => gunSec(t0)}>Bugün</button>
+            <button type="button" className={`rt-chip${tarih === tarihEkle(t0, 1) ? ' on' : ''}`} onClick={() => gunSec(tarihEkle(t0, 1))}>Yarın</button>
           </div>
           <div className="rt-ts-ay">
             <button type="button" className="arrow" onClick={() => setAy(new Date(ay.getFullYear(), ay.getMonth() - 1, 1))} aria-label="Önceki ay">‹</button>
@@ -538,18 +549,13 @@ function TarihSaatSecici({ tarih, saat, onTarih, onSaat, onKapat, not }: {
             {['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].map((g) => <span key={g} className="rt-ay-gad">{g}</span>)}
             {Array.from({ length: bosluk }, (_, i) => <span key={`b${i}`} />)}
             {gunler.map((g) => (
-              <button key={g} type="button" className={`rt-ts-gun${g === tarih ? ' secili' : ''}${g === t0 ? ' bugun' : ''}`} onClick={() => sec(g)}>{tarihParse(g).getDate()}</button>
+              <button key={g} type="button" className={`rt-ts-gun${g === tarih ? ' secili' : ''}${g === t0 ? ' bugun' : ''}`} onClick={() => gunSec(g)}>{tarihParse(g).getDate()}</button>
             ))}
           </div>
         </>
       )}
-      <div className="rt-ts-saat">
-        <span className="rt-muted">🕐 Saat</span>
-        <input className="rt-inp rt-orta" type="time" value={saat} onChange={(e) => onSaat(e.target.value)} aria-label="Saat" />
-        {saat ? <button type="button" className="rt-link-btn tehlike" onClick={() => onSaat('')}>Saati kaldır</button> : <span className="rt-muted">saatsiz</span>}
-      </div>
       {not && <p className="rt-muted">{not}</p>}
-      <button type="button" className="rt-btn primary rt-ts-tamam" onClick={onKapat}>Tamam</button>
+    </div>
     </div>
   );
 }
