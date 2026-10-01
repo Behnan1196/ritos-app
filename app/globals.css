@@ -693,3 +693,7 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-video-bos > *{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#8a8069;font-size:28px;text-decoration:none;}
 .rt-video-bos a{font-size:13.5px;padding:0 16px;text-align:center;}
 .rt-vform-alt{align-items:center;}
+/* Video ekle/ayarla formu oynatıcının yerinde: 16:9 gri alan, içerik sığmazsa hafifçe uzar */
+.rt-video-form{aspect-ratio:16/9;background:#e7e0d2;border-radius:10px;padding:10px;display:flex;flex-direction:column;justify-content:center;gap:6px;}
+.rt-video-form .rt-inp{background:#fff;}
+.rt-video-form .rt-btn{padding:6px 12px;}
