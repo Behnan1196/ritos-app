@@ -706,3 +706,4 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-video-form .rt-muted{color:#cfc6b3;}
 .rt-video-form .rt-link-btn.tehlike{color:#e8907f;}
 .rt-video-form .rt-btn:not(.primary){background:#3a372f;border-color:#4a463c;color:#efe9dd;}
+.rt-ig-kutu{width:100%;height:560px;border:1px solid var(--line);border-radius:10px;background:#fff;display:block;}

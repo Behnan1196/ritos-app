@@ -26,7 +26,7 @@ import { teslimAl, kartGuncelle, kartTasi } from '@/lib/ajanda';
 import { GUN_KISA, PAKET_SURUM, TAM_IZIN, bugun, gunFarki, tarihEkle, tarihParse, tarihStr, type Blok, type Hatirlatma, type KartPaketi } from '@/lib/paket';
 import type { AjandaKartRow } from '@/lib/db';
 import type { KocKartTaslak, KocTekrar } from '@/lib/danisanAjanda';
-import { Modal, youtubeId } from './ortak';
+import { Modal, VideoOynatici, instagramEmbed, youtubeId } from './ortak';
 import { YansitDugmesi } from './Yansit';
 import { GorevFormu, gorevTeslim, useSinavOzeti } from './Sinav';
 import type { GorevTaslak } from '@/lib/sinavGorev';
@@ -281,7 +281,6 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
     if (t === 'video') {
       const vid = v ? youtubeId(v.url) : null;
       const bs = v ? sn(v.bas) : undefined, bt = v ? sn(v.bit) : undefined;
-      const q = [bs !== undefined ? `start=${bs}` : '', bt !== undefined ? `end=${bt}` : '', 'rel=0', 'playsinline=1'].filter(Boolean).join('&');
       return (
         <>
           {videolar.length > 1 && (
@@ -307,8 +306,8 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
             setVform(null);
           }}
         />
-          ) : vid ? (
-            <div className="rt-video-kutu"><iframe key={`${vid}-${vsec}`} src={`https://www.youtube-nocookie.com/embed/${vid}?${q}`} title={v?.baslik || 'Video'} allow="encrypted-media; picture-in-picture; fullscreen" /></div>
+          ) : v && (vid || instagramEmbed(v.url)) ? (
+            <VideoOynatici key={`${v.url}-${vsec}`} url={v.url} bas={bs} bit={bt} baslik={v.baslik} />
           ) : (
             <div className="rt-video-kutu rt-video-bos">
               {v ? <a href={v.url} target="_blank" rel="noreferrer">🔗 {v.baslik || v.url}</a> : <span className="rt-video-ipucu"><span><b>＋ Video ekle</b> ile ilk YouTube ya da Instagram videonu ekle</span></span>}
@@ -316,7 +315,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
           )}
           <div className="rt-video-alt">
             {vid && <YansitDugmesi videoId={vid} bas={bs} pasif={!!vform} />}
-            {vid && <button type="button" className={`rt-btn sm${izle ? ' on' : ''}`} disabled={!!vform} onClick={sabitle} title="İzlerken üstte tut">{izle ? '📌 Bırak' : '📌 Sabitle'}</button>}
+            {v && (vid || instagramEmbed(v.url)) && <button type="button" className={`rt-btn sm${izle ? ' on' : ''}`} disabled={!!vform} onClick={sabitle} title="İzlerken üstte tut">{izle ? '📌 Bırak' : '📌 Sabitle'}</button>}
             {v && !izle && <button type="button" className="rt-btn sm" disabled={!!vform} onClick={() => setVform({ ...v, i: vsec })} aria-label="Videoyu ayarla" title="Bağlantı, başla/bitir, kaldır">⚙️</button>}
             {!izle && <button type="button" className="rt-btn sm" disabled={!!vform} onClick={() => setVform({ ...BOS_VIDEO, i: null })}>＋ Video ekle</button>}
           </div>

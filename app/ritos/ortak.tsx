@@ -59,11 +59,11 @@ export function BlokGoster({ bloklar, bosMetin, kayit, belgeIsaret }: {
   let kayitCizildi = false;
   for (let i = 0; i < bloklar.length; i++) {
     const b = bloklar[i];
-    if (b.tur === 'video' && youtubeId(b.url)) {
+    if (b.tur === 'video' && oynatilir(b.url)) {
       const grup: Extract<Blok, { tur: 'video' }>[] = [b];
       while (i + 1 < bloklar.length) {
         const n = bloklar[i + 1];
-        if (n.tur === 'video' && youtubeId(n.url)) { grup.push(n); i++; } else break;
+        if (n.tur === 'video' && oynatilir(n.url)) { grup.push(n); i++; } else break;
       }
       out.push(<VideoGrubu key={`v${i}`} videolar={grup} />);
       continue;
@@ -89,13 +89,11 @@ export function BlokGoster({ bloklar, bosMetin, kayit, belgeIsaret }: {
   return <div className="rt-bloklar">{out}</div>;
 }
 
-// Video grubu: tek video ya da sekmeli alternatifler + altında Yansıt (Chromecast).
+// Video grubu: tek video ya da sekmeli videolar (YouTube + Instagram karışık olabilir); YouTube'da Yansıt.
 export function VideoGrubu({ videolar }: { videolar: Extract<Blok, { tur: 'video' }>[] }) {
   const [sec, setSec] = useState(0);
   const v = videolar[Math.min(sec, videolar.length - 1)];
   const id = youtubeId(v.url);
-  if (!id) return null;
-  const q = [v.bas !== undefined ? `start=${v.bas}` : '', v.bit !== undefined ? `end=${v.bit}` : '', 'rel=0', 'playsinline=1'].filter(Boolean).join('&');
   return (
     <div className="rt-video">
       {videolar.length > 1 ? (
@@ -105,11 +103,31 @@ export function VideoGrubu({ videolar }: { videolar: Extract<Blok, { tur: 'video
           ))}
         </div>
       ) : v.baslik ? <span className="rt-video-bas">{v.baslik}</span> : null}
-      <div className="rt-video-kutu"><iframe key={`${id}-${sec}`} src={`https://www.youtube-nocookie.com/embed/${id}?${q}`} title={v.baslik || 'Video'} allow="encrypted-media; picture-in-picture; fullscreen" /></div>
-      <div className="rt-video-alt"><YansitDugmesi videoId={id} bas={v.bas} /></div>
+      <VideoOynatici key={sec} url={v.url} bas={v.bas} bit={v.bit} baslik={v.baslik} />
+      {id && <div className="rt-video-alt"><YansitDugmesi videoId={id} bas={v.bas} /></div>}
     </div>
   );
 }
+
+// Tek oynatıcı: YouTube (başla/bitir ile) ya da Instagram (izin verilmiş, herkese açık gönderi).
+export function VideoOynatici({ url, bas, bit, baslik }: { url: string; bas?: number; bit?: number; baslik?: string }) {
+  const id = youtubeId(url);
+  if (id) {
+    const q = [bas !== undefined ? `start=${bas}` : '', bit !== undefined ? `end=${bit}` : '', 'rel=0', 'playsinline=1'].filter(Boolean).join('&');
+    return <div className="rt-video-kutu"><iframe key={id} src={`https://www.youtube-nocookie.com/embed/${id}?${q}`} title={baslik || 'Video'} allow="encrypted-media; picture-in-picture; fullscreen" /></div>;
+  }
+  const ig = instagramEmbed(url);
+  if (ig) return <iframe className="rt-ig-kutu" src={ig} title={baslik || 'Instagram'} scrolling="no" allow="encrypted-media; fullscreen" />;
+  return null;
+}
+
+// Instagram gönderi/reel bağlantısından gömme adresi (yalnız herkese açık ve gömmeye izin verilenler oynar).
+export function instagramEmbed(url: string): string | null {
+  const m = url.match(/instagram\.com\/(reel|reels|p|tv)\/([\w-]+)/);
+  if (!m) return null;
+  return `https://www.instagram.com/${m[1] === 'reels' ? 'reel' : m[1]}/${m[2]}/embed`;
+}
+export const oynatilir = (url: string) => !!youtubeId(url) || !!instagramEmbed(url);
 
 // YouTube bağlantısından video kimliği (watch?v=, youtu.be/, shorts/, embed/).
 export function youtubeId(url: string): string | null {
