@@ -407,8 +407,8 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
   const zamanBolumu = !tarihsiz && (!tekrarYok || bildirimGoster);
   // Üst şeritteki tarih-saat çipi (kütüphane kartında yok; planda yalnız saat).
   const ustCip = tarihsiz ? undefined : (
-    <button type="button" className={`rt-ts-cip${secici ? ' acik' : ''}${!tarihGoster && !saat ? ' bos' : ''}`} onClick={() => setSecici(!secici)} aria-label="Tarih ve saat">
-      {tarihGoster ? `📅 ${kisaTarih(tarihSec)}${saat ? ` · ${saat}` : ''}` : `🕐 ${saat || 'Saat'}`}
+    <button type="button" className={`rt-ts-cip${secici ? ' acik' : ''}`} onClick={() => setSecici(!secici)} aria-label="Tarih ve saat">
+      {tarihGoster && `📅 ${kisaTarih(tarihSec)} · `}{!tarihGoster && '🕐 '}{saat || <span className="rt-ts-bos">--:--</span>}
     </button>
   );
 

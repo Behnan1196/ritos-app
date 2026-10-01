@@ -677,3 +677,4 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 /* İçerik şeridi artık blokların altında: çerçevesiz, akışın sonu */
 .rt-serit{border:0;padding:2px 0;margin-top:0;}
 .rt-zaman{border-top:1px solid var(--line);padding-top:10px;}
+.rt-ts-bos{color:var(--muted);font-weight:400;letter-spacing:.05em;}
