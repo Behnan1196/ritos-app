@@ -132,8 +132,9 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
   const [menu, setMenu] = useState<Icerik | null>(null);
   // 📌 Sabitle: video bloğu pencerenin üstüne yapışır; izlerken açıklamaya not alınabilir.
   const [izle, setIzle] = useState(false);
-  // ⚙️ Video ayarı (bağlantı, ad, başla/bitir, kaldır) — yeni eklenen videoda açık gelir.
-  const [vayar, setVayar] = useState(false);
+  // Video formu (küçük pencere): i null = yeni video; ⚙️ seçili videoyu düzenler. Ekran kaymasın diye
+  // bağlantı/başla/bitir alanları blokta değil, pencerede.
+  const [vform, setVform] = useState<(VideoSatir & { i: number | null }) | null>(null);
   const [geri, setGeri] = useState<{ t: Icerik; i: number; veri: Record<string, unknown> } | null>(null);
   useEffect(() => {
     if (!geri) return;
@@ -157,7 +158,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
   function ekle(t: Icerik) {
     setSira([...sira, t]);
     setMenu(null);
-    if (t === 'video' && !videolar.length) { setVideolar([{ ...BOS_VIDEO }]); setVsec(0); setVayar(true); }
+    if (t === 'video') setVsec(0);
     if (t === 'kayit' && !sureKaydi && !seciliOlcu.length && !eskiDegKalsin) setSureKaydi(true);
   }
   function sabitle() {
@@ -165,7 +166,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
     // Açıklama videonun üstündeyse video öne alınır — yapışınca not alanı altında kalsın.
     const ai = sira.indexOf('aciklama'), vi = sira.indexOf('video');
     if (ai >= 0 && ai < vi) { const n: Icerik[] = sira.filter((x) => x !== 'video'); n.splice(ai, 0, 'video'); setSira(n); }
-    setIzle(true); setVayar(false); setMenu(null);
+    setIzle(true); setMenu(null);
   }
   function tasi(t: Icerik, yon: -1 | 1) {
     const i = sira.indexOf(t), j = i + yon;
@@ -290,29 +291,19 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
               ))}
             </div>
           )}
-          {vid && <div className="rt-video-kutu"><iframe key={`${vid}-${vsec}`} src={`https://www.youtube-nocookie.com/embed/${vid}?${q}`} title={v?.baslik || 'Video'} allow="encrypted-media; picture-in-picture; fullscreen" /></div>}
+          {vid ? (
+            <div className="rt-video-kutu"><iframe key={`${vid}-${vsec}`} src={`https://www.youtube-nocookie.com/embed/${vid}?${q}`} title={v?.baslik || 'Video'} allow="encrypted-media; picture-in-picture; fullscreen" /></div>
+          ) : (
+            <div className="rt-video-kutu rt-video-bos">
+              {v ? <a href={v.url} target="_blank" rel="noreferrer">🔗 {v.baslik || v.url}</a> : <span>▶</span>}
+            </div>
+          )}
           <div className="rt-video-alt">
             {vid && <YansitDugmesi videoId={vid} bas={bs} />}
             {vid && <button type="button" className={`rt-btn sm${izle ? ' on' : ''}`} onClick={sabitle} title="İzlerken üstte tut">{izle ? '📌 Bırak' : '📌 Sabitle'}</button>}
-            {!izle && <button type="button" className={`rt-btn sm${vayar || !vid ? ' on' : ''}`} onClick={() => setVayar(!vayar)} aria-label="Videoyu ayarla" title="Bağlantı, başla/bitir, kaldır">⚙️</button>}
-            {!izle && <button type="button" className="rt-btn sm" onClick={() => { setVideolar([...videolar, { ...BOS_VIDEO }]); setVsec(videolar.length); setVayar(true); }}>＋ Video ekle</button>}
+            {v && !izle && <button type="button" className="rt-btn sm" onClick={() => setVform({ ...v, i: vsec })} aria-label="Videoyu ayarla" title="Bağlantı, başla/bitir, kaldır">⚙️</button>}
+            {!izle && <button type="button" className="rt-btn sm" onClick={() => setVform({ ...BOS_VIDEO, i: null })}>＋ Video ekle</button>}
           </div>
-          {v && !izle && (vayar || !vid) && (
-            <div className="rt-video-ayar">
-              <input className="rt-inp" placeholder="YouTube ya da bağlantı" value={v.url} onChange={(e) => vGuncelle({ url: e.target.value })} />
-              <input className="rt-inp" placeholder={videolar.length > 1 ? 'Sekme adı (örn. 2. bölüm)' : 'Başlık (isteğe bağlı)'} value={v.baslik} onChange={(e) => vGuncelle({ baslik: e.target.value })} />
-              {videoMu(v.url) && (
-                <div className="rt-satir rt-sure-satir">
-                  <span className="rt-muted">Başla</span><input className="rt-inp rt-kisa" placeholder="0:00" value={v.bas} onChange={(e) => vGuncelle({ bas: e.target.value })} />
-                  <span className="rt-muted">Bitir</span><input className="rt-inp rt-kisa" placeholder="son" value={v.bit} onChange={(e) => vGuncelle({ bit: e.target.value })} />
-                </div>
-              )}
-              <button type="button" className="rt-link-btn tehlike" onClick={() => {
-                if (videolar.length > 1) { setVideolar(videolar.filter((_, j) => j !== vsec)); setVsec(Math.max(0, vsec - 1)); } else sil('video');
-              }}>Bu videoyu kaldır</button>
-              <p className="rt-muted">Birden fazla video kartta sekme olarak görünür: alternatifler, bir serinin bölümleri ya da bir oynatma listesi.</p>
-            </div>
-          )}
         </>
       );
     }
@@ -441,6 +432,23 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
 
   return (
     <Modal baslik={baslik ?? (kart ? 'Kartı düzenle' : 'Kart ekle')} onKapat={onKapat} ust={ustCip}>
+      {vform && (
+        <VideoFormu
+          ilk={vform} cok={videolar.length > (vform.i === null ? 0 : 1)}
+          onKapat={() => setVform(null)}
+          onKaydet={(x) => {
+            if (vform.i === null) { setVideolar([...videolar, x]); setVsec(videolar.length); }
+            else setVideolar(videolar.map((y, j) => (j === vform.i ? x : y)));
+            setVform(null);
+          }}
+          onKaldir={vform.i === null ? undefined : () => {
+            const i = vform.i!;
+            if (videolar.length > 1) { setVideolar(videolar.filter((_, j) => j !== i)); setVsec(Math.max(0, Math.min(vsec, videolar.length - 2))); }
+            else sil('video');
+            setVform(null);
+          }}
+        />
+      )}
       {secici && !tarihsiz && (
         <TarihSaatSecici
           tarih={tarihGoster ? tarihSec : null} saat={saat}
@@ -556,6 +564,36 @@ function TarihSaatSecici({ tarih, saat, onTarih, onSaat, onKapat, not }: {
       )}
       {not && <p className="rt-muted">{not}</p>}
     </div>
+    </div>
+  );
+}
+
+// Video ekle / ayarla — küçük pencere (dışarı dokununca kapanır). Bağlantı, ad, başla/bitir, kaldır.
+function VideoFormu({ ilk, cok, onKaydet, onKaldir, onKapat }: {
+  ilk: VideoSatir; cok: boolean; onKaydet: (v: VideoSatir) => void; onKaldir?: () => void; onKapat: () => void;
+}) {
+  const [f, setF] = useState<VideoSatir>({ url: ilk.url, baslik: ilk.baslik, bas: ilk.bas, bit: ilk.bit });
+  const yeni = !onKaldir;
+  return (
+    <div className="rt-ts-bg" onClick={onKapat}>
+      <div className="rt-ts" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={yeni ? 'Video ekle' : 'Videoyu ayarla'}>
+        <div className="rt-zpanel-hd"><span>{yeni ? '🎬 Video ekle' : '⚙️ Videoyu ayarla'}</span></div>
+        <input className="rt-inp" placeholder="YouTube ya da bağlantı" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} autoFocus={yeni} />
+        <input className="rt-inp" placeholder={cok ? 'Sekme adı (örn. 2. bölüm)' : 'Başlık (isteğe bağlı)'} value={f.baslik} onChange={(e) => setF({ ...f, baslik: e.target.value })} />
+        {videoMu(f.url) && (
+          <div className="rt-satir rt-sure-satir">
+            <span className="rt-muted">Başla</span><input className="rt-inp rt-kisa" placeholder="0:00" value={f.bas} onChange={(e) => setF({ ...f, bas: e.target.value })} />
+            <span className="rt-muted">Bitir</span><input className="rt-inp rt-kisa" placeholder="son" value={f.bit} onChange={(e) => setF({ ...f, bit: e.target.value })} />
+          </div>
+        )}
+        <p className="rt-muted">Birden fazla video kartta sekme olarak görünür: alternatifler, bir serinin bölümleri ya da bir oynatma listesi.</p>
+        <div className="rt-satir rt-vform-alt">
+          {onKaldir && <button type="button" className="rt-link-btn tehlike" onClick={onKaldir}>Bu videoyu kaldır</button>}
+          <span style={{ flex: 1 }} />
+          <button type="button" className="rt-btn" onClick={onKapat}>Vazgeç</button>
+          <button type="button" className="rt-btn primary" disabled={!f.url.trim()} onClick={() => onKaydet({ ...f, url: f.url.trim() })}>{yeni ? 'Ekle' : 'Kaydet'}</button>
+        </div>
+      </div>
     </div>
   );
 }

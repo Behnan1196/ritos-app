@@ -688,3 +688,8 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 /* Video: altında Yansıt · Sabitle · ⚙️ · Video ekle; ⚙️ ile ayar alanı */
 .rt-btn.sm.on{background:var(--green2);border-color:var(--green);}
 .rt-video-ayar{display:flex;flex-direction:column;gap:6px;}
+/* Video bloğu boşken gri alan — eklenince yerini oynatıcı alır, ekran kaymaz */
+.rt-video-bos{background:#e7e0d2;display:flex;align-items:center;justify-content:center;}
+.rt-video-bos > *{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#8a8069;font-size:28px;text-decoration:none;}
+.rt-video-bos a{font-size:13.5px;padding:0 16px;text-align:center;}
+.rt-vform-alt{align-items:center;}
