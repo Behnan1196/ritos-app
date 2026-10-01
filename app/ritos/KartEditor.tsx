@@ -302,8 +302,8 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
           }}
           onKaldir={vform.i === null ? undefined : () => {
             const i = vform.i!;
-            if (videolar.length > 1) { setVideolar(videolar.filter((_, j) => j !== i)); setVsec(Math.max(0, Math.min(vsec, videolar.length - 2))); }
-            else sil('video');
+            // Yalnız o video kalkar; son video da kalkınca blok boş (gri alan) kalır — bloğu silmek ⋯ menüsünde.
+            setVideolar(videolar.filter((_, j) => j !== i)); setVsec(Math.max(0, Math.min(vsec, videolar.length - 2)));
             setVform(null);
           }}
         />
@@ -314,12 +314,12 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
               {v ? <a href={v.url} target="_blank" rel="noreferrer">🔗 {v.baslik || v.url}</a> : <span>▶</span>}
             </div>
           )}
-          {!vform && <div className="rt-video-alt">
-            {vid && <YansitDugmesi videoId={vid} bas={bs} />}
-            {vid && <button type="button" className={`rt-btn sm${izle ? ' on' : ''}`} onClick={sabitle} title="İzlerken üstte tut">{izle ? '📌 Bırak' : '📌 Sabitle'}</button>}
-            {v && !izle && <button type="button" className="rt-btn sm" onClick={() => setVform({ ...v, i: vsec })} aria-label="Videoyu ayarla" title="Bağlantı, başla/bitir, kaldır">⚙️</button>}
-            {!izle && <button type="button" className="rt-btn sm" onClick={() => setVform({ ...BOS_VIDEO, i: null })}>＋ Video ekle</button>}
-          </div>}
+          <div className="rt-video-alt">
+            {vid && <YansitDugmesi videoId={vid} bas={bs} pasif={!!vform} />}
+            {vid && <button type="button" className={`rt-btn sm${izle ? ' on' : ''}`} disabled={!!vform} onClick={sabitle} title="İzlerken üstte tut">{izle ? '📌 Bırak' : '📌 Sabitle'}</button>}
+            {v && !izle && <button type="button" className="rt-btn sm" disabled={!!vform} onClick={() => setVform({ ...v, i: vsec })} aria-label="Videoyu ayarla" title="Bağlantı, başla/bitir, kaldır">⚙️</button>}
+            {!izle && <button type="button" className="rt-btn sm" disabled={!!vform} onClick={() => setVform({ ...BOS_VIDEO, i: null })}>＋ Video ekle</button>}
+          </div>
         </>
       );
     }

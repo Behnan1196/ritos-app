@@ -39,7 +39,7 @@ function castYukle(): Promise<boolean> {
   return sdk;
 }
 
-export function YansitDugmesi({ videoId, bas }: { videoId: string; bas?: number }) {
+export function YansitDugmesi({ videoId, bas, pasif }: { videoId: string; bas?: number; pasif?: boolean }) {
   const [hazir, setHazir] = useState(false);
   const [mesgul, setMesgul] = useState(false);
   useEffect(() => {
@@ -64,5 +64,5 @@ export function YansitDugmesi({ videoId, bas }: { videoId: string; bas?: number 
     setMesgul(false);
   }
   if (!hazir) return null;
-  return <button type="button" className="rt-btn sm" onClick={yansit} disabled={mesgul} title="Chromecast/Google TV'ye yansıt — aynı Wi-Fi ağında bir cihaz gerekir">📺 {mesgul ? 'Bağlanıyor…' : 'Yansıt'}</button>;
+  return <button type="button" className="rt-btn sm" onClick={yansit} disabled={mesgul || pasif} title="Chromecast/Google TV'ye yansıt — aynı Wi-Fi ağında bir cihaz gerekir">📺 {mesgul ? 'Bağlanıyor…' : 'Yansıt'}</button>;
 }
