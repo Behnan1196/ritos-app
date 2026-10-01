@@ -697,3 +697,12 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-video-form{aspect-ratio:16/9;background:#e7e0d2;border-radius:10px;padding:10px;display:flex;flex-direction:column;justify-content:center;gap:6px;}
 .rt-video-form .rt-inp{background:#fff;}
 .rt-video-form .rt-btn{padding:6px 12px;}
+/* Video alanı (boş + form): siyaha yakın — oynatıcının yerini belli eder */
+.rt-video-bos,.rt-video-form{background:#1d1b17;}
+.rt-video-bos > *{color:#cfc6b3;}
+.rt-video-bos .rt-video-ipucu{font-size:13px;line-height:1.5;padding:0 22px;text-align:center;}
+.rt-video-bos .rt-video-ipucu b{color:#efe9dd;}
+.rt-video-bos a{color:#efe9dd;}
+.rt-video-form .rt-muted{color:#cfc6b3;}
+.rt-video-form .rt-link-btn.tehlike{color:#e8907f;}
+.rt-video-form .rt-btn:not(.primary){background:#3a372f;border-color:#4a463c;color:#efe9dd;}

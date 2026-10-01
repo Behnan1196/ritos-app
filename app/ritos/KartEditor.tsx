@@ -311,7 +311,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
             <div className="rt-video-kutu"><iframe key={`${vid}-${vsec}`} src={`https://www.youtube-nocookie.com/embed/${vid}?${q}`} title={v?.baslik || 'Video'} allow="encrypted-media; picture-in-picture; fullscreen" /></div>
           ) : (
             <div className="rt-video-kutu rt-video-bos">
-              {v ? <a href={v.url} target="_blank" rel="noreferrer">🔗 {v.baslik || v.url}</a> : <span>▶</span>}
+              {v ? <a href={v.url} target="_blank" rel="noreferrer">🔗 {v.baslik || v.url}</a> : <span className="rt-video-ipucu"><span>Henüz video yok. Aşağıdaki <b>＋ Video ekle</b> ile bir YouTube bağlantısı ekle; birden fazla video eklersen kartta sekme olurlar.</span></span>}
             </div>
           )}
           <div className="rt-video-alt">
