@@ -9,8 +9,9 @@
 //      · Video: birden fazla video alternatiftir (Rite'taki çoklu video) — kartta sekme olur.
 //      · Kayıt: Süre (isteğe bağlı hedefle geri sayım; ⏱ ile ölçülüp kendiliğinden yazılır) ve/veya Ölçüm.
 //        Ayrı "zamanlayıcı" yok: sayaç, süre kaydının parçası.
-//   2) Zaman — tek satır ikon: 📅 tarih (değiştirmek = taşımak), 🕐 saat, 🔁 tekrar, 🔔 bildirim.
-//      Boş olan soluk durur; dokununca ayarı hemen altında açılır.
+//      Şerit eklenen içeriğin ALTINDA durur — yeni içerik akışın sonuna eklenir.
+//   2) Tarih-saat üst şeritte tek çip (1 ekim): dokununca tek seçici — ay takvimi + saat + "Saati
+//      kaldır". Tarihi değiştirmek = taşımak. Altta yalnız 🔁 tekrar ve 🔔 bildirim kalır.
 // Aynı editör ekleme, düzenleme, plan (onPlan) ve kütüphane (tarihsiz) için kullanılır.
 // Veri modeli değişmedi: içerik sırası `bloklar` dizisinin sırasıdır.
 // ————————————————————————————————————————————————————————————————
@@ -22,7 +23,7 @@ import { useCanli } from '@/lib/canli';
 import { OLC_ONEK, olcuBlok, olcuEkle, olculer } from '@/lib/olcum';
 import type { OlcuTanimRow } from '@/lib/db';
 import { teslimAl, kartGuncelle, kartTasi } from '@/lib/ajanda';
-import { GUN_KISA, PAKET_SURUM, TAM_IZIN, gunFarki, tarihEkle, tarihParse, type Blok, type Hatirlatma, type KartPaketi } from '@/lib/paket';
+import { GUN_KISA, PAKET_SURUM, TAM_IZIN, bugun, gunFarki, tarihEkle, tarihParse, tarihStr, type Blok, type Hatirlatma, type KartPaketi } from '@/lib/paket';
 import type { AjandaKartRow } from '@/lib/db';
 import type { KocKartTaslak, KocTekrar } from '@/lib/danisanAjanda';
 import { Modal } from './ortak';
@@ -34,7 +35,7 @@ import { V2 } from '@/lib/surum';
 const ZenginEditor = dynamic(() => import('./NotEditor').then((m) => m.ZenginEditor), { ssr: false, loading: () => <p className="rt-muted">…</p> });
 
 type Icerik = 'aciklama' | 'video' | 'kayit';
-type Panel = 'tarih' | 'saat' | 'tekrar' | 'bildirim';
+type Panel = 'tekrar' | 'bildirim';
 interface VideoSatir { url: string; baslik: string; bas: string; bit: string }
 const ICERIK: [Icerik, string][] = [['aciklama', '📝 Açıklama'], ['video', '🎬 Video'], ['kayit', '📊 Kayıt']];
 const BOS_VIDEO: VideoSatir = { url: '', baslik: '', bas: '', bit: '' };
@@ -144,6 +145,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
   const [saat, setSaat] = useState(kart?.saatler[0] ?? '');
   const [hatirlatma, setHatirlatma] = useState<Hatirlatma | null>(kart?.hatirlatma ?? null);
   const [panel, setPanel] = useState<Panel | null>(null);
+  const [secici, setSecici] = useState(false);
   const tarihGoster = !onPlan && (!kart || kart.izinler.gun_degistir);
   const bildirimGoster = !onPlan && !sinav;
 
@@ -347,19 +349,6 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
   );
 
   function panelGovde(k: Panel) {
-    if (k === 'tarih') return (
-      <>
-        <input className="rt-inp rt-orta" type="date" value={tarihSec} onChange={(e) => e.target.value && setTarihSec(e.target.value)} />
-        <p className="rt-muted">{kart ? (tekrarli0 ? 'Seri bu günden itibaren seçtiğin güne kayar; önceki günler yerinde kalır.' : 'Kart seçtiğin güne taşınır.') : tekrar ? 'Tekrar bu günden başlar.' : 'Kart bu güne eklenir.'}</p>
-      </>
-    );
-    if (k === 'saat') return (
-      <>
-        <input className="rt-inp rt-orta" type="time" value={saat} onChange={(e) => setSaat(e.target.value)} />
-        <p className="rt-muted">{saat ? 'Kart ajandada bu saatte durur.' : 'Saat seçmezsen kart gün içinde serbest kalır.'}</p>
-        {saat && <button type="button" className="rt-link-btn tehlike" onClick={() => setSaat('')}>Saati kaldır</button>}
-      </>
-    );
     if (k === 'tekrar') return (
       <>
         <div className="rt-chips">
@@ -414,10 +403,24 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
     );
   }
 
-  const PANEL_AD: Record<Panel, string> = { tarih: kart && tekrarli0 ? 'Bu günü taşı' : tekrar ? 'Başlangıç' : 'Tarih', saat: 'Saat', tekrar: 'Tekrar', bildirim: 'Bildirim' };
+  const PANEL_AD: Record<Panel, string> = { tekrar: 'Tekrar', bildirim: 'Bildirim' };
+  const zamanBolumu = !tarihsiz && (!tekrarYok || bildirimGoster);
+  // Üst şeritteki tarih-saat çipi (kütüphane kartında yok; planda yalnız saat).
+  const ustCip = tarihsiz ? undefined : (
+    <button type="button" className={`rt-ts-cip${secici ? ' acik' : ''}${!tarihGoster && !saat ? ' bos' : ''}`} onClick={() => setSecici(!secici)} aria-label="Tarih ve saat">
+      {tarihGoster ? `📅 ${kisaTarih(tarihSec)}${saat ? ` · ${saat}` : ''}` : `🕐 ${saat || 'Saat'}`}
+    </button>
+  );
 
   return (
-    <Modal baslik={baslik ?? (kart ? 'Kartı düzenle' : 'Kart ekle')} onKapat={onKapat}>
+    <Modal baslik={baslik ?? (kart ? 'Kartı düzenle' : 'Kart ekle')} onKapat={onKapat} ust={ustCip}>
+      {secici && !tarihsiz && (
+        <TarihSaatSecici
+          tarih={tarihGoster ? tarihSec : null} saat={saat}
+          onTarih={setTarihSec} onSaat={setSaat} onKapat={() => setSecici(false)}
+          not={!tarihGoster ? null : kart ? (tekrarli0 ? 'Seri bu günden itibaren seçtiğin güne kayar; önceki günler yerinde kalır.' : 'Kart seçtiğin güne taşınır.') : tekrar ? 'Tekrar bu günden başlar.' : null}
+        />
+      )}
       {sinavKurulu && (
         <div className="rt-chips">
           <button type="button" className={`rt-chip${!sinav ? ' on' : ''}`} onClick={() => setSinav(false)}>Kart</button>
@@ -430,13 +433,6 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
 
       {!sinav && (
         <>
-          {sira.length < ICERIK.length && (
-            <div className="rt-serit" aria-label="İçerik ekle">
-              {ICERIK.filter(([t]) => !sira.includes(t)).map(([t, e]) => (
-                <button key={t} type="button" className="rt-chip rt-ek-cip" onClick={() => ekle(t)}>＋ {e}</button>
-              ))}
-            </div>
-          )}
           {sira.map((t, i) => (
             <div key={t} className="rt-ek rt-blok">
               <div className="rt-ek-hd">
@@ -453,15 +449,19 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
               {icerikGovde(t)}
             </div>
           ))}
+          {sira.length < ICERIK.length && (
+            <div className="rt-serit" aria-label="İçerik ekle">
+              {ICERIK.filter(([t]) => !sira.includes(t)).map(([t, e]) => (
+                <button key={t} type="button" className="rt-chip rt-ek-cip" onClick={() => ekle(t)}>＋ {e}</button>
+              ))}
+            </div>
+          )}
         </>
       )}
 
-      {!tarihsiz && (
+      {zamanBolumu && (
         <div className="rt-zaman">
-          <div className="rt-bolum-ad">Zaman</div>
           <div className="rt-zrow">
-            {tarihGoster && zc('tarih', '📅', kart && tekrarli0 ? kisaTarih(tarihSec) : tekrar ? `Baş. ${kisaTarih(tarihSec)}` : kisaTarih(tarihSec), 'Tarih')}
-            {zc('saat', '🕐', saat || null, 'Saat')}
             {!tekrarYok && zc('tekrar', '🔁', tekrarMetni, 'Tekrar')}
             {bildirimGoster && zc('bildirim', '🔔', bildirim, 'Bildirim')}
           </div>
@@ -483,5 +483,50 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
       {hataM && <p className="rt-hata">⚠ {hataM}</p>}
       <button type="button" className="rt-btn primary" disabled={sinav ? !gorev : !ad.trim() || kayitEksik} onClick={kaydet}>{kart ? 'Kaydet' : 'Ekle'}</button>
     </Modal>
+  );
+}
+
+// Tek tarih-saat seçici (1 ekim): ay takvimi (Bugün / Yarın kısayollarıyla) + saat + "Saati kaldır".
+// tarih null ise (plan kartı) yalnız saat. Telefonun birleşik tarih-saat alanı saati boş
+// bırakmaya izin vermediği için kendi seçicimiz.
+function TarihSaatSecici({ tarih, saat, onTarih, onSaat, onKapat, not }: {
+  tarih: string | null; saat: string; onTarih: (t: string) => void; onSaat: (s: string) => void; onKapat: () => void; not: string | null;
+}) {
+  const [ay, setAy] = useState(() => { const d = tarihParse(tarih ?? bugun()); return new Date(d.getFullYear(), d.getMonth(), 1); });
+  const t0 = bugun();
+  const gunSayisi = new Date(ay.getFullYear(), ay.getMonth() + 1, 0).getDate();
+  const bosluk = (ay.getDay() + 6) % 7; // Pazartesi başlangıç
+  const gunler = Array.from({ length: gunSayisi }, (_, i) => tarihStr(new Date(ay.getFullYear(), ay.getMonth(), i + 1)));
+  const sec = (t: string) => { onTarih(t); const d = tarihParse(t); setAy(new Date(d.getFullYear(), d.getMonth(), 1)); };
+  return (
+    <div className="rt-ts">
+      {tarih && (
+        <>
+          <div className="rt-chips">
+            <button type="button" className={`rt-chip${tarih === t0 ? ' on' : ''}`} onClick={() => sec(t0)}>Bugün</button>
+            <button type="button" className={`rt-chip${tarih === tarihEkle(t0, 1) ? ' on' : ''}`} onClick={() => sec(tarihEkle(t0, 1))}>Yarın</button>
+          </div>
+          <div className="rt-ts-ay">
+            <button type="button" className="arrow" onClick={() => setAy(new Date(ay.getFullYear(), ay.getMonth() - 1, 1))} aria-label="Önceki ay">‹</button>
+            <b>{ay.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}</b>
+            <button type="button" className="arrow" onClick={() => setAy(new Date(ay.getFullYear(), ay.getMonth() + 1, 1))} aria-label="Sonraki ay">›</button>
+          </div>
+          <div className="rt-ts-grid">
+            {['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].map((g) => <span key={g} className="rt-ay-gad">{g}</span>)}
+            {Array.from({ length: bosluk }, (_, i) => <span key={`b${i}`} />)}
+            {gunler.map((g) => (
+              <button key={g} type="button" className={`rt-ts-gun${g === tarih ? ' secili' : ''}${g === t0 ? ' bugun' : ''}`} onClick={() => sec(g)}>{tarihParse(g).getDate()}</button>
+            ))}
+          </div>
+        </>
+      )}
+      <div className="rt-ts-saat">
+        <span className="rt-muted">🕐 Saat</span>
+        <input className="rt-inp rt-orta" type="time" value={saat} onChange={(e) => onSaat(e.target.value)} aria-label="Saat" />
+        {saat ? <button type="button" className="rt-link-btn tehlike" onClick={() => onSaat('')}>Saati kaldır</button> : <span className="rt-muted">saatsiz</span>}
+      </div>
+      {not && <p className="rt-muted">{not}</p>}
+      <button type="button" className="rt-btn primary rt-ts-tamam" onClick={onKapat}>Tamam</button>
+    </div>
   );
 }

@@ -6,12 +6,14 @@ import { BelgeGoster } from './Belge';
 import { YansitDugmesi } from './Yansit';
 
 // Modal — formlar ekranda sabit durmaz, modal ile açılır.
-export function Modal({ baslik, onKapat, children }: { baslik: string; onKapat: () => void; children: ReactNode }) {
+// ust: başlığın sağında, ✕'ten önce duran ek öğe (örn. kart editöründe tarih-saat çipi).
+export function Modal({ baslik, onKapat, children, ust }: { baslik: string; onKapat: () => void; children: ReactNode; ust?: ReactNode }) {
   return (
     <div className="rt-modal-bg" onClick={onKapat}>
       <div className="rt-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={baslik}>
         <div className="rt-modal-hd">
           <b>{baslik}</b>
+          {ust}
           <button type="button" className="rt-x" onClick={onKapat} aria-label="Kapat">×</button>
         </div>
         <div className="rt-modal-body">{children}</div>
