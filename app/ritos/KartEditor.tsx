@@ -26,7 +26,7 @@ import { teslimAl, kartGuncelle, kartTasi } from '@/lib/ajanda';
 import { GUN_KISA, PAKET_SURUM, TAM_IZIN, bugun, gunFarki, tarihEkle, tarihParse, tarihStr, type Blok, type Hatirlatma, type KartPaketi } from '@/lib/paket';
 import type { AjandaKartRow } from '@/lib/db';
 import type { KocKartTaslak, KocTekrar } from '@/lib/danisanAjanda';
-import { Modal } from './ortak';
+import { Modal, youtubeId } from './ortak';
 import { GorevFormu, gorevTeslim, useSinavOzeti } from './Sinav';
 import type { GorevTaslak } from '@/lib/sinavGorev';
 import { V2 } from '@/lib/surum';
@@ -129,6 +129,9 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
   const [olcumAcik, setOlcumAcik] = useState(olc0.length > 0 || !!eskiDeg);
   const [yeniOlcu, setYeniOlcu] = useState<{ ad: string; birim: string } | null>(null);
   const [menu, setMenu] = useState<Icerik | null>(null);
+  // İzlerken not al: video bloğu pencerenin üstüne yapışır, altında açıklama yazılır.
+  const [izle, setIzle] = useState(false);
+  const [notOdak, setNotOdak] = useState(false);
   const [geri, setGeri] = useState<{ t: Icerik; i: number; veri: Record<string, unknown> } | null>(null);
   useEffect(() => {
     if (!geri) return;
@@ -154,6 +157,17 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
     setMenu(null);
     if (t === 'video' && !videolar.length) { setVideolar([{ ...BOS_VIDEO }]); setVsec(0); }
     if (t === 'kayit' && !sureKaydi && !seciliOlcu.length && !eskiDegKalsin) setSureKaydi(true);
+  }
+  function izleNotAl() {
+    if (izle) { setIzle(false); return; }
+    // Video açıklamanın üstünde olmalı ki yapışınca not alanı altında kalsın.
+    let n: Icerik[] = sira.filter((x) => x !== 'aciklama');
+    const vi = n.indexOf('video');
+    n = [...n.slice(0, vi + 1), 'aciklama', ...n.slice(vi + 1)];
+    if (!sira.includes('aciklama')) setNotOdak(true);
+    setSira(n);
+    setIzle(true);
+    setMenu(null);
   }
   function tasi(t: Icerik, yon: -1 | 1) {
     const i = sira.indexOf(t), j = i + yon;
@@ -264,31 +278,40 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
   const vGuncelle = (p: Partial<VideoSatir>) => setVideolar(videolar.map((x, j) => (j === vsec ? { ...x, ...p } : x)));
 
   function icerikGovde(t: Icerik) {
-    if (t === 'aciklama') return <ZenginEditor icerik={aciklama} kompakt placeholder="Notun, adımlar… ( - madde, [ ] yapılacak )" onDegis={(b) => setAciklama(b)} />;
-    if (t === 'video') return (
-      <>
-        <div className="rt-chips">
-          {videolar.map((x, i) => (
-            <button key={i} type="button" className={`rt-chip${i === vsec ? ' on' : ''}`} onClick={() => setVsec(i)}>{x.baslik.trim() || `Video ${i + 1}`}</button>
-          ))}
-          <button type="button" className="rt-chip rt-ek-cip" onClick={() => { setVideolar([...videolar, { ...BOS_VIDEO }]); setVsec(videolar.length); }}>＋ Alternatif</button>
-        </div>
-        {v && (
-          <>
-            <input className="rt-inp" placeholder="YouTube ya da bağlantı" value={v.url} onChange={(e) => vGuncelle({ url: e.target.value })} />
-            <input className="rt-inp" placeholder={videolar.length > 1 ? 'Sekme adı (örn. Kolay seviye)' : 'Başlık (isteğe bağlı)'} value={v.baslik} onChange={(e) => vGuncelle({ baslik: e.target.value })} />
-            {videoMu(v.url) && (
-              <div className="rt-satir rt-sure-satir">
-                <span className="rt-muted">Başla</span><input className="rt-inp rt-kisa" placeholder="0:00" value={v.bas} onChange={(e) => vGuncelle({ bas: e.target.value })} />
-                <span className="rt-muted">Bitir</span><input className="rt-inp rt-kisa" placeholder="son" value={v.bit} onChange={(e) => vGuncelle({ bit: e.target.value })} />
-              </div>
-            )}
-          </>
-        )}
-        {videolar.length > 1 && <button type="button" className="rt-link-btn tehlike" onClick={() => { setVideolar(videolar.filter((_, j) => j !== vsec)); setVsec(Math.max(0, vsec - 1)); }}>Bu videoyu kaldır</button>}
-        <p className="rt-muted">Birden fazla video alternatif olur (seviye, versiyon); kartta sekme olarak görünür.</p>
-      </>
-    );
+    if (t === 'aciklama') return <ZenginEditor icerik={aciklama} kompakt autofocus={notOdak} placeholder={izle ? 'İzlerken notların…' : 'Notun, adımlar… ( - madde, [ ] yapılacak )'} onDegis={(b) => setAciklama(b)} />;
+    if (t === 'video') {
+      const vid = v ? youtubeId(v.url) : null;
+      const bs = v ? sn(v.bas) : undefined, bt = v ? sn(v.bit) : undefined;
+      const q = [bs !== undefined ? `start=${bs}` : '', bt !== undefined ? `end=${bt}` : '', 'rel=0', 'playsinline=1'].filter(Boolean).join('&');
+      return (
+        <>
+          {(videolar.length > 1 || !izle) && (
+            <div className="rt-chips">
+              {videolar.map((x, i) => (
+                <button key={i} type="button" className={`rt-chip${i === vsec ? ' on' : ''}`} onClick={() => setVsec(i)}>{x.baslik.trim() || `Video ${i + 1}`}</button>
+              ))}
+              {!izle && <button type="button" className="rt-chip rt-ek-cip" onClick={() => { setVideolar([...videolar, { ...BOS_VIDEO }]); setVsec(videolar.length); }}>＋ Video ekle</button>}
+            </div>
+          )}
+          {vid && <div className="rt-video-kutu"><iframe key={`${vid}-${vsec}`} src={`https://www.youtube-nocookie.com/embed/${vid}?${q}`} title={v?.baslik || 'Video'} allow="encrypted-media; picture-in-picture; fullscreen" /></div>}
+          {vid && <button type="button" className="rt-btn sm rt-izle" onClick={izleNotAl}>{izle ? '📌 Bırak' : '📝 İzlerken not al'}</button>}
+          {v && !izle && (
+            <>
+              <input className="rt-inp" placeholder="YouTube ya da bağlantı" value={v.url} onChange={(e) => vGuncelle({ url: e.target.value })} />
+              <input className="rt-inp" placeholder={videolar.length > 1 ? 'Sekme adı (örn. 2. bölüm)' : 'Başlık (isteğe bağlı)'} value={v.baslik} onChange={(e) => vGuncelle({ baslik: e.target.value })} />
+              {videoMu(v.url) && (
+                <div className="rt-satir rt-sure-satir">
+                  <span className="rt-muted">Başla</span><input className="rt-inp rt-kisa" placeholder="0:00" value={v.bas} onChange={(e) => vGuncelle({ bas: e.target.value })} />
+                  <span className="rt-muted">Bitir</span><input className="rt-inp rt-kisa" placeholder="son" value={v.bit} onChange={(e) => vGuncelle({ bit: e.target.value })} />
+                </div>
+              )}
+            </>
+          )}
+          {!izle && videolar.length > 1 && <button type="button" className="rt-link-btn tehlike" onClick={() => { setVideolar(videolar.filter((_, j) => j !== vsec)); setVsec(Math.max(0, vsec - 1)); }}>Bu videoyu kaldır</button>}
+          {!izle && <p className="rt-muted">Birden fazla video kartta sekme olarak görünür: alternatifler, bir serinin bölümleri ya da bir oynatma listesi.</p>}
+        </>
+      );
+    }
     return (
       <>
         <div className="rt-chips">
@@ -434,7 +457,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
       {!sinav && (
         <>
           {sira.map((t, i) => (
-            <div key={t} className="rt-ek rt-blok">
+            <div key={t} className={`rt-ek rt-blok${t === 'video' && izle ? ' rt-yapis' : ''}`}>
               <div className="rt-ek-hd">
                 <span>{ICERIK.find(([x]) => x === t)![1]}</span>
                 <button type="button" className="rt-blok-menu" onClick={() => setMenu(menu === t ? null : t)} aria-label="Blok menüsü">⋯</button>
