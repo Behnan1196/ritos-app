@@ -117,7 +117,9 @@ export function VideoOynatici({ url, bas, bit, baslik }: { url: string; bas?: nu
     return <div className="rt-video-kutu"><iframe key={id} src={`https://www.youtube-nocookie.com/embed/${id}?${q}`} title={baslik || 'Video'} allow="encrypted-media; picture-in-picture; fullscreen" /></div>;
   }
   const ig = instagramEmbed(url);
-  if (ig) return <iframe className="rt-ig-kutu" src={ig} title={baslik || 'Instagram'} scrolling="no" allow="encrypted-media; fullscreen" />;
+  // Instagram'ın gömme sayfası sabit genişlikte (~326px) dikey bir sayfa; içi yeniden boyutlanmıyor.
+  // Sayfayı bozmasın diye olduğu gibi küçültülerek (ölçekle) ortada gösterilir.
+  if (ig) return <div className="rt-ig-sar"><iframe className="rt-ig-kutu" src={ig} title={baslik || 'Instagram'} scrolling="no" allow="encrypted-media; fullscreen" /></div>;
   return null;
 }
 
