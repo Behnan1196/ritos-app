@@ -311,7 +311,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
             <div className="rt-video-kutu"><iframe key={`${vid}-${vsec}`} src={`https://www.youtube-nocookie.com/embed/${vid}?${q}`} title={v?.baslik || 'Video'} allow="encrypted-media; picture-in-picture; fullscreen" /></div>
           ) : (
             <div className="rt-video-kutu rt-video-bos">
-              {v ? <a href={v.url} target="_blank" rel="noreferrer">🔗 {v.baslik || v.url}</a> : <span className="rt-video-ipucu"><span>Henüz video yok. Aşağıdaki <b>＋ Video ekle</b> ile bir YouTube bağlantısı ekle; birden fazla video eklersen kartta sekme olurlar.</span></span>}
+              {v ? <a href={v.url} target="_blank" rel="noreferrer">🔗 {v.baslik || v.url}</a> : <span className="rt-video-ipucu"><span><b>＋ Video ekle</b> ile ilk YouTube ya da Instagram videonu ekle</span></span>}
             </div>
           )}
           <div className="rt-video-alt">
@@ -577,7 +577,7 @@ function VideoFormu({ ilk, cok, onKaydet, onKaldir, onKapat }: {
     <div className="rt-video-form" role="group" aria-label={yeni ? 'Video ekle' : 'Videoyu ayarla'}>
         <input className="rt-inp" placeholder="YouTube ya da bağlantı" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} autoFocus={yeni} />
         <input className="rt-inp" placeholder={cok ? 'Sekme adı (örn. 2. bölüm)' : 'Başlık (isteğe bağlı)'} value={f.baslik} onChange={(e) => setF({ ...f, baslik: e.target.value })} />
-        {videoMu(f.url) && (
+        {youtubeId(f.url) && (
           <div className="rt-satir rt-sure-satir">
             <span className="rt-muted">Başla</span><input className="rt-inp rt-kisa" placeholder="0:00" value={f.bas} onChange={(e) => setF({ ...f, bas: e.target.value })} />
             <span className="rt-muted">Bitir</span><input className="rt-inp rt-kisa" placeholder="son" value={f.bit} onChange={(e) => setF({ ...f, bit: e.target.value })} />
