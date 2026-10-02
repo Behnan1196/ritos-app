@@ -13,6 +13,7 @@ import AjandaPane from './ritos/AjandaPane';
 import { useBeklemeIzleyici, useSayacIzleyici } from '@/lib/sayac';
 import { BaglantiWidgetlari } from './ritos/Baglanti';
 import { useBildirimPlani } from '@/lib/bildirim';
+import { useDisKartlar } from '@/lib/disKart';
 import { OdakAlanlari } from './ritos/KisiselGelisim';
 import Kutuphane from './ritos/Kutuphane';
 import { V2 } from '@/lib/surum';
@@ -52,6 +53,7 @@ export default function RitosLab() {
 
 function RitosUygulama() {
   useHesapBaslat();
+  useDisKartlar(); // dış uygulamaların kartları (cat_dis_kart)
   useBildirimPlani(); // 🔔 ayarlı kartların bildirimlerini kuyruğa yazar
   useGelenSenkron();
   const [isNarrow, setIsNarrow] = useState(false);

@@ -295,7 +295,7 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
   useTik(bekliyor, 15000);
   const adetB = kart.tip === 'yap' ? kart.bloklar.find((b): b is Extract<Blok, { tur: 'sayi' }> => b.tur === 'sayi' && b.bicim === 'adet') : undefined;
   const adetV = adetB ? Number((kayit?.degerler ?? {})[adetB.anahtar]) || 0 : 0;
-  const meta = [yapildi && kayit?.zaman ? `✓ ${saatMetni(kayit.zaman)}` : '', kart.saatler.join(' · ') + (kart.hatirlatma ? ' 🔔' : ''), bagli && kart.kaynak_etiket ? `${uzak ? '🤝' : '🌱'} ${kart.kaynak_etiket}` : ''].filter(Boolean).join(' · ');
+  const meta = [yapildi && kayit?.zaman ? `✓ ${saatMetni(kayit.zaman)}` : '', kart.saatler.join(' · ') + (kart.hatirlatma ? ' 🔔' : ''), bagli && kart.kaynak_etiket ? `${kart.kaynak_modul === 'dis' ? '🔗' : uzak ? '🤝' : '🌱'} ${kart.kaynak_etiket}` : ''].filter(Boolean).join(' · ');
   const yeniGuncel = !!kart.isaret && Date.now() - kart.isaret < 3 * 86400000;
   // A9 — değer düzeltme süresi (koçun izni): süre geçtiyse yapılmış kart değiştirilemez.
   const kilitli = !!kayit?.yapildi && kart.izinler.duzeltme_gun !== null && gunFarki(tarih, bugun()) > kart.izinler.duzeltme_gun;
@@ -502,7 +502,9 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
       />
       {bagli && (kart.geri_bildirim === 'uzak'
         ? <p className="rt-muted">🤝 Koçunun kartı · <b>{kart.kaynak_etiket}</b>. İşaretin ve girdiğin değerler yalnız koçuna gider.</p>
-        : <p className="rt-muted">Bu kart <b>{kart.kaynak_etiket}</b> programından geliyor; içeriği ve günü programdan yönetilir.</p>)}
+        : kart.kaynak_modul === 'dis'
+          ? <p className="rt-muted">🔗 <b>{kart.kaynak_etiket}</b> uygulamasından geliyor; içeriğini ve gününü o uygulama yönetir. İşaretin ve girdiğin değerler ona geri yazılır.</p>
+          : <p className="rt-muted">Bu kart <b>{kart.kaynak_etiket}</b> programından geliyor; içeriği ve günü programdan yönetilir.</p>)}
 
       {degerAc && (
         <DegerGir bloklar={kart.bloklar} ilk={kayitCanli?.degerler ?? null}
