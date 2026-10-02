@@ -29,7 +29,8 @@ export type Blok =
   | { tur: 'belge'; belge: unknown }   // 30 eylül — stilli açıklama (Tiptap JSON): listeler, checklist, vurgu
   | { tur: 'video'; url: string; baslik?: string; bas?: number; bit?: number }
   | { tur: 'baglanti'; url: string; baslik?: string }
-  | { tur: 'sayi'; anahtar: string; etiket: string; birim?: string; hedef?: number }
+  // bicim (2 ekim): sayi = serbest değer, olcek = 1–5 seçim (ruh hali), adet = gün boyunca +1 (su); adette hedef dolunca yapıldı
+  | { tur: 'sayi'; anahtar: string; etiket: string; birim?: string; hedef?: number; bicim?: 'sayi' | 'olcek' | 'adet' }
   | { tur: 'secenek'; anahtar: string; etiket: string; secenekler: string[] }
   | { tur: 'metin_girdi'; anahtar: string; etiket: string }
   | { tur: 'zamanlayici'; dakika: number };
@@ -47,6 +48,7 @@ export interface Zamanlama {
   gunler: number[] | null;  // JS getDay (0=Paz..6=Cmt); null = her gün
   saatler: string[];        // "HH:MM" — sırayı değiştirmez, yalnız bilgi + hatırlatma
   hatirlatma?: Hatirlatma | null;
+  bekle?: number | null;    // 2 ekim — yapıldıktan sonra bekleme süresi (dk); satırda geri sayım + uyarı
 }
 
 // Bildirim (30 eylül) — kartın gününden `gun` gün önce. Aynı gün (gun 0) + saatli kartta

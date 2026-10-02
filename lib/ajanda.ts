@@ -20,6 +20,7 @@ function paketToRow(p: KartPaketi, sira: number): AjandaKartRow {
     gunler: p.zamanlama.gunler,
     saatler: p.zamanlama.saatler,
     hatirlatma: p.zamanlama.hatirlatma ?? null,
+    bekle: p.zamanlama.bekle ?? null,
     kaynak_modul: p.kaynak.modul,
     kaynak_ref: p.kaynak.ref,
     kaynak_etiket: p.kaynak.etiket,
@@ -33,7 +34,7 @@ function paketToRow(p: KartPaketi, sira: number): AjandaKartRow {
 }
 
 export function rowZamanlama(k: AjandaKartRow) {
-  return { baslangic: k.baslangic, bitis: k.bitis, gunler: k.gunler, saatler: k.saatler, hatirlatma: k.hatirlatma ?? null };
+  return { baslangic: k.baslangic, bitis: k.bitis, gunler: k.gunler, saatler: k.saatler, hatirlatma: k.hatirlatma ?? null, bekle: k.bekle ?? null };
 }
 
 // Kart o gün listede görünür mü: zamanlama + "yalnız bu gün" kaldırılan günler.
@@ -88,15 +89,42 @@ async function yayinla(kart: AjandaKartRow, tarih: string, olay: GeriBildirimOla
 async function kayitYaz(kartId: string, tarih: string, patch: Partial<AjandaKayitRow>) {
   const id = `${kartId}|${tarih}`;
   const mevcut = await db.ajanda_kayit.get(id);
+  // Yapılma anı: yapıldıya geçerken otomatik yazılır, geri alınınca silinir, zaten yapıldıysa korunur.
+  const zaman = patch.yapildi === true ? (mevcut?.yapildi && mevcut.zaman ? mevcut.zaman : Date.now())
+    : patch.yapildi === false ? null : mevcut?.zaman ?? null;
   await db.ajanda_kayit.put({
     id,
     kart_id: kartId,
     tarih,
     yapildi: mevcut?.yapildi ?? false,
     degerler: mevcut?.degerler ?? null,
+    zaman,
     ...patch,
     guncellendi: Date.now(),
   });
+}
+
+// Yapılma anını düzelt (2 ekim — "15 dk sonra aklıma geldi").
+export async function yapildiZamani(kartId: string, tarih: string, zaman: number) {
+  const mevcut = await db.ajanda_kayit.get(`${kartId}|${tarih}`);
+  if (!mevcut?.yapildi) return;
+  await kayitYaz(kartId, tarih, { zaman });
+}
+
+// Adet (2 ekim): gün boyunca +1/−1 (örn. su). Hedefe ulaşınca kart yapıldı olur, altına inince geri alınır.
+export async function degerArttir(kartId: string, tarih: string, anahtar: string, fark: number, hedef?: number) {
+  const kart = await db.ajanda_kart.get(kartId);
+  if (!kart) return;
+  const mevcut = await db.ajanda_kayit.get(`${kartId}|${tarih}`);
+  const once = Number((mevcut?.degerler ?? {})[anahtar]) || 0;
+  const v = Math.max(0, once + fark);
+  const degerler = { ...(mevcut?.degerler ?? {}), [anahtar]: v };
+  const yapildi = hedef ? v >= hedef : mevcut?.yapildi ?? false;
+  await db.transaction('rw', db.ajanda_kayit, db.geri_bildirim, async () => {
+    await kayitYaz(kartId, tarih, { degerler, yapildi });
+    await yayinla(kart, tarih, 'deger', degerler);
+  });
+  await olcumYaz(kart, tarih, degerler);
 }
 
 // A4 — Yap kartında yapıldı işaretle / geri al.
@@ -255,7 +283,7 @@ export async function yenidenTeslim(ref: string, etkin: string, paket: KartPaket
 // Geçmiş kayıtlar (yapıldı / değerler) yerinde kalır.
 export async function kartGuncelle(
   kartId: string,
-  patch: Partial<Pick<AjandaKartRow, 'tip' | 'ad' | 'bloklar' | 'bitis' | 'gunler' | 'saatler' | 'hatirlatma'>>,
+  patch: Partial<Pick<AjandaKartRow, 'tip' | 'ad' | 'bloklar' | 'bitis' | 'gunler' | 'saatler' | 'hatirlatma' | 'bekle'>>,
 ) {
   const kart = await db.ajanda_kart.get(kartId);
   if (!kart || !kart.izinler.duzenle || kart.geri_bildirim !== 'yok') return;

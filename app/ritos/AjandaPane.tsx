@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ayOzeti, degerKaydet, gununKartlari, kartKaldir, kartTasi, listeIsaretle, siraDegistir, yapildiAyarla, type GunSatiri } from '@/lib/ajanda';
+import { ayOzeti, degerArttir, degerKaydet, yapildiZamani, gununKartlari, kartKaldir, kartTasi, listeIsaretle, siraDegistir, yapildiAyarla, type GunSatiri } from '@/lib/ajanda';
 import { useCanli } from '@/lib/canli';
 import {
   bugun, degerBloklari, gunFarki, tarihEkle, tarihEtiket, tarihParse, tarihStr,
@@ -13,7 +13,7 @@ import { sinavOzeti } from '@/lib/sinavGorev';
 import { kartPaketi } from '@/lib/paylasim';
 import { PaylasDugmesi } from './Sohbet';
 import { KartEditor, SURE_ANAHTAR } from './KartEditor';
-import { sayacAnahtari, sayacBaslat, sayacBitir, sayacDuraklat, sayacMetni, sayacSil, useSayac } from '@/lib/sayac';
+import { sayacAnahtari, sayacBaslat, sayacBitir, sayacDuraklat, sayacMetni, sayacSil, sesAc, useSayac, useTik } from '@/lib/sayac';
 import { gorevler, type BDugum } from '@/lib/belge';
 import { KlasorSecModal } from './Kutuphane';
 import { ajandadanKaydet } from '@/lib/kutuphane';
@@ -219,7 +219,13 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
   const sk = sayacAnahtari(kart.id, tarih);
   const sayac = useSayac(sk);
   const uzak = kart.geri_bildirim === 'uzak';
-  const meta = [kart.saatler.join(' · ') + (kart.hatirlatma ? ' 🔔' : ''), bagli && kart.kaynak_etiket ? `${uzak ? '🤝' : '🌱'} ${kart.kaynak_etiket}` : ''].filter(Boolean).join(' · ');
+  // Yapılma saati + bekleme (2 ekim)
+  const bekleSon = yapildi && kart.bekle && kayit?.zaman ? kayit.zaman + kart.bekle * 60000 : null;
+  const bekliyor = !!bekleSon && Date.now() < bekleSon;
+  useTik(bekliyor, 15000);
+  const adetB = kart.tip === 'yap' ? kart.bloklar.find((b): b is Extract<Blok, { tur: 'sayi' }> => b.tur === 'sayi' && b.bicim === 'adet') : undefined;
+  const adetV = adetB ? Number((kayit?.degerler ?? {})[adetB.anahtar]) || 0 : 0;
+  const meta = [yapildi && kayit?.zaman ? `✓ ${saatMetni(kayit.zaman)}` : '', kart.saatler.join(' · ') + (kart.hatirlatma ? ' 🔔' : ''), bagli && kart.kaynak_etiket ? `${uzak ? '🤝' : '🌱'} ${kart.kaynak_etiket}` : ''].filter(Boolean).join(' · ');
   const yeniGuncel = !!kart.isaret && Date.now() - kart.isaret < 3 * 86400000;
   // A9 — değer düzeltme süresi (koçun izni): süre geçtiyse yapılmış kart değiştirilemez.
   const kilitli = !!kayit?.yapildi && kart.izinler.duzeltme_gun !== null && gunFarki(tarih, bugun()) > kart.izinler.duzeltme_gun;
@@ -235,6 +241,7 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
   function isaretle() {
     if (yapildi) { yapildiAyarla(kart.id, tarih, false); setDegerAcik(false); return; }
     if (sayac) { sayacBitti(); return; }
+    if (kart.bekle) sesAc(); // bekleme dolunca bip için ses bağlamı bu dokunuşla açılır
     if (kayitBl.length) setDegerAcik((v) => !v);
     else yapildiAyarla(kart.id, tarih, true);
   }
@@ -264,6 +271,13 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
         </button>
         {zamanli && !yapildi && !kilitli && !sayac && <button type="button" className="rt-oynat" onClick={() => sayacBaslat(sk, hedefDakika(kart.bloklar))} aria-label="Sayacı başlat">▶</button>}
         {sayac && !yapildi && <SayacKontrol sayac={sayac} sk={sk} onBitir={sayacBitti} />}
+        {adetB && !kilitli && (
+          <span className="rt-adet-k" onClick={(e) => e.stopPropagation()}>
+            <span className={adetB.hedef && adetV >= adetB.hedef ? 'tam' : ''}>{adetV}{adetB.hedef ? `/${adetB.hedef}` : ''}</span>
+            <button type="button" aria-label={`${adetB.etiket} ekle`} onClick={() => { void degerArttir(kart.id, tarih, adetB.anahtar, 1, adetB.hedef); }}>＋</button>
+          </span>
+        )}
+        {bekliyor && <span className="rt-bekle" title="Yaptıktan sonra bekleme">⏳ {saatMetni(bekleSon!)}{"'a kadar"}</span>}
         {tutamac}
       </div>
       {uygulaAcik && <Uygula satir={satir} tarih={tarih} onKapat={() => setUygulaAcik(false)} />}
@@ -292,12 +306,21 @@ function DegerGir({ bloklar, ilk, onKaydet, onSadeceIsaretle }: { bloklar: Blok[
     <div className="rt-deger">
       {alanlar.map((a) => (
         <label key={a.anahtar} className="rt-alan">
-          <span>{a.etiket}{a.tur === 'sayi' && a.birim ? ` (${a.birim})` : ''}</span>
+          <span>{a.etiket}{a.tur === 'sayi' && a.birim && a.bicim !== 'olcek' ? ` (${a.birim})` : ''}</span>
           {a.tur === 'secenek' ? (
             <select value={d[a.anahtar]} onChange={(e) => setD({ ...d, [a.anahtar]: e.target.value })}>
               <option value="">—</option>
               {a.secenekler.map((s) => <option key={s}>{s}</option>)}
             </select>
+          ) : a.tur === 'sayi' && a.bicim === 'olcek' ? (
+            <OlcekSec deger={d[a.anahtar]} ruh={/ruh|mood/i.test(a.anahtar + a.etiket)} onSec={(v) => setD({ ...d, [a.anahtar]: v })} />
+          ) : a.tur === 'sayi' && a.bicim === 'adet' ? (
+            <span className="rt-adim-k">
+              <button type="button" aria-label="Azalt" onClick={(e) => { e.preventDefault(); setD({ ...d, [a.anahtar]: String(Math.max(0, (Number(d[a.anahtar]) || 0) - 1)) }); }}>−</button>
+              <input inputMode="numeric" value={d[a.anahtar] || '0'} onChange={(e) => setD({ ...d, [a.anahtar]: e.target.value.replace(/\D/g, '') })} />
+              <span className="birim">{a.hedef ? `/ ${a.hedef}` : ''}</span>
+              <button type="button" aria-label="Artır" onClick={(e) => { e.preventDefault(); setD({ ...d, [a.anahtar]: String((Number(d[a.anahtar]) || 0) + 1) }); }}>+</button>
+            </span>
           ) : (
             <input className="rt-inp" inputMode={a.tur === 'sayi' ? 'decimal' : 'text'} value={d[a.anahtar]} onChange={(e) => setD({ ...d, [a.anahtar]: e.target.value })} />
           )}
@@ -339,6 +362,7 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
   const sureli = kart.bloklar.some((b) => b.tur === 'zamanlayici' || (b.tur === 'sayi' && b.anahtar === SURE_ANAHTAR));
   const olcular = kart.bloklar.filter((b): b is Extract<Blok, { tur: 'sayi' }> => b.tur === 'sayi' && b.anahtar !== SURE_ANAHTAR);
   const baslatilir = sureli && !kayitCanli?.yapildi && !kilitliDetay && kart.izinler.ac;
+  const adetler = olcular.filter((o) => o.bicim === 'adet');
   const kayitAlani = baslatilir || dSayac || olcular.length ? (
     <div className="rt-kayit-kutu">
       {baslatilir && !dSayac && detaySure === null && <button type="button" className="rt-btn primary" onClick={() => sayacBaslat(dsk, hedefDk)}>⏱ Başlat{hedefDk > 0 ? ` · ${hedefDk} dk` : ''}</button>}
@@ -351,7 +375,20 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
         <DegerGir bloklar={kart.bloklar} ilk={{ ...(kayitCanli?.degerler ?? {}), [SURE_ANAHTAR]: detaySure }}
           onKaydet={async (d) => { await degerKaydet(kart.id, tarih, d); setDetaySure(null); }} />
       )}
-      {olcular.length > 0 && detaySure === null && <p className="rt-muted">📏 Bitince sorulur: {olcular.map((o) => o.etiket + (o.birim ? ` (${o.birim})` : '')).join(', ')}</p>}
+      {adetler.map((o) => {
+        const v = Number((kayitCanli?.degerler ?? {})[o.anahtar]) || 0;
+        return (
+          <div key={o.anahtar} className="rt-satir rt-adim-satir"><span>{o.etiket}</span>
+            <span className="rt-adim-k">
+              <button type="button" aria-label="Azalt" disabled={kilitliDetay} onClick={() => degerArttir(kart.id, tarih, o.anahtar, -1, o.hedef)}>−</button>
+              <input readOnly value={v} aria-label={o.etiket} />
+              <span className="birim">{o.hedef ? `/ ${o.hedef} ` : ''}{o.birim}</span>
+              <button type="button" aria-label="Artır" disabled={kilitliDetay} onClick={() => degerArttir(kart.id, tarih, o.anahtar, 1, o.hedef)}>+</button>
+            </span>
+          </div>
+        );
+      })}
+      {olcular.some((o) => o.bicim !== 'adet') && detaySure === null && <p className="rt-muted">📏 İşaretlerken sorulur: {olcular.filter((o) => o.bicim !== 'adet').map((o) => o.etiket + (o.birim && o.bicim !== 'olcek' ? ` (${o.birim})` : '')).join(', ')}</p>}
     </div>
   ) : null;
 
@@ -360,6 +397,7 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
 
   return (
     <Modal baslik={kart.ad} onKapat={onKapat}>
+      {kayitCanli?.yapildi && kayitCanli.zaman && <YapildiSaati zaman={kayitCanli.zaman} kilitli={kilitliDetay} bekle={kart.bekle ?? null} onDegis={(z) => yapildiZamani(kart.id, tarih, z)} />}
       <BlokGoster
         bloklar={kart.bloklar}
         kayit={kart.tip === 'yap' ? kayitAlani : undefined}
@@ -480,5 +518,43 @@ function SayacKontrol({ sayac, sk, onBitir, buyuk }: { sayac: NonNullable<Return
         ? <button type="button" className="sil" onClick={() => sayacSil(sk)}>Sıfırla?</button>
         : <button type="button" className="sil" onClick={() => setVazgec(true)} aria-label="Sayacı sıfırla">↺</button>)}
     </div>
+  );
+}
+
+const saatMetni = (t: number) => new Date(t).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+
+// Yapılma saati (2 ekim): otomatik kaydedilir; dokununca −5/−15/−30 dk ya da elle düzeltilir.
+function YapildiSaati({ zaman, kilitli, bekle, onDegis }: { zaman: number; kilitli: boolean; bekle: number | null; onDegis: (z: number) => void }) {
+  const [acik, setAcik] = useState(false);
+  useTik(!!bekle, 15000);
+  const son = bekle ? zaman + bekle * 60000 : null;
+  const kalan = son ? Math.ceil((son - Date.now()) / 60000) : 0;
+  return (
+    <div className="rt-yapildi-saat">
+      <button type="button" className="rt-chip" disabled={kilitli} onClick={() => setAcik(!acik)}>✓ Yapıldı · {saatMetni(zaman)} ✎</button>
+      {son && (kalan > 0 ? <span className="rt-bekle">⏳ {saatMetni(son)}{"'a kadar"} · {kalan} dk</span> : <span className="rt-muted">⏳ Bekleme bitti</span>)}
+      {acik && (
+        <div className="rt-chips">
+          {[5, 15, 30].map((d) => <button key={d} type="button" className="rt-chip" onClick={() => onDegis(zaman - d * 60000)}>−{d} dk</button>)}
+          <input className="rt-inp rt-orta" type="time" aria-label="Yapıldığı saat" value={saatMetni(zaman)} onChange={(e) => {
+            const [h, m] = e.target.value.split(':').map(Number);
+            if (Number.isFinite(h) && Number.isFinite(m)) { const d = new Date(zaman); d.setHours(h, m, 0, 0); onDegis(d.getTime()); }
+          }} />
+          <button type="button" className="rt-chip on" onClick={() => setAcik(false)}>Tamam</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 1–5 ölçek; ruh halinde yüzler.
+function OlcekSec({ deger, ruh, onSec }: { deger: string; ruh: boolean; onSec: (v: string) => void }) {
+  const yuz = ['😞', '🙁', '😐', '🙂', '😄'];
+  return (
+    <span className="rt-olcek">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button key={n} type="button" className={deger === String(n) ? 'on' : ''} onClick={(e) => { e.preventDefault(); onSec(String(n)); }} aria-label={String(n)}>{ruh ? yuz[n - 1] : n}</button>
+      ))}
+    </span>
   );
 }

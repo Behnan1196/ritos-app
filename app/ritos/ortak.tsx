@@ -145,6 +145,7 @@ export function degerMetni(d: Record<string, unknown>, bloklar?: Blok[]): string
       const m = typeof v === 'number' ? v.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) : String(v);
       if (k === 'sure_dk') return `${m} dk`;
       const b = bloklar?.find((x) => 'anahtar' in x && x.anahtar === k);
+      if (b && b.tur === 'sayi' && b.bicim === 'olcek') return `${b.etiket} ${m}/5`;
       return b && b.tur === 'sayi' && b.birim ? `${m} ${b.birim}` : m;
     })
     .join(' · ');
@@ -158,6 +159,32 @@ export function OnayKutusu({ metin, evet, onEvet, onVazgec }: { metin: string; e
       <div className="rt-satir">
         <button type="button" className="rt-btn" onClick={onVazgec}>Vazgeç</button>
         <button type="button" className="rt-btn tehlike" onClick={onEvet}>{evet}</button>
+      </div>
+    </div>
+  );
+}
+
+// Adımlayıcı (2 ekim) — süre seçimlerinde hazır değer listesi yerine: [Yok] [−] [değer] [+].
+// Değer kutusuna doğrudan yazılabilir. Yok seçiliyken değer soluk durur; −/+/değere dokunmak açar.
+export function Adimlayici({ deger, onDegis, adim = 5, varsayilan = 5, min, birim = 'dk', yokEtiket = 'Yok', yokYok }: {
+  deger: number | null; onDegis: (v: number | null) => void; adim?: number; varsayilan?: number; min?: number; birim?: string; yokEtiket?: string; yokYok?: boolean;
+}) {
+  const alt = min ?? adim;
+  const v = deger ?? varsayilan;
+  const [yazi, setYazi] = useState<string | null>(null);
+  return (
+    <div className="rt-adim">
+      {!yokYok && <button type="button" className={`rt-chip${deger === null ? ' on' : ''}`} onClick={() => onDegis(null)}>{yokEtiket}</button>}
+      <div className={`rt-adim-k${deger === null ? ' soluk' : ''}`}>
+        <button type="button" aria-label="Azalt" onClick={() => onDegis(deger === null ? varsayilan : Math.max(alt, v - adim))}>−</button>
+        <input
+          inputMode="numeric" aria-label="Değer" value={yazi ?? String(v)}
+          onFocus={() => setYazi(String(v))}
+          onChange={(e) => setYazi(e.target.value.replace(/\D/g, ''))}
+          onBlur={() => { const n = Number(yazi); if (yazi && n > 0) onDegis(n); setYazi(null); }}
+        />
+        <span className="birim">{birim}</span>
+        <button type="button" aria-label="Artır" onClick={() => onDegis(deger === null ? varsayilan : v + adim)}>+</button>
       </div>
     </div>
   );

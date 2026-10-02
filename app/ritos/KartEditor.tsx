@@ -20,13 +20,13 @@ import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { belgeBos, metindenBelge } from '@/lib/belge';
 import { useCanli } from '@/lib/canli';
-import { OLC_ONEK, olcuBlok, olcuEkle, olculer } from '@/lib/olcum';
+import { OLC_ONEK, olcuBlok, olcuEkle, olculer, varsayilanBicim, type OlcuBicim } from '@/lib/olcum';
 import type { OlcuTanimRow } from '@/lib/db';
 import { teslimAl, kartGuncelle, kartTasi } from '@/lib/ajanda';
 import { GUN_KISA, PAKET_SURUM, TAM_IZIN, bugun, gunFarki, tarihEkle, tarihParse, tarihStr, type Blok, type Hatirlatma, type KartPaketi } from '@/lib/paket';
 import type { AjandaKartRow } from '@/lib/db';
 import type { KocKartTaslak, KocTekrar } from '@/lib/danisanAjanda';
-import { Modal, VideoOynatici, instagramEmbed, youtubeId } from './ortak';
+import { Adimlayici, Modal, VideoOynatici, instagramEmbed, youtubeId } from './ortak';
 import { YansitDugmesi } from './Yansit';
 import { GorevFormu, gorevTeslim, useSinavOzeti } from './Sinav';
 import type { GorevTaslak } from '@/lib/sinavGorev';
@@ -35,12 +35,13 @@ import { V2 } from '@/lib/surum';
 // Açıklama stilli (Tiptap, sade araç çubuğu) — madde, numaralı liste, checklist, kalın, vurgu, tablo.
 const ZenginEditor = dynamic(() => import('./NotEditor').then((m) => m.ZenginEditor), { ssr: false, loading: () => <p className="rt-muted">…</p> });
 
-type Icerik = 'aciklama' | 'video' | 'kayit';
-type Panel = 'tekrar' | 'bildirim';
+type Icerik = 'aciklama' | 'video' | 'sure' | 'olcum';
+type Panel = 'tekrar' | 'bildirim' | 'bekle';
 interface VideoSatir { url: string; baslik: string; bas: string; bit: string }
-const ICERIK: [Icerik, string][] = [['aciklama', '📝 Açıklama'], ['video', '🎬 Video'], ['kayit', '📊 Kayıt']];
+type SeciliOlcu = Pick<OlcuTanimRow, 'id' | 'ad' | 'birim'> & { bicim: OlcuBicim; hedef: number | null };
+const BICIM: [OlcuBicim, string][] = [['sayi', 'Sayı'], ['olcek', '1–5'], ['adet', 'Adet (+1)']];
+const ICERIK: [Icerik, string][] = [['aciklama', '📝 Açıklama'], ['video', '🎬 Video'], ['sure', '⏱ Süre'], ['olcum', '📏 Ölçüm']];
 const BOS_VIDEO: VideoSatir = { url: '', baslik: '', bas: '', bit: '' };
-const HEDEFLER = [5, 10, 15, 20, 30, 45];
 
 export const SURE_ANAHTAR = 'sure_dk';
 
@@ -75,7 +76,8 @@ function ilkSira(b0: Blok[]): Icerik[] {
   for (const b of b0) {
     const t: Icerik | null = b.tur === 'belge' || b.tur === 'metin' ? 'aciklama'
       : b.tur === 'video' || b.tur === 'baglanti' ? 'video'
-      : b.tur === 'sayi' || b.tur === 'zamanlayici' ? 'kayit' : null;
+      : b.tur === 'zamanlayici' || (b.tur === 'sayi' && b.anahtar === SURE_ANAHTAR) ? 'sure'
+      : b.tur === 'sayi' ? 'olcum' : null;
     if (t && !s.includes(t)) s.push(t);
   }
   return s;
@@ -121,10 +123,10 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
   );
   const [vsec, setVsec] = useState(0);
   const [sureKaydi, setSureKaydi] = useState(!!surB || !!zamB);
-  const [hedef, setHedef] = useState(zamB && zamB.dakika > 0 ? String(zamB.dakika) : '');
+  const [hedef, setHedef] = useState<number | null>(zamB && zamB.dakika > 0 ? zamB.dakika : null);
   const tanimlar = useCanli(olculer, [], [] as OlcuTanimRow[]);
-  const [seciliOlcu, setSeciliOlcu] = useState<Pick<OlcuTanimRow, 'id' | 'ad' | 'birim'>[]>(
-    olc0.map((b) => ({ id: b.anahtar.slice(OLC_ONEK.length), ad: b.etiket, birim: b.birim ?? '' })),
+  const [seciliOlcu, setSeciliOlcu] = useState<SeciliOlcu[]>(
+    olc0.map((b) => ({ id: b.anahtar.slice(OLC_ONEK.length), ad: b.etiket, birim: b.birim ?? '', bicim: b.bicim ?? 'sayi', hedef: b.hedef ?? null })),
   );
   const [eskiDegKalsin, setEskiDegKalsin] = useState(!!eskiDeg);
   const [olcumAcik, setOlcumAcik] = useState(olc0.length > 0 || !!eskiDeg);
@@ -150,6 +152,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
   const [sure, setSure] = useState(sure0);
   const [saat, setSaat] = useState(kart?.saatler[0] ?? '');
   const [hatirlatma, setHatirlatma] = useState<Hatirlatma | null>(kart?.hatirlatma ?? null);
+  const [bekle, setBekle] = useState<number | null>(kart?.bekle ?? null);
   const [panel, setPanel] = useState<Panel | null>(null);
   const [secici, setSecici] = useState(false);
   const tarihGoster = !onPlan && (!kart || kart.izinler.gun_degistir);
@@ -159,7 +162,8 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
     setSira([...sira, t]);
     setMenu(null);
     if (t === 'video') setVsec(0);
-    if (t === 'kayit' && !sureKaydi && !seciliOlcu.length && !eskiDegKalsin) setSureKaydi(true);
+    if (t === 'sure') setSureKaydi(true);
+    if (t === 'olcum') setOlcumAcik(true);
   }
   function sabitle() {
     if (izle) { setIzle(false); return; }
@@ -177,12 +181,13 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
     setMenu(null);
   }
   function sil(t: Icerik) {
-    const veri: Record<string, unknown> = t === 'aciklama' ? { aciklama } : t === 'video' ? { videolar, vsec } : { sureKaydi, hedef, seciliOlcu, eskiDegKalsin, olcumAcik };
+    const veri: Record<string, unknown> = t === 'aciklama' ? { aciklama } : t === 'video' ? { videolar, vsec } : t === 'sure' ? { hedef } : { seciliOlcu, eskiDegKalsin };
     setGeri({ t, i: sira.indexOf(t), veri });
     setSira(sira.filter((x) => x !== t));
     if (t === 'aciklama') setAciklama(null);
     else if (t === 'video') { setVideolar([]); setVsec(0); }
-    else { setSureKaydi(false); setHedef(''); setSeciliOlcu([]); setEskiDegKalsin(false); setOlcumAcik(false); setYeniOlcu(null); }
+    else if (t === 'sure') { setSureKaydi(false); setHedef(null); }
+    else { setSeciliOlcu([]); setEskiDegKalsin(false); setOlcumAcik(false); setYeniOlcu(null); }
     setMenu(null);
   }
   function geriAl() {
@@ -192,8 +197,8 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
     if (t === 'aciklama') setAciklama(veri.aciklama as object | null);
     else if (t === 'video') { setVideolar(veri.videolar as VideoSatir[]); setVsec(veri.vsec as number); }
     else {
-      setSureKaydi(veri.sureKaydi as boolean); setHedef(veri.hedef as string); setSeciliOlcu(veri.seciliOlcu as typeof seciliOlcu);
-      setEskiDegKalsin(veri.eskiDegKalsin as boolean); setOlcumAcik(veri.olcumAcik as boolean);
+      if (t === 'sure') { setSureKaydi(true); setHedef(veri.hedef as number | null); }
+      else { setOlcumAcik(true); setSeciliOlcu(veri.seciliOlcu as SeciliOlcu[]); setEskiDegKalsin(veri.eskiDegKalsin as boolean); }
     }
     setGeri(null);
   }
@@ -209,11 +214,10 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
           if (videoMu(url)) b.push({ tur: 'video', url, ...(v.baslik.trim() ? { baslik: v.baslik.trim() } : {}), ...(sn(v.bas) !== undefined ? { bas: sn(v.bas) } : {}), ...(sn(v.bit) !== undefined ? { bit: sn(v.bit) } : {}) });
           else b.push({ tur: 'baglanti', url, ...(v.baslik.trim() ? { baslik: v.baslik.trim() } : {}) });
         }
+      } else if (t === 'sure') {
+        b.push({ tur: 'sayi', anahtar: SURE_ANAHTAR, etiket: 'Kaç dakika?', birim: 'dk' });
+        if (hedef && hedef > 0) b.push({ tur: 'zamanlayici', dakika: hedef });
       } else {
-        if (sureKaydi) {
-          b.push({ tur: 'sayi', anahtar: SURE_ANAHTAR, etiket: 'Kaç dakika?', birim: 'dk' });
-          if (Number(hedef) > 0) b.push({ tur: 'zamanlayici', dakika: Number(hedef) });
-        }
         if (eskiDeg && eskiDegKalsin) b.push(eskiDeg);
         for (const o of seciliOlcu) b.push(olcuBlok(o));
       }
@@ -230,10 +234,11 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
       gunler: tekrar ? secili : null,
       saatler: saat ? [saat] : [],
       hatirlatma: bildirimGoster ? hatirlatma : null,
+      bekle: bildirimGoster ? bekle : null,
     };
   }
 
-  const kayitEksik = sira.includes('kayit') && !sureKaydi && !seciliOlcu.length && !(eskiDeg && eskiDegKalsin);
+  const kayitEksik = sira.includes('olcum') && !seciliOlcu.length && !(eskiDeg && eskiDegKalsin);
 
   async function kaydet() {
     if (sinav) {
@@ -252,7 +257,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
     }
     if (kart) {
       const z = zamanlama(kart.baslangic);
-      await kartGuncelle(kart.id, { tip: 'yap', ad: ad.trim(), bloklar: bloklarUret(), bitis: z.bitis, gunler: z.gunler, saatler: z.saatler, hatirlatma: z.hatirlatma });
+      await kartGuncelle(kart.id, { tip: 'yap', ad: ad.trim(), bloklar: bloklarUret(), bitis: z.bitis, gunler: z.gunler, saatler: z.saatler, hatirlatma: z.hatirlatma, bekle: z.bekle });
       if (tarihGoster && tarihSec && tarihSec !== tarih) await kartTasi(kart.id, tarih, tarihSec);
     } else {
       const paket: KartPaketi = {
@@ -322,52 +327,57 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
         </>
       );
     }
+    if (t === 'sure') return (
+      <>
+        <div className="rt-satir rt-adim-satir"><span className="rt-muted">Hedef</span>
+          <Adimlayici deger={hedef} onDegis={setHedef} adim={5} varsayilan={5} />
+        </div>
+        <p className="rt-muted">{hedef ? `Kartta ▶ ile ${hedef} dk geri sayılır, dolunca uyarır; bitince süre kendiliğinden yazılır.` : 'Kartta ▶ ile süre tutulur ya da işaretlerken "Kaç dakika?" diye sorulur.'}</p>
+      </>
+    );
     return (
       <>
         <div className="rt-chips">
-          <button type="button" className={`rt-chip${sureKaydi ? ' on' : ''}`} onClick={() => setSureKaydi(!sureKaydi)}>⏱ Süre</button>
-          <button type="button" className={`rt-chip${olcumAcik ? ' on' : ''}`} onClick={() => { if (olcumAcik) { setSeciliOlcu([]); setEskiDegKalsin(false); setYeniOlcu(null); } setOlcumAcik(!olcumAcik); }}>📏 Ölçüm</button>
+          {eskiDeg && (
+            <button type="button" className={`rt-chip${eskiDegKalsin ? ' on' : ''}`} onClick={() => setEskiDegKalsin(!eskiDegKalsin)}>{eskiDeg.etiket}{eskiDeg.birim ? ` (${eskiDeg.birim})` : ''}</button>
+          )}
+          {[...tanimlar, ...seciliOlcu.filter((o) => !tanimlar.some((x) => x.id === o.id))].map((x) => {
+            const on = seciliOlcu.some((o) => o.id === x.id);
+            return (
+              <button key={x.id} type="button" className={`rt-chip${on ? ' on' : ''}`} onClick={() => setSeciliOlcu(on ? seciliOlcu.filter((o) => o.id !== x.id) : [...seciliOlcu, { id: x.id, ad: x.ad, birim: x.birim, ...varsayilanBicim(x.id) }])}>
+                {x.ad}{x.birim ? ` (${x.birim})` : ''}
+              </button>
+            );
+          })}
+          {!yeniOlcu && <button type="button" className="rt-chip rt-ek-cip" onClick={() => setYeniOlcu({ ad: '', birim: '' })}>＋ Yeni ölçü</button>}
         </div>
-        {sureKaydi && (
-          <>
-            <div className="rt-chips">
-              <span className="rt-muted">Hedef:</span>
-              <button type="button" className={`rt-chip${!hedef ? ' on' : ''}`} onClick={() => setHedef('')}>Yok</button>
-              {HEDEFLER.map((d) => (
-                <button key={d} type="button" className={`rt-chip${hedef === String(d) ? ' on' : ''}`} onClick={() => setHedef(String(d))}>{d} dk</button>
-              ))}
-              <input className="rt-inp rt-kisa" inputMode="numeric" placeholder="dk" value={HEDEFLER.map(String).includes(hedef) ? '' : hedef} onChange={(e) => setHedef(e.target.value.replace(/\D/g, ''))} />
-            </div>
-            <p className="rt-muted">{Number(hedef) > 0 ? `Kartta ⏱ ile ${hedef} dk geri sayılır, süre dolunca uyarır; bitince süre kendiliğinden yazılır.` : 'Kartta ⏱ ile süre tutulur ya da işaretlerken "Kaç dakika?" diye sorulur.'}</p>
-          </>
+        {yeniOlcu && (
+          <div className="rt-satir">
+            <input className="rt-inp" placeholder="Ölçü adı (örn. Tansiyon)" value={yeniOlcu.ad} onChange={(e) => setYeniOlcu({ ...yeniOlcu, ad: e.target.value })} autoFocus />
+            <input className="rt-inp rt-kisa" placeholder="Birim" value={yeniOlcu.birim} onChange={(e) => setYeniOlcu({ ...yeniOlcu, birim: e.target.value })} />
+            <button type="button" className="rt-btn" disabled={!yeniOlcu.ad.trim()} onClick={async () => { const x = await olcuEkle(yeniOlcu.ad, yeniOlcu.birim); setSeciliOlcu([...seciliOlcu, { id: x.id, ad: x.ad, birim: x.birim, bicim: 'sayi', hedef: null }]); setYeniOlcu(null); }}>Ekle</button>
+          </div>
         )}
-        {olcumAcik && (
-          <>
-            <div className="rt-chips">
-              {eskiDeg && (
-                <button type="button" className={`rt-chip${eskiDegKalsin ? ' on' : ''}`} onClick={() => setEskiDegKalsin(!eskiDegKalsin)}>{eskiDeg.etiket}{eskiDeg.birim ? ` (${eskiDeg.birim})` : ''}</button>
-              )}
-              {[...tanimlar, ...seciliOlcu.filter((o) => !tanimlar.some((x) => x.id === o.id))].map((x) => {
-                const on = seciliOlcu.some((o) => o.id === x.id);
-                return (
-                  <button key={x.id} type="button" className={`rt-chip${on ? ' on' : ''}`} onClick={() => setSeciliOlcu(on ? seciliOlcu.filter((o) => o.id !== x.id) : [...seciliOlcu, { id: x.id, ad: x.ad, birim: x.birim }])}>
-                    {x.ad}{x.birim ? ` (${x.birim})` : ''}
-                  </button>
-                );
-              })}
-              {!yeniOlcu && <button type="button" className="rt-chip rt-ek-cip" onClick={() => setYeniOlcu({ ad: '', birim: '' })}>＋ Yeni ölçü</button>}
-            </div>
-            {yeniOlcu && (
-              <div className="rt-satir">
-                <input className="rt-inp" placeholder="Ölçü adı (örn. Tansiyon)" value={yeniOlcu.ad} onChange={(e) => setYeniOlcu({ ...yeniOlcu, ad: e.target.value })} autoFocus />
-                <input className="rt-inp rt-kisa" placeholder="Birim" value={yeniOlcu.birim} onChange={(e) => setYeniOlcu({ ...yeniOlcu, birim: e.target.value })} />
-                <button type="button" className="rt-btn" disabled={!yeniOlcu.ad.trim()} onClick={async () => { const x = await olcuEkle(yeniOlcu.ad, yeniOlcu.birim); setSeciliOlcu([...seciliOlcu, x]); setYeniOlcu(null); }}>Ekle</button>
+        {seciliOlcu.map((o) => {
+          const g = (p: Partial<SeciliOlcu>) => setSeciliOlcu(seciliOlcu.map((x) => (x.id === o.id ? { ...x, ...p } : x)));
+          return (
+            <div key={o.id} className="rt-olcu-ayar">
+              <b>{o.ad}</b>
+              <div className="rt-chips">
+                {BICIM.map(([bc, e]) => (
+                  <button key={bc} type="button" className={`rt-chip${o.bicim === bc ? ' on' : ''}`} onClick={() => g({ bicim: bc, hedef: bc === 'adet' ? o.hedef ?? 8 : null })}>{e}</button>
+                ))}
               </div>
-            )}
-            <p className="rt-muted">İşaretlerken seçtiğin ölçüler sorulur; değerler Ölçümlerim'de birikir.</p>
-          </>
-        )}
-        {kayitEksik && <p className="rt-hata">Süre ya da en az bir ölçü seç — ya da Kayıt'ı ⋯ menüsünden sil.</p>}
+              {o.bicim === 'adet' && (
+                <div className="rt-satir rt-adim-satir"><span className="rt-muted">Günlük hedef</span>
+                  <Adimlayici deger={o.hedef} onDegis={(v) => g({ hedef: v })} adim={1} varsayilan={8} min={1} birim={o.birim || 'adet'} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <p className="rt-muted">{seciliOlcu.some((o) => o.bicim === 'adet') ? 'Adet: gün boyunca satırdaki ＋ ile artar, hedefe ulaşınca kart yapıldı olur. ' : ''}Diğerleri işaretlerken sorulur; değerler Ölçümlerim'de birikir.</p>
+        {kayitEksik && <p className="rt-hata">En az bir ölçü seç — ya da Ölçüm'ü ⋯ menüsünden sil.</p>}
       </>
     );
   }
@@ -407,6 +417,12 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
         )}
       </>
     );
+    if (k === 'bekle') return (
+      <>
+        <Adimlayici deger={bekle} onDegis={setBekle} adim={5} varsayilan={5} />
+        <p className="rt-muted">{bekle ? `Yaptım dediğinde satırda ${bekle} dk geri sayılır, dolunca uyarır (örn. kreatinden sonra kafein için bekleme).` : 'Yaptıktan sonra bir süre beklemen gerekiyorsa (örn. 45 dk kafein yok) süre ver.'}</p>
+      </>
+    );
     const h = hatirlatma;
     const hGuncelle = (p: Partial<Hatirlatma>) => setHatirlatma({ gun: 0, ...(h ?? {}), ...p });
     return (
@@ -417,11 +433,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
           <button type="button" className={`rt-chip${h && h.gun > 0 ? ' on' : ''}`} onClick={() => setHatirlatma({ gun: h && h.gun > 0 ? h.gun : 1, saat: h && h.gun > 0 ? h.saat ?? '20:00' : '20:00' })}>Günler önce</button>
         </div>
         {h && h.gun === 0 && saat && (
-          <div className="rt-chips">
-            {([[0, 'Vaktinde'], [5, '5 dk'], [10, '10 dk'], [30, '30 dk'], [60, '1 saat']] as [number, string][]).map(([d, e]) => (
-              <button key={d} type="button" className={`rt-chip${(h.dk ?? 0) === d ? ' on' : ''}`} onClick={() => hGuncelle({ dk: d })}>{e}</button>
-            ))}
-          </div>
+          <Adimlayici deger={h.dk || null} onDegis={(d) => hGuncelle({ dk: d ?? 0 })} adim={5} varsayilan={5} yokEtiket="Vaktinde" />
         )}
         {h && h.gun > 0 && (
           <div className="rt-chips">
@@ -436,7 +448,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
     );
   }
 
-  const PANEL_AD: Record<Panel, string> = { tekrar: 'Tekrar', bildirim: 'Bildirim' };
+  const PANEL_AD: Record<Panel, string> = { tekrar: 'Tekrar', bildirim: 'Bildirim', bekle: 'Yaptıktan sonra bekle' };
   const zamanBolumu = !tarihsiz && (!tekrarYok || bildirimGoster);
   // Üst şeritteki tarih-saat çipi (kütüphane kartında yok; planda yalnız saat).
   const ustCip = tarihsiz ? undefined : (
@@ -497,6 +509,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
           <div className="rt-zrow">
             {!tekrarYok && zc('tekrar', '🔁', tekrarMetni, 'Tekrar')}
             {bildirimGoster && zc('bildirim', '🔔', bildirim, 'Bildirim')}
+            {bildirimGoster && zc('bekle', '⏳', bekle ? `${bekle} dk bekle` : null, 'Sonra bekle')}
           </div>
           {panel && (
             <div className="rt-zpanel">
@@ -509,7 +522,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
 
       {geri && (
         <div className="rt-geri">
-          <span>{ICERIK.find(([x]) => x === geri.t)![1].slice(3)} silindi</span>
+          <span>{ICERIK.find(([x]) => x === geri.t)![1].split(' ').slice(1).join(' ')} silindi</span>
           <button type="button" onClick={geriAl}>Geri al</button>
         </div>
       )}

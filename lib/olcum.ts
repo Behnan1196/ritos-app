@@ -36,8 +36,19 @@ export async function olcuEkle(ad: string, birim: string): Promise<OlcuTanimRow>
   return t;
 }
 
-export const olcuBlok = (t: Pick<OlcuTanimRow, 'id' | 'ad' | 'birim'>): Blok =>
-  ({ tur: 'sayi', anahtar: `${OLC_ONEK}${t.id}`, etiket: t.ad, ...(t.birim ? { birim: t.birim } : {}) });
+export type OlcuBicim = 'sayi' | 'olcek' | 'adet';
+export const olcuBlok = (t: Pick<OlcuTanimRow, 'id' | 'ad' | 'birim'> & { bicim?: OlcuBicim; hedef?: number | null }): Blok =>
+  ({
+    tur: 'sayi', anahtar: `${OLC_ONEK}${t.id}`, etiket: t.ad, ...(t.birim ? { birim: t.birim } : {}),
+    ...(t.bicim && t.bicim !== 'sayi' ? { bicim: t.bicim } : {}), ...(t.bicim === 'adet' && t.hedef ? { hedef: t.hedef } : {}),
+  });
+
+// Hazır ölçülerin varsayılan giriş biçimi: su adetle (hedef 8), ruh hali/enerji 1–5 ölçekle.
+export function varsayilanBicim(id: string): { bicim: OlcuBicim; hedef: number | null } {
+  if (id === 'su') return { bicim: 'adet', hedef: 8 };
+  if (id === 'ruh_hali' || id === 'enerji') return { bicim: 'olcek', hedef: null };
+  return { bicim: 'sayi', hedef: null };
+}
 
 export const olcuBloklari = (bloklar: Blok[]) =>
   bloklar.filter((b): b is Extract<Blok, { tur: 'sayi' }> => b.tur === 'sayi' && b.anahtar.startsWith(OLC_ONEK));

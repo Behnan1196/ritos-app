@@ -63,6 +63,7 @@ export interface AjandaKartRow {
   ek?: PaketEk | null;           // alan paketi bilgisi (26 eylül) — indekssiz
   isaret?: number | null;        // D8 — koç güncelledi (zaman); kartta kısa süre "güncellendi" görünür
   hatirlatma?: Hatirlatma | null; // bildirim ayarı (30 eylül) — indekssiz
+  bekle?: number | null;         // yapıldıktan sonra bekleme (dk, 2 ekim) — indekssiz
   atla?: string[];               // tekrar eden kartın "yalnız bu gün" kaldırılan günleri (A7) — indekssiz, göç gerektirmez
   guncellendi: number;
 }
@@ -74,6 +75,7 @@ export interface AjandaKayitRow {
   tarih: string;
   yapildi: boolean;
   degerler: Record<string, unknown> | null;
+  zaman?: number | null;         // 2 ekim — yapıldığı an (epoch ms); işaretlerken otomatik, sonradan düzeltilebilir
   guncellendi: number;
 }
 

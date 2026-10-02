@@ -9,6 +9,8 @@
 // ————————————————————————————————————————————————————————————————
 
 import { useEffect, useState } from 'react';
+import { db } from './db';
+import { bugun } from './paket';
 
 export interface Sayac {
   bas: number | null;   // çalışıyorsa başlama anı (epoch ms); duraklatılmışsa null
@@ -120,7 +122,7 @@ export function useSayacIzleyici() {
 
 // Ses: iOS yalnız bir dokunuşla açılan ses bağlamında çalar — bağlam "Başlat"ta açılır.
 let sesBaglami: AudioContext | null = null;
-function sesAc() {
+export function sesAc() {
   try {
     const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!sesBaglami) sesBaglami = new Ctx();
@@ -139,4 +141,42 @@ function bitisUyarisi() {
       o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.26);
     });
   } catch { /* ses yok */ }
+}
+
+/** aktifken saniyede bir yeniden çizdirir (bekleme geri sayımı gibi). */
+export function useTik(aktif: boolean, ms = 1000) {
+  const [, setT] = useState(0);
+  useEffect(() => {
+    if (!aktif) return;
+    const t = setInterval(() => setT((x) => x + 1), ms);
+    return () => clearInterval(t);
+  }, [aktif, ms]);
+}
+
+// Bekleme (2 ekim): yapıldıktan sonra "X dk bekle" — bugünün yapılmış kartlarında süre dolunca
+// bir kez uyarır (uygulama açıkken). Hangi bekleme için uyarıldığı cihazda tutulur.
+const UYARILDI = 'ritos-bekleme-uyarildi';
+export function useBeklemeIzleyici() {
+  useEffect(() => {
+    const kontrol = async () => {
+      const t = bugun();
+      const kayitlar = await db.ajanda_kayit.where('tarih').equals(t).filter((r) => r.yapildi && !!r.zaman).toArray();
+      if (!kayitlar.length) return;
+      let uy: Record<string, number> = {};
+      try { uy = JSON.parse(localStorage.getItem(UYARILDI) || '{}'); } catch { /* yoksay */ }
+      const simdi = Date.now();
+      let caldi = false, degisti = false;
+      for (const r of kayitlar) {
+        const kart = await db.ajanda_kart.get(r.kart_id);
+        if (!kart?.bekle) continue;
+        const son = r.zaman! + kart.bekle * 60000;
+        if (simdi >= son && simdi - son < 15 * 60000 && uy[r.id] !== son) { uy[r.id] = son; caldi = true; degisti = true; }
+      }
+      if (degisti) { try { localStorage.setItem(UYARILDI, JSON.stringify(uy)); } catch { /* yoksay */ } }
+      if (caldi) bitisUyarisi();
+    };
+    void kontrol();
+    const iv = setInterval(() => { void kontrol(); }, 15000);
+    return () => clearInterval(iv);
+  }, []);
 }

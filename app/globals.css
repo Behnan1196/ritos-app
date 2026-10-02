@@ -724,3 +724,25 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-sayac-k.buyuk{padding:6px 8px 6px 14px;border-radius:12px;gap:8px;align-self:flex-start;}
 .rt-sayac-k.buyuk .sure{font-size:28px;min-width:96px;}
 .rt-sayac-k.buyuk button{font-size:15px;padding:6px 10px;}
+/* Adımlayıcı: [Yok] [− değer +] */
+.rt-adim{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.rt-adim-k{display:inline-flex;align-items:center;border:1px solid var(--line);background:#fff;border-radius:18px;overflow:hidden;}
+.rt-adim-k button{border:0;background:none;width:34px;height:32px;font:inherit;font-size:17px;cursor:pointer;color:var(--green);}
+.rt-adim-k button:hover{background:#efe8da;}
+.rt-adim-k input{width:40px;border:0;background:transparent;text-align:right;font:inherit;font-size:14px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;padding:0;}
+.rt-adim-k input:focus{outline:none;}
+.rt-adim-k .birim{font-size:12.5px;color:var(--muted);padding:0 4px 0 3px;}
+.rt-adim-k.soluk input,.rt-adim-k.soluk .birim{color:#bdb4a2;font-weight:400;}
+.rt-adim-satir{align-items:center;gap:10px;}
+.rt-olcu-ayar{display:flex;flex-direction:column;gap:6px;border-top:1px dashed var(--line);padding-top:8px;}
+.rt-olcu-ayar b{font-size:13px;}
+/* Adet (satırda +1), bekleme, yapılma saati, ölçek */
+.rt-adet-k{display:inline-flex;align-items:center;gap:2px;flex:0 0 auto;border:1px solid var(--line);background:#fff;border-radius:16px;padding:2px 3px 2px 9px;font-size:13px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;}
+.rt-adet-k .tam{color:var(--green);}
+.rt-adet-k button{border:0;background:var(--green2);color:var(--green);border-radius:50%;width:26px;height:26px;font:inherit;font-size:15px;cursor:pointer;}
+.rt-bekle{flex:0 0 auto;font-size:12px;font-weight:700;color:#9a6b1f;background:#fbf1dc;border-radius:12px;padding:3px 8px;white-space:nowrap;}
+.rt-yapildi-saat{display:flex;flex-direction:column;gap:6px;align-items:flex-start;}
+.rt-yapildi-saat > .rt-chip{background:var(--green2);border-color:var(--green);font-weight:700;}
+.rt-olcek{display:flex;gap:4px;}
+.rt-olcek button{width:40px;height:36px;border:1px solid var(--line);background:#fff;border-radius:10px;font:inherit;font-size:16px;cursor:pointer;}
+.rt-olcek button.on{background:var(--green2);border-color:var(--green);}
