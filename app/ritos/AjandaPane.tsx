@@ -13,6 +13,7 @@ import { sinavOzeti } from '@/lib/sinavGorev';
 import { kartPaketi } from '@/lib/paylasim';
 import { PaylasDugmesi } from './Sohbet';
 import { KartEditor, SURE_ANAHTAR } from './KartEditor';
+import { sayacAnahtari, sayacBaslat, sayacBitir, sayacDuraklat, sayacMetni, sayacSil, useSayac } from '@/lib/sayac';
 import { gorevler, type BDugum } from '@/lib/belge';
 import { KlasorSecModal } from './Kutuphane';
 import { ajandadanKaydet } from '@/lib/kutuphane';
@@ -214,6 +215,9 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
   const yapildi = kayit?.yapildi ?? false;
   const [degerAcik, setDegerAcik] = useState(false);
   const [uygulaAcik, setUygulaAcik] = useState(false);
+  const [sureOn, setSureOn] = useState<number | null>(null); // sayaçtan gelen süre (değer formuna)
+  const sk = sayacAnahtari(kart.id, tarih);
+  const sayac = useSayac(sk);
   const uzak = kart.geri_bildirim === 'uzak';
   const meta = [kart.saatler.join(' · ') + (kart.hatirlatma ? ' 🔔' : ''), bagli && kart.kaynak_etiket ? `${uzak ? '🤝' : '🌱'} ${kart.kaynak_etiket}` : ''].filter(Boolean).join(' · ');
   const yeniGuncel = !!kart.isaret && Date.now() - kart.isaret < 3 * 86400000;
@@ -230,8 +234,15 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
   const ekMeta = [videoSay ? `🎬 ${videoSay}` : '', gorevSay ? `☑ ${isaretli}/${gorevSay}` : ''].filter(Boolean).join(' ');
   function isaretle() {
     if (yapildi) { yapildiAyarla(kart.id, tarih, false); setDegerAcik(false); return; }
+    if (sayac) { sayacBitti(); return; }
     if (kayitBl.length) setDegerAcik((v) => !v);
     else yapildiAyarla(kart.id, tarih, true);
+  }
+  // Sayacı bitir: ölçü de soruluyorsa süre forma dolar; yoksa doğrudan kaydedilir.
+  async function sayacBitti() {
+    const dk = sayacBitir(sk);
+    if (kayitBl.some((b) => b.anahtar !== SURE_ANAHTAR)) { setSureOn(dk); setDegerAcik(true); return; }
+    await degerKaydet(kart.id, tarih, { ...(kayit?.degerler ?? {}), [SURE_ANAHTAR]: dk });
   }
 
   return (
@@ -251,7 +262,8 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
           {(meta || ekMeta) && <span className="m">{[meta, ekMeta].filter(Boolean).join(' · ')}</span>}
           {(kart.tip === 'kaydet' || kart.tip === 'uygula' || (kart.tip === 'yap' && yapildi)) && kayit?.degerler && degerMetni(kayit.degerler, kart.bloklar) && <span className="m">✓ {(kart.ek && sinavOzeti(kart.ek, kayit.degerler)) || degerMetni(kayit.degerler, kart.bloklar)}</span>}
         </button>
-        {zamanli && !yapildi && !kilitli && <button type="button" className="rt-oynat" onClick={() => setUygulaAcik(true)} aria-label="Zamanlayıcıyı başlat">▶</button>}
+        {zamanli && !yapildi && !kilitli && !sayac && <button type="button" className="rt-oynat" onClick={() => sayacBaslat(sk, hedefDakika(kart.bloklar))} aria-label="Sayacı başlat">▶</button>}
+        {sayac && !yapildi && <SayacKontrol sayac={sayac} sk={sk} onBitir={sayacBitti} />}
         {tutamac}
       </div>
       {uygulaAcik && <Uygula satir={satir} tarih={tarih} onKapat={() => setUygulaAcik(false)} />}
@@ -264,7 +276,7 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
       {degerAcik && kart.tip === 'yap' && !yapildi && (
         <DegerGir
           bloklar={kart.bloklar}
-          ilk={kayit?.degerler ?? null}
+          ilk={sureOn !== null ? { ...(kayit?.degerler ?? {}), [SURE_ANAHTAR]: sureOn } : kayit?.degerler ?? null}
           onKaydet={async (d) => { await degerKaydet(kart.id, tarih, d); setDegerAcik(false); }}
           onSadeceIsaretle={async () => { await yapildiAyarla(kart.id, tarih, true); setDegerAcik(false); }}
         />
@@ -310,6 +322,9 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
   const [duzenle, setDuzenle] = useState(false);
   const [kutKaydet, setKutKaydet] = useState(false);
   const [uygula, setUygula] = useState(false);
+  const [detaySure, setDetaySure] = useState<number | null>(null);
+  const dsk = sayacAnahtari(kart.id, tarih);
+  const dSayac = useSayac(dsk);
   // Checklist işaretleri o günün kaydında; detay açıkken canlı izlenir.
   const kayitCanli = useCanli(() => db.ajanda_kayit.get(`${kart.id}|${tarih}`), [kart.id, tarih], satir.kayit ?? undefined);
   const kilitliDetay = !!kayitCanli?.yapildi && kart.izinler.duzeltme_gun !== null && gunFarki(tarih, bugun()) > kart.izinler.duzeltme_gun;
@@ -320,14 +335,23 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
 
   if (duzenle) return <KartEditor tarih={tarih} kart={kart} onKapat={onKapat} />;
   // Kayıt bloğunun kart içindeki yeri: süre varsa ⏱ Başlat, ölçüler varsa bitince sorulacaklar.
-  const hedefDk = kart.bloklar.find((b): b is Extract<Blok, { tur: 'zamanlayici' }> => b.tur === 'zamanlayici')?.dakika ?? 0;
+  const hedefDk = hedefDakika(kart.bloklar);
   const sureli = kart.bloklar.some((b) => b.tur === 'zamanlayici' || (b.tur === 'sayi' && b.anahtar === SURE_ANAHTAR));
   const olcular = kart.bloklar.filter((b): b is Extract<Blok, { tur: 'sayi' }> => b.tur === 'sayi' && b.anahtar !== SURE_ANAHTAR);
   const baslatilir = sureli && !kayitCanli?.yapildi && !kilitliDetay && kart.izinler.ac;
-  const kayitAlani = baslatilir || olcular.length ? (
+  const kayitAlani = baslatilir || dSayac || olcular.length ? (
     <div className="rt-kayit-kutu">
-      {baslatilir && <button type="button" className="rt-btn primary" onClick={() => setUygula(true)}>⏱ Başlat{hedefDk > 0 ? ` · ${hedefDk} dk` : ''}</button>}
-      {olcular.length > 0 && <p className="rt-muted">📏 Bitince sorulur: {olcular.map((o) => o.etiket + (o.birim ? ` (${o.birim})` : '')).join(', ')}</p>}
+      {baslatilir && !dSayac && detaySure === null && <button type="button" className="rt-btn primary" onClick={() => sayacBaslat(dsk, hedefDk)}>⏱ Başlat{hedefDk > 0 ? ` · ${hedefDk} dk` : ''}</button>}
+      {dSayac && <SayacKontrol sayac={dSayac} sk={dsk} buyuk onBitir={async () => {
+        const dk = sayacBitir(dsk);
+        if (olcular.length) setDetaySure(dk);
+        else await degerKaydet(kart.id, tarih, { ...(kayitCanli?.degerler ?? {}), [SURE_ANAHTAR]: dk });
+      }} />}
+      {detaySure !== null && (
+        <DegerGir bloklar={kart.bloklar} ilk={{ ...(kayitCanli?.degerler ?? {}), [SURE_ANAHTAR]: detaySure }}
+          onKaydet={async (d) => { await degerKaydet(kart.id, tarih, d); setDetaySure(null); }} />
+      )}
+      {olcular.length > 0 && detaySure === null && <p className="rt-muted">📏 Bitince sorulur: {olcular.map((o) => o.etiket + (o.birim ? ` (${o.birim})` : '')).join(', ')}</p>}
     </div>
   ) : null;
 
@@ -420,61 +444,41 @@ function AyTakvimi({ secili, onSec, onKapat }: { secili: string; onSec: (t: stri
 }
 
 
-// Uygula — zamanlayıcılı/rehberli pratik. Bitince süre değer olarak kaydedilir ve
-// bağlı kartta sahibine (programa) geri bildirim olarak gider.
+// Uygula — rehberli pratik (program kartları). Sayaç ortak depoda: pencere kapansa da sürer,
+// satırda görünmeye devam eder.
 function Uygula({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string; onKapat: () => void }) {
   const { kart } = satir;
-  const zb = kart.bloklar.find((b): b is Extract<Blok, { tur: 'zamanlayici' }> => b.tur === 'zamanlayici');
-  const hedefSn = zb && zb.dakika > 0 ? zb.dakika * 60 : null; // 0 = serbest süre (ileri sayar)
-  const [gecen, setGecen] = useState(0);
-  const [calisiyor, setCalisiyor] = useState(false);
-
-  useEffect(() => {
-    if (!calisiyor) return;
-    const t = setInterval(() => setGecen((g) => g + 1), 1000);
-    return () => clearInterval(t);
-  }, [calisiyor]);
-
-  useEffect(() => {
-    if (hedefSn !== null && gecen >= hedefSn && calisiyor) { setCalisiyor(false); bitisUyarisi(); }
-  }, [gecen, hedefSn, calisiyor]);
-
-  const goster = hedefSn !== null ? Math.max(0, hedefSn - gecen) : gecen;
-  const mmss = `${String(Math.floor(goster / 60)).padStart(2, '0')}:${String(goster % 60).padStart(2, '0')}`;
-  const bitti = hedefSn !== null && gecen >= hedefSn;
-
+  const sk = sayacAnahtari(kart.id, tarih);
+  const sayac = useSayac(sk);
   return (
     <Modal baslik={kart.ad} onKapat={onKapat}>
       <BlokGoster bloklar={kart.bloklar} kayit={null} />
-      <div className={`rt-sayac${bitti ? ' bitti' : ''}`}>{mmss}</div>
-      <div className="rt-satir">
-        {!bitti && <button type="button" className="rt-btn" onClick={() => { sesAc(); setCalisiyor((c) => !c); }}>{calisiyor ? 'Duraklat' : gecen ? 'Devam' : 'Başla'}</button>}
-        <button type="button" className="rt-btn primary" disabled={gecen === 0} onClick={async () => { await degerKaydet(kart.id, tarih, { ...(satir.kayit?.degerler ?? {}), sure_dk: Math.max(1, Math.round(gecen / 60)) }); onKapat(); }}>Bitir ve kaydet</button>
-      </div>
+      {sayac ? (
+        <SayacKontrol sayac={sayac} sk={sk} buyuk onBitir={async () => { const dk = sayacBitir(sk); await degerKaydet(kart.id, tarih, { ...(satir.kayit?.degerler ?? {}), sure_dk: dk }); onKapat(); }} />
+      ) : (
+        <button type="button" className="rt-btn primary" onClick={() => sayacBaslat(sk, hedefDakika(kart.bloklar))}>⏱ Başlat</button>
+      )}
     </Modal>
   );
 }
 
-// Hedef süre dolunca: kısa titreşim (destekleyen cihazda) + üç kısa bip. iOS sesi yalnız bir
-// dokunuşla açılan ses bağlamında çalar — bağlam "Başla"ya basınca açılır (sesAc).
-let sesBaglami: AudioContext | null = null;
-function sesAc() {
-  try {
-    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!sesBaglami) sesBaglami = new Ctx();
-    void sesBaglami.resume();
-  } catch { /* ses yok */ }
+function hedefDakika(bloklar: Blok[]): number {
+  return bloklar.find((b): b is Extract<Blok, { tur: 'zamanlayici' }> => b.tur === 'zamanlayici')?.dakika ?? 0;
 }
-function bitisUyarisi() {
-  try { navigator.vibrate?.([200, 100, 200]); } catch { /* yok */ }
-  try {
-    const ctx = sesBaglami;
-    if (!ctx) return;
-    [0, 0.35, 0.7].forEach((t) => {
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
-      g.gain.setValueAtTime(0.25, ctx.currentTime + t); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.25);
-      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.26);
-    });
-  } catch { /* ses yok */ }
+
+// Çalışan/duraklatılmış sayaç: süre + ⏸/▶ + ⏹ (bitir ve kaydet). Satırda küçük, detayda büyük.
+function SayacKontrol({ sayac, sk, onBitir, buyuk }: { sayac: NonNullable<ReturnType<typeof useSayac>>; sk: string; onBitir: () => void; buyuk?: boolean }) {
+  const [vazgec, setVazgec] = useState(false);
+  return (
+    <div className={`rt-sayac-k${buyuk ? ' buyuk' : ''}${sayac.bas ? ' akiyor' : ''}${sayac.doldu ? ' doldu' : ''}`} onClick={(e) => e.stopPropagation()}>
+      <span className="sure">{sayac.doldu ? '✓ ' : '⏱ '}{sayacMetni(sayac)}</span>
+      {!sayac.doldu && (sayac.bas
+        ? <button type="button" onClick={() => sayacDuraklat(sk)} aria-label="Duraklat">⏸</button>
+        : <button type="button" onClick={() => sayacBaslat(sk, 0)} aria-label="Devam">▶</button>)}
+      <button type="button" className="bitir" onClick={onBitir} aria-label="Bitir ve kaydet">⏹{buyuk ? ' Bitir' : ''}</button>
+      {buyuk && (vazgec
+        ? <button type="button" className="sil" onClick={() => sayacSil(sk)}>Sıfırla?</button>
+        : <button type="button" className="sil" onClick={() => setVazgec(true)} aria-label="Sayacı sıfırla">↺</button>)}
+    </div>
+  );
 }

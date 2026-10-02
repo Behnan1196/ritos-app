@@ -710,3 +710,17 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 /* Instagram: 326×600 gömme sayfası %62 ölçekle ~202×372 — YouTube'a yakın bir yer kaplar */
 .rt-ig-sar{height:372px;overflow:hidden;display:flex;justify-content:center;background:#1d1b17;border-radius:10px;}
 .rt-ig-sar .rt-ig-kutu{flex:0 0 auto;width:326px;height:600px;border:0;border-radius:0;transform:scale(.62);transform-origin:top center;}
+/* Kart sayacı (2 ekim): satırda ve detayda */
+.rt-sayac-k{display:inline-flex;align-items:center;gap:4px;flex:0 0 auto;border:1px solid var(--line);background:#fff;border-radius:16px;padding:2px 4px 2px 9px;font-variant-numeric:tabular-nums;}
+.rt-sayac-k .sure{font-size:13px;font-weight:700;color:var(--muted);min-width:46px;}
+.rt-sayac-k.akiyor{border-color:var(--green);}
+.rt-sayac-k.akiyor .sure{color:var(--green);}
+.rt-sayac-k.doldu{background:var(--green2);border-color:var(--green);}
+.rt-sayac-k.doldu .sure{color:var(--green);}
+.rt-sayac-k button{border:0;background:none;font:inherit;font-size:14px;cursor:pointer;padding:3px 5px;border-radius:10px;color:var(--ink);}
+.rt-sayac-k button:hover{background:#efe8da;}
+.rt-sayac-k .bitir{color:var(--green);font-weight:700;}
+.rt-sayac-k .sil{color:var(--muted);font-size:13px;}
+.rt-sayac-k.buyuk{padding:6px 8px 6px 14px;border-radius:12px;gap:8px;align-self:flex-start;}
+.rt-sayac-k.buyuk .sure{font-size:28px;min-width:96px;}
+.rt-sayac-k.buyuk button{font-size:15px;padding:6px 10px;}

@@ -10,6 +10,7 @@
 
 import React, { useEffect, useRef, useState, type ReactNode } from 'react';
 import AjandaPane from './ritos/AjandaPane';
+import { useSayacIzleyici } from '@/lib/sayac';
 import { OdakAlanlari } from './ritos/KisiselGelisim';
 import Kutuphane from './ritos/Kutuphane';
 import { V2 } from '@/lib/surum';
@@ -37,6 +38,7 @@ const TOOL_META: Record<ToolId, { icon: string; title: string }> = {
 
 export default function RitosLab() {
   const o = useOturum();
+  useSayacIzleyici(); // kart sayaçları: hedef süre dolunca uyarı (hangi sekmede olunursa olunsun)
   const [sifirla, setSifirla] = useState(false);
   useEffect(() => { try { setSifirla(new URL(location.href).searchParams.has('sifirla')); } catch { /* yoksay */ } }, []);
   if (!o.hazir) return <div className="rt-kilit-bos" />;
