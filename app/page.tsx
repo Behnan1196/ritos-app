@@ -11,6 +11,8 @@
 import React, { useEffect, useRef, useState, type ReactNode } from 'react';
 import AjandaPane from './ritos/AjandaPane';
 import { useBeklemeIzleyici, useSayacIzleyici } from '@/lib/sayac';
+import { BaglantiWidgetlari } from './ritos/Baglanti';
+import { useBildirimPlani } from '@/lib/bildirim';
 import { OdakAlanlari } from './ritos/KisiselGelisim';
 import Kutuphane from './ritos/Kutuphane';
 import { V2 } from '@/lib/surum';
@@ -50,6 +52,7 @@ export default function RitosLab() {
 
 function RitosUygulama() {
   useHesapBaslat();
+  useBildirimPlani(); // 🔔 ayarlı kartların bildirimlerini kuyruğa yazar
   useGelenSenkron();
   const [isNarrow, setIsNarrow] = useState(false);
   const [ratio, setRatio] = useState(58);
@@ -201,9 +204,11 @@ function SplitPane({
 
 function HomeEkrani({ onDanismanlik, onGelisim, onSohbet }: { onDanismanlik: (disiplin: string) => void; onGelisim: () => void; onSohbet: () => void }) {
   const sohbet = useSohbetOzeti();
+  const [widgetEkle, setWidgetEkle] = useState(false);
   return (
     <div className="fixed-widgets">
       <NotlarWidget />
+      <BaglantiWidgetlari ekleAcik={widgetEkle} onEkleKapat={() => setWidgetEkle(false)} />
       {/* 30 eylül: alanlar V1'de yok (ileride üst klasörler alanlara karşılık gelebilir). */}
       {V2 && <OdakAlanlari onAc={onGelisim} />}
       <KoclarimSatiri />
@@ -217,6 +222,7 @@ function HomeEkrani({ onDanismanlik, onGelisim, onSohbet }: { onDanismanlik: (di
       )}
       {/* Danışmanlık — tek kapı (28 eylül): her alan bir widget, ＋ ile yeni alan. */}
       <DanismanlikSatiri onAc={onDanismanlik} />
+      <button type="button" className="rt-widget-ekle" onClick={() => setWidgetEkle(true)}>＋ Bağlantı widget&apos;ı ekle</button>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 // Hesap ekranları (27 eylül — V1 sadelik): giriş kapısı, şifre sıfırlama, kurtarma hatırlatması, Ayarlar.
 
+import { BildirimAyarlari } from './BildirimAyar';
 import React, { useEffect, useState } from 'react';
 import { useCanli } from '@/lib/canli';
 import { db } from '@/lib/db';
@@ -241,6 +242,7 @@ export function AyarlarPane() {
       {dn.profil?.koc && <PaketlerKap />}
       <DanismanlikAyarlari />
       <AileAyarlari />
+      <BildirimAyarlari />
 
       {modal === 'cikis' && <CikisModal onKapat={() => setModal(null)} bekleyen={d.bekleyen} />}
       {modal === 'sifre' && <SifreModal onKapat={() => setModal(null)} />}

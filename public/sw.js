@@ -1,6 +1,6 @@
 // Ritos service worker — uygulama kabuğunu önbellekler ki çevrimdışı da açılsın.
 // Veri zaten cihazda (IndexedDB); Supabase gibi dış istekler önbelleğe alınmaz.
-const SURUM = 'ritos-v1';
+const SURUM = 'ritos-v2';
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(SURUM).then((c) => c.addAll(['/', '/manifest.webmanifest', '/ikon/192.png'])).then(() => self.skipWaiting()));
@@ -43,4 +43,37 @@ self.addEventListener('fetch', (e) => {
       return h || ag;
     }),
   );
+});
+
+
+// Bildirim (2 ekim) — cat_bildirim kuyruğundan Edge Function'ın gönderdiği Web Push.
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (_) { d = { title: 'Ritos', body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Ritos', {
+    body: d.body || '',
+    icon: '/ikon/192.png',
+    badge: '/ikon/192.png',
+    tag: d.tag,
+    data: { url: d.url || '/' },
+  }));
+});
+
+// Dokununca: açık Ritos penceresi varsa ona geç (ve adrese git), yoksa yeni pencere aç.
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/';
+  const hedef = new URL(url, self.location.origin);
+  e.waitUntil((async () => {
+    if (hedef.origin !== self.location.origin) return self.clients.openWindow(hedef.href);
+    const ps = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of ps) {
+      if (new URL(c.url).origin === self.location.origin) {
+        await c.focus();
+        c.postMessage({ ritos: 'bildirim-ac', url: hedef.pathname + hedef.search + hedef.hash });
+        return;
+      }
+    }
+    return self.clients.openWindow(hedef.href);
+  })());
 });

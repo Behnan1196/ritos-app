@@ -443,7 +443,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
           </div>
         )}
         {h && (h.gun > 0 || !saat) && <input className="rt-inp rt-orta" type="time" value={h.saat ?? ''} onChange={(e) => hGuncelle({ saat: e.target.value })} />}
-        {h && <p className="rt-muted">{h.gun === 0 ? (saat ? `${saat} kartından ${h.dk ? `${h.dk} dk önce` : 'tam vaktinde'} bildirim gelir.` : `Kartın saati yok; bildirim o gün ${h.saat ?? '09:00'}'da gelir.`) : `${h.gun === 7 ? 'Bir hafta' : `${h.gun} gün`} önce ${h.saat ?? '20:00'}'da bildirim gelir${tarihGoster ? ` (${kisaTarih(tarihEkle(tarihSec, -h.gun))})` : ''}.`} Bildirimler henüz gönderilmiyor; ayar saklanır.</p>}
+        {h && <p className="rt-muted">{h.gun === 0 ? (saat ? `${saat} kartından ${h.dk ? `${h.dk} dk önce` : 'tam vaktinde'} bildirim gelir.` : `Kartın saati yok; bildirim o gün ${h.saat ?? '09:00'}'da gelir.`) : `${h.gun === 7 ? 'Bir hafta' : `${h.gun} gün`} önce ${h.saat ?? '20:00'}'da bildirim gelir${tarihGoster ? ` (${kisaTarih(tarihEkle(tarihSec, -h.gun))})` : ''}.`} Bildirim için Ayarlar → Bildirimler'de bu cihazda açık olmalı.</p>}
       </>
     );
   }
