@@ -509,7 +509,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
           <div className="rt-zrow">
             {!tekrarYok && zc('tekrar', '🔁', tekrarMetni, 'Tekrar')}
             {bildirimGoster && zc('bildirim', '🔔', bildirim, 'Bildirim')}
-            {bildirimGoster && zc('bekle', '⏳', bekle ? `${bekle} dk bekle` : null, 'Sonra bekle')}
+            {V2 && bildirimGoster && zc('bekle', '⏳', bekle ? `${bekle} dk bekle` : null, 'Sonra bekle')}
           </div>
           {panel && (
             <div className="rt-zpanel">

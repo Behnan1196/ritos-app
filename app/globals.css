@@ -746,3 +746,17 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-olcek{display:flex;gap:4px;}
 .rt-olcek button{width:40px;height:36px;border:1px solid var(--line);background:#fff;border-radius:10px;font:inherit;font-size:16px;cursor:pointer;}
 .rt-olcek button.on{background:var(--green2);border-color:var(--green);}
+/* Kart detayı: başlıkta ✎ ve ⋯ menüsü, altta tek ana düğme */
+.rt-detay-ust{position:relative;display:inline-flex;align-items:center;gap:2px;margin-right:4px;}
+.rt-detay-ust .rt-x{font-size:17px;padding:2px 7px;}
+.rt-detay-pop{top:34px;right:0;min-width:200px;}
+.rt-detay-pop .rt-btn{border:0;background:none;text-align:left;padding:8px 10px;border-radius:7px;font-size:13.5px;width:100%;}
+.rt-detay-pop .rt-btn::before{content:'💬 ';}
+.rt-detay-pop .rt-btn:hover{background:#efe8da;}
+.rt-ana{align-self:stretch;padding:11px;font-size:14px;}
+/* Uzun basıp sürükleme */
+.rt-uzun{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
+.rt-liste.suruklu .rt-suruklenen .rt-kart{transform:scale(1.02);}
+.rt-hayalet{position:fixed;z-index:95;pointer-events:none;transform:translate(-50%,-130%);background:#fff;border:1px solid var(--green);border-radius:10px;padding:6px 10px;font-size:13px;font-weight:600;box-shadow:0 10px 24px -8px rgba(0,0,0,.35);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rt-hafta-ad .ok{color:var(--muted);font-weight:400;}
+.rt-hafta-ad:hover{color:var(--green);}

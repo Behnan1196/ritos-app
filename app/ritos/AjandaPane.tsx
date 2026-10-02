@@ -125,84 +125,154 @@ function HaftaGorunumu({ bas, onAc, onEkle, onGun }: { bas: string; onAc: (s: Gu
   const gunler = Array.from({ length: 7 }, (_, i) => tarihEkle(bas, i));
   const veri = useCanli(() => Promise.all(gunler.map((t) => gununKartlari(t))), [bas], [] as GunSatiri[][]);
   const t0 = bugun();
+  // Uzun basıp başka güne bırak (2 ekim): tek günlük, taşınabilir kartlarda. Tekrar eden kart
+  // detaydaki "Başka güne taşı" ile taşınır (orada serinin nasıl kayacağı anlatılıyor).
+  const gunRef = useRef(new Map<string, HTMLDivElement>());
+  const [tasi, setTasi] = useState<{ id: string; ad: string; kaynak: string; hedef: string | null; x: number; y: number } | null>(null);
+  const tasiRef = useRef(tasi);
+  tasiRef.current = tasi;
+  const bul = (id: string) => { for (let i = 0; i < 7; i++) { const s = (veri[i] ?? []).find((x) => x.kart.id === id); if (s) return { s, t: gunler[i] }; } return null; };
+  const gunBul = (x: number, y: number) => { for (const [t, el] of Array.from(gunRef.current.entries())) { const r = el.getBoundingClientRect(); if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return t; } return null; };
+  const uzun = useUzunBas({
+    izin: (id) => { const b = bul(id); return !!b && b.s.kart.izinler.gun_degistir && b.s.kart.bitis === b.s.kart.baslangic; },
+    onBasla: (id, x, y) => { const b = bul(id); if (b) setTasi({ id, ad: b.s.kart.ad, kaynak: b.t, hedef: b.t, x, y }); },
+    onHareket: (x, y) => setTasi((o) => (o ? { ...o, x, y, hedef: gunBul(x, y) } : o)),
+    onBirak: async () => {
+      const o = tasiRef.current;
+      setTasi(null);
+      if (o?.hedef && o.hedef !== o.kaynak) await kartTasi(o.id, o.kaynak, o.hedef);
+    },
+  });
   return (
-    <div className="rt-hafta">
+    <div className={`rt-hafta${tasi ? ' suruklu' : ''}`}>
       {gunler.map((t, i) => {
         const d = tarihParse(t);
         const liste = veri[i] ?? [];
         const yapilan = liste.filter((s) => s.kayit?.yapildi && s.kart.tip !== 'oku').length;
         const toplam = liste.filter((s) => s.kart.tip !== 'oku').length;
         return (
-          <div key={t} className={`rt-hafta-gun${t === t0 ? ' bugun' : ''}${t < t0 ? ' gecmis' : ''}`}>
+          <div key={t} ref={(el) => { if (el) gunRef.current.set(t, el); else gunRef.current.delete(t); }} className={`rt-hafta-gun${t === t0 ? ' bugun' : ''}${t < t0 ? ' gecmis' : ''}${tasi?.hedef === t ? ' hedef' : ''}`}>
             <div className="rt-hafta-hd">
               <button type="button" className="rt-hafta-ad" onClick={() => onGun(t)} title="Gün görünümünde aç">
-                <b>{d.toLocaleDateString('tr-TR', { weekday: 'short' })}</b> {d.getDate()}
+                <b>{d.toLocaleDateString('tr-TR', { weekday: 'short' })}</b> {d.getDate()} <span className="ok">›</span>
               </button>
               {toplam > 0 && <span className={`rt-rozet${yapilan === toplam ? ' tam' : ''}`}>{yapilan}/{toplam}</span>}
               <button type="button" className="rt-ikon" onClick={() => onEkle(t)} aria-label={`${d.getDate()} için kart ekle`}>＋</button>
             </div>
             <div className="rt-liste">
-              {liste.map((s) => <KartSatiri key={s.kart.id} satir={s} tarih={t} onAc={() => onAc(s, t)} />)}
+              {liste.map((s) => (
+                <div key={s.kart.id} className={`rt-uzun${tasi?.id === s.kart.id ? ' rt-suruklenen-kart' : ''}`} {...uzun(s.kart.id)}>
+                  <KartSatiri satir={s} tarih={t} onAc={() => onAc(s, t)} />
+                </div>
+              ))}
               {liste.length === 0 && <p className="rt-muted rt-hafta-bos">—</p>}
             </div>
           </div>
         );
       })}
+      {tasi && <div className="rt-hayalet" style={{ left: tasi.x, top: tasi.y }}>{tasi.ad}</div>}
     </div>
   );
 }
 
-// A7 — sürükle-bırak sıralama. Pointer olaylarıyla (fare + dokunmatik) çalışır;
-// sürükleme sırasında liste yerelde yeniden dizilir, bırakınca sıra kalıcı yazılır.
+// Uzun basıp sürükleme (2 ekim) — tutamak yerine: karta ~0,45 sn basılı tutunca kart kalkar
+// (titreşim) ve sürüklenir. Süre dolmadan parmak kayarsa liste normal kaydırılır. Sürükleme
+// bitince ardından gelen tıklama yutulur (kart açılmasın). Fare ile de basılı tutarak çalışır.
+const ETKILESIM = '.rt-chk, .rt-oynat, .rt-sayac-k, .rt-adet-k, .rt-deger, input, textarea, select';
+function useUzunBas(o: { izin: (id: string) => boolean; onBasla: (id: string, x: number, y: number) => void; onHareket: (x: number, y: number) => void; onBirak: (x: number, y: number) => void }) {
+  const ref = useRef(o);
+  ref.current = o;
+  const st = useRef<{ id: string; x: number; y: number; t: ReturnType<typeof setTimeout>; aktif: boolean; sx: number; sy: number } | null>(null);
+  const yut = useRef(false);
+  useEffect(() => {
+    const bitir = (x: number, y: number) => {
+      const s = st.current;
+      if (!s) return;
+      clearTimeout(s.t);
+      st.current = null;
+      if (s.aktif) { yut.current = true; setTimeout(() => { yut.current = false; }, 400); ref.current.onBirak(x, y); }
+    };
+    const move = (e: PointerEvent) => {
+      const s = st.current;
+      if (!s) return;
+      if (!s.aktif) { if (Math.hypot(e.clientX - s.x, e.clientY - s.y) > 8) { clearTimeout(s.t); st.current = null; } return; }
+      s.sx = e.clientX; s.sy = e.clientY;
+      ref.current.onHareket(e.clientX, e.clientY);
+    };
+    const up = (e: PointerEvent) => bitir(e.clientX, e.clientY);
+    const cancel = () => { const s = st.current; if (s) bitir(s.sx, s.sy); };
+    const tm = (e: TouchEvent) => { if (st.current?.aktif) e.preventDefault(); };
+    const click = (e: MouseEvent) => { if (yut.current) { e.stopPropagation(); e.preventDefault(); yut.current = false; } };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', cancel);
+    window.addEventListener('touchmove', tm, { passive: false });
+    window.addEventListener('click', click, true);
+    return () => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel);
+      window.removeEventListener('touchmove', tm); window.removeEventListener('click', click, true);
+    };
+  }, []);
+  return (id: string) => ({
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.button > 0 || !ref.current.izin(id) || (e.target as HTMLElement).closest(ETKILESIM)) return;
+      const x = e.clientX, y = e.clientY;
+      const t = setTimeout(() => {
+        const s = st.current;
+        if (!s) return;
+        s.aktif = true;
+        try { navigator.vibrate?.(12); } catch { /* yok */ }
+        ref.current.onBasla(id, s.sx, s.sy);
+      }, 450);
+      st.current = { id, x, y, t, aktif: false, sx: x, sy: y };
+    },
+    onContextMenu: (e: React.MouseEvent) => { if (st.current) e.preventDefault(); },
+  });
+}
+
+// A7 — gün listesinde sıralama: uzun bas, sürükle, bırak; sıra kalıcı yazılır.
 function SiraliListe({ satirlar, tarih, onAc }: { satirlar: GunSatiri[]; tarih: string; onAc: (s: GunSatiri) => void }) {
   const [yerel, setYerel] = useState<GunSatiri[] | null>(null);
   const [surukle, setSurukle] = useState<string | null>(null);
   const refs = useRef(new Map<string, HTMLDivElement>());
+  const yerelRef = useRef<GunSatiri[] | null>(null);
   const liste = yerel ?? satirlar;
-
-  useEffect(() => {
-    if (!surukle) return;
-    function onMove(e: PointerEvent) {
-      setYerel((onceki) => {
-        const l = [...(onceki ?? satirlar)];
-        const i = l.findIndex((x) => x.kart.id === surukle);
-        if (i < 0) return onceki;
-        const [x] = l.splice(i, 1);
-        let hedef = l.length;
-        for (let j = 0; j < l.length; j++) {
-          const el = refs.current.get(l[j].kart.id);
-          if (!el) continue;
-          const r = el.getBoundingClientRect();
-          if (e.clientY < r.top + r.height / 2) { hedef = j; break; }
-        }
-        if (hedef === i) return onceki;
-        l.splice(hedef, 0, x);
-        return l;
-      });
-    }
-    async function onUp() {
-      const son = yerel;
+  const bas = useUzunBas({
+    izin: (id) => satirlar.length > 1 && !!satirlar.find((x) => x.kart.id === id)?.kart.izinler.sirala,
+    onBasla: (id) => { yerelRef.current = satirlar; setYerel(satirlar); setSurukle(id); },
+    onHareket: (_x, y) => {
+      const l = [...(yerelRef.current ?? satirlar)];
+      const i = l.findIndex((x) => x.kart.id === surukleRef.current);
+      if (i < 0) return;
+      const [k] = l.splice(i, 1);
+      let hedef = l.length;
+      for (let j = 0; j < l.length; j++) {
+        const el = refs.current.get(l[j].kart.id);
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        if (y < r.top + r.height / 2) { hedef = j; break; }
+      }
+      if (hedef === i) return;
+      l.splice(hedef, 0, k);
+      yerelRef.current = l;
+      setYerel(l);
+    },
+    onBirak: async () => {
+      const son = yerelRef.current;
       setSurukle(null);
       if (son) await siraDegistir(son.map((x) => x.kart.id));
+      yerelRef.current = null;
       setYerel(null);
-    }
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp, { once: true });
-    return () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); };
-  }, [surukle, satirlar, yerel]);
+    },
+  });
+  const surukleRef = useRef<string | null>(null);
+  surukleRef.current = surukle;
 
   return (
-    <div className="rt-liste">
+    <div className={`rt-liste${surukle ? ' suruklu' : ''}`}>
       {liste.map((s) => (
-        <div key={s.kart.id} ref={(el) => { if (el) refs.current.set(s.kart.id, el); else refs.current.delete(s.kart.id); }} className={surukle === s.kart.id ? 'rt-suruklenen' : ''}>
-          <KartSatiri
-            satir={s}
-            tarih={tarih}
-            onAc={() => onAc(s)}
-            tutamac={s.kart.izinler.sirala && liste.length > 1 ? (
-              <span className="rt-tutamac" aria-label="Sürükleyerek sırala" onPointerDown={(e) => { e.preventDefault(); setYerel(liste); setSurukle(s.kart.id); }}>⋮⋮</span>
-            ) : null}
-          />
+        <div key={s.kart.id} ref={(el) => { if (el) refs.current.set(s.kart.id, el); else refs.current.delete(s.kart.id); }} className={`rt-uzun${surukle === s.kart.id ? ' rt-suruklenen' : ''}`} {...bas(s.kart.id)}>
+          <KartSatiri satir={s} tarih={tarih} onAc={() => onAc(s)} />
         </div>
       ))}
     </div>
@@ -346,6 +416,8 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
   const [kutKaydet, setKutKaydet] = useState(false);
   const [uygula, setUygula] = useState(false);
   const [detaySure, setDetaySure] = useState<number | null>(null);
+  const [menuAcik, setMenuAcik] = useState(false);
+  const [degerAc, setDegerAc] = useState(false);
   const dsk = sayacAnahtari(kart.id, tarih);
   const dSayac = useSayac(dsk);
   // Checklist işaretleri o günün kaydında; detay açıkken canlı izlenir.
@@ -392,11 +464,33 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
     </div>
   ) : null;
 
+  // Ana düğme: yapılmamış "yap" kartında ✓ Yapıldı (değer soruluyorsa form). Sayaç çalışırken sayaç kendi düğmesiyle biter.
+  const anaDugme = kart.tip === 'yap' && !kayitCanli?.yapildi && !kilitliDetay && !dSayac && detaySure === null;
+  // ⋯ menüsü: Düzenle dışındaki işler (taşı, kütüphane, paylaş, kaldır).
+  const tasinir = kart.izinler.gun_degistir && (!bagli || kart.geri_bildirim === 'uzak');
+  const silinir = !bagli && kart.izinler.sil;
+  const paylasilir = !bagli;
+  const menuVar = tasinir || silinir || paylasilir || kaydedilir;
+  const ust = (
+    <span className="rt-detay-ust">
+      {duzenlenir && <button type="button" className="rt-x" onClick={() => setDuzenle(true)} aria-label="Düzenle" title="Düzenle">✎</button>}
+      {menuVar && <button type="button" className="rt-x" onClick={() => setMenuAcik(!menuAcik)} aria-label="Diğer işlemler" title="Diğer işlemler">⋯</button>}
+      {menuAcik && (
+        <span className="rt-pop rt-detay-pop" onClick={(e) => e.stopPropagation()}>
+          {tasinir && <button type="button" onClick={() => { setMenuAcik(false); setTasiAcik(true); }}>📅 Başka güne taşı</button>}
+          {kaydedilir && <button type="button" onClick={() => { setMenuAcik(false); setKutKaydet(true); }}>📚 Kütüphaneye kaydet</button>}
+          {paylasilir && <PaylasDugmesi paketUret={() => kartPaketi(kart)} />}
+          {silinir && <button type="button" className="tehlike" onClick={() => { setMenuAcik(false); if (tekrarli) setSilAcik(true); else setTekSil(true); }}>🗑 Kaldır</button>}
+        </span>
+      )}
+    </span>
+  );
+
   if (uygula) return <Uygula satir={satir} tarih={tarih} onKapat={onKapat} />;
   if (kutKaydet) return <KlasorSecModal baslik="📚 Kütüphaneye kaydet" onKapat={onKapat} onSec={async (kl) => { await ajandadanKaydet(kart, kl); }} />;
 
   return (
-    <Modal baslik={kart.ad} onKapat={onKapat}>
+    <Modal baslik={kart.ad} onKapat={onKapat} ust={ust}>
       {kayitCanli?.yapildi && kayitCanli.zaman && <YapildiSaati zaman={kayitCanli.zaman} kilitli={kilitliDetay} bekle={kart.bekle ?? null} onDegis={(z) => yapildiZamani(kart.id, tarih, z)} />}
       <BlokGoster
         bloklar={kart.bloklar}
@@ -410,20 +504,19 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
         ? <p className="rt-muted">🤝 Koçunun kartı · <b>{kart.kaynak_etiket}</b>. İşaretin ve girdiğin değerler yalnız koçuna gider.</p>
         : <p className="rt-muted">Bu kart <b>{kart.kaynak_etiket}</b> programından geliyor; içeriği ve günü programdan yönetilir.</p>)}
 
-      {kaydedilir && !tasiAcik && !silAcik && !tekSil && <div className="rt-satir"><button type="button" className="rt-btn" onClick={() => setKutKaydet(true)}>📚 Kütüphaneye kaydet</button></div>}
+      {degerAc && (
+        <DegerGir bloklar={kart.bloklar} ilk={kayitCanli?.degerler ?? null}
+          onKaydet={async (d) => { await degerKaydet(kart.id, tarih, d); setDegerAc(false); }}
+          onSadeceIsaretle={async () => { await yapildiAyarla(kart.id, tarih, true); setDegerAc(false); }} />
+      )}
+      {anaDugme && !degerAc && !tasiAcik && !silAcik && !tekSil && (
+        <button type="button" className="rt-btn primary rt-ana" onClick={async () => {
+          if (kart.bekle) sesAc();
+          if (olcular.some((o) => o.bicim !== 'adet')) setDegerAc(true);
+          else await yapildiAyarla(kart.id, tarih, true);
+        }}>✓ Yapıldı</button>
+      )}
       {tekSil && <OnayKutusu metin="Kart silinsin mi?" evet="Sil" onVazgec={() => setTekSil(false)} onEvet={() => kartKaldir(kart.id, tarih, 'tamamen').then(onKapat)} />}
-      {bagli && kart.geri_bildirim === 'uzak' && kart.izinler.gun_degistir && !tasiAcik && (
-        <div className="rt-satir"><button type="button" className="rt-btn" onClick={() => setTasiAcik(true)}>Başka güne taşı</button></div>
-      )}
-      {!bagli && !tasiAcik && !silAcik && !tekSil && (
-        <div className="rt-satir">
-          {duzenlenir && <button type="button" className="rt-btn" onClick={() => setDuzenle(true)}>Düzenle</button>}
-          {kart.izinler.gun_degistir && <button type="button" className="rt-btn" onClick={() => setTasiAcik(true)}>Taşı</button>}
-          <PaylasDugmesi paketUret={() => kartPaketi(kart)} />
-          {kart.izinler.sil && <button type="button" className="rt-btn tehlike" onClick={() => (tekrarli ? setSilAcik(true) : setTekSil(true))}>Kaldır</button>}
-        </div>
-      )}
-
       {tasiAcik && (
         <>
           <label className="rt-alan"><span>Yeni gün</span><input className="rt-inp" type="date" value={yeniTarih} onChange={(e) => setYeniTarih(e.target.value)} /></label>
@@ -437,6 +530,7 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
 
       {silAcik && (
         <div className="rt-satir">
+          <span className="rt-muted">Tekrar eden kart:</span>
           <button type="button" className="rt-btn" onClick={async () => { await kartKaldir(kart.id, tarih, 'yalniz_bugun'); onKapat(); }}>Yalnız bu gün</button>
           <button type="button" className="rt-btn tehlike" onClick={async () => { await kartKaldir(kart.id, tarih, 'seriyi_bitir'); onKapat(); }}>Seriyi bugünden bitir</button>
           <button type="button" className="rt-btn" onClick={() => setSilAcik(false)}>Vazgeç</button>
