@@ -775,7 +775,7 @@ export function DavetGelenDetay({ g, onKapat }: { g: GelenRow; onKapat: () => vo
 /** Home — danışan: kimden hangi danışmanlığı alıyor (bilgi satırı; haftalık plan adı değil). */
 export function KoclarimSatiri() {
   const d = useDanismanlik();
-  const koclar = useIliskiler().filter((x) => x.danisan === d.uid && x.durum === 'aktif');
+  const koclar = useIliskiler().filter((x) => x.danisan === d.uid && x.durum === 'aktif' && x.disiplin !== 'aile');
   if (!koclar.length) return null;
   return (
     <>

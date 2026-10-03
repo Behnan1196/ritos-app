@@ -775,3 +775,11 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-bag-w .rt-notlar-hd b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .rt-bil-sec{align-items:flex-start;gap:8px;font-size:13.5px;cursor:pointer;}
 .rt-bil-sec input{margin-top:3px;}
+/* Kaynak filtresi */
+.rt-kaynak-filtre{display:flex;flex-direction:column;gap:6px;margin:0 0 8px;}
+.rt-kaynak-cipler{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;}
+.rt-kaynak-cipler::-webkit-scrollbar{display:none;}
+.rt-kaynak-cipler .rt-chip{flex:0 0 auto;white-space:nowrap;}
+.rt-kaynak-cipler .say{font-size:11px;opacity:.7;margin-left:2px;}
+.rt-kaynak-cipler.alt .rt-chip{font-size:12px;padding:4px 10px;background:transparent;}
+.rt-kaynak-cipler.alt .rt-chip.on{background:var(--green2);color:var(--ink);border-color:var(--green);}

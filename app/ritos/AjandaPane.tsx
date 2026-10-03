@@ -23,6 +23,7 @@ import { db, type IliskiRow, type ProgramRow } from '@/lib/db';
 import type { PlanHedef } from '@/lib/danisanAjanda';
 import { disiplinAdi } from '@/lib/danismanlik';
 import { useSeciliDanisan } from '@/lib/seciliDanisan';
+import { KAYNAK_TUR, filtreOku, filtreYaz, kaynakBilgi, uyar, type Filtre, type KaynakTur } from '@/lib/kaynakFiltre';
 
 // A1–A9 (ilk dilim). Ajanda yalnızca kart satırlarını bilir; kaynağın içini bilmez.
 const GORUNUM_ANAH = 'ritos-ajanda-gorunum';
@@ -47,6 +48,12 @@ export default function AjandaPane() {
   const [ekle, setEkle] = useState<string | null>(null); // hangi güne kart eklenecek
   const [ayAcik, setAyAcik] = useState(false);
   const [detay, setDetay] = useState<{ satir: GunSatiri; tarih: string } | null>(null);
+  // Kaynak filtresi (3 ekim) — seçim cihazda hatırlanır.
+  const [filtre, setFiltreS] = useState<Filtre>({ tur: null, ad: null });
+  useEffect(() => { setFiltreS(filtreOku()); }, []);
+  const setFiltre = (f: Filtre) => { setFiltreS(f); filtreYaz(f); };
+  const tumProgramlar = useCanli(() => db.program.toArray(), [], [] as ProgramRow[]);
+  const pMap = new Map(tumProgramlar.map((p) => [p.id, p]));
   const satirlar = useCanli(() => gununKartlari(tarih), [tarih], [] as GunSatiri[]);
   const t0 = bugun();
   const hafta = gorunum === 'hafta';
@@ -55,15 +62,17 @@ export default function AjandaPane() {
   // Koç: Ajanda'nın başında "kimin ajandası" seçimi (28 eylül). Danışan seçilince aynı gün/hafta
   // görünümünde o danışana atadığın kartlar ve durumları görünür.
   const dn = useDanismanlik();
-  const danisanlar = useCanli(async () => (await db.iliski.toArray()).filter((i) => i.durum === 'aktif' && i.koc === dn.uid), [dn.uid], [] as IliskiRow[]);
+  const verdiklerim = useCanli(async () => (await db.iliski.toArray()).filter((i) => i.durum === 'aktif' && i.koc === dn.uid), [dn.uid], [] as IliskiRow[]);
+  const danisanlar = verdiklerim.filter((i) => i.disiplin !== 'aile');
+  const ailem = verdiklerim.filter((i) => i.disiplin === 'aile'); // 3 ekim — aile içinde görev verdiklerim
   // Seçim danışmanlık ekranıyla ortak ve oturum boyunca korunur (lib/seciliDanisan).
   const [kisi, setKisi] = useSeciliDanisan();
   // Kişisel programlar da odaklanabilir (28 eylül): "p:<id>" — yalnız o programın kartları, planlama araçlarıyla.
   const programlar = useCanli(() => db.program.filter((p) => !p.uzak && !p.sablon).toArray(), [], [] as ProgramRow[]);
-  const secili = danisanlar.find((i) => i.id === kisi) ?? null;
+  const secili = verdiklerim.find((i) => i.id === kisi) ?? null;
   const seciliProgram = kisi.startsWith('p:') ? programlar.find((p) => p.id === kisi.slice(2)) ?? null : null;
   const hedef: PlanHedef | null = secili ? { tur: 'danisan', il: secili } : seciliProgram ? { tur: 'program', programId: seciliProgram.id } : null;
-  const odakVar = (dn.profil?.koc && danisanlar.length > 0) || programlar.length > 0;
+  const odakVar = (dn.profil?.koc && danisanlar.length > 0) || programlar.length > 0 || ailem.length > 0;
 
   return (
     <div className="rt-ajanda">
@@ -73,6 +82,9 @@ export default function AjandaPane() {
             <option value="">📅 Benim ajandam</option>
             {programlar.length > 0 && <optgroup label="Programlarım">
               {programlar.sort((a, b) => a.ad.localeCompare(b.ad, 'tr')).map((p) => <option key={p.id} value={`p:${p.id}`}>🌱 {p.ad}</option>)}
+            </optgroup>}
+            {ailem.length > 0 && <optgroup label="Ailem — verdiğim görevler">
+              {ailem.map((i) => <option key={i.id} value={i.id}>👪 {i.danisan_ad}</option>)}
             </optgroup>}
             {dn.profil?.koc && danisanlar.length > 0 && <optgroup label="Danışanlarım">
               {danisanlar.map((i) => <option key={i.id} value={i.id}>🤝 {i.danisan_ad}</option>)}
@@ -97,18 +109,22 @@ export default function AjandaPane() {
         <DanisanAjandasi
           h={hedef}
           baslik={secili
-            ? <>🤝 <b>{secili.danisan_ad}</b> · {disiplinAdi(secili.disiplin)} — yalnız senin atadığın kartlar görünür.</>
+            ? secili.disiplin === 'aile'
+              ? <>👪 <b>{secili.danisan_ad}</b> — ona verdiğin görevler ve durumları. Kart ekle; işaretleyince burada görürsün.</>
+              : <>🤝 <b>{secili.danisan_ad}</b> · {disiplinAdi(secili.disiplin)} — yalnız senin atadığın kartlar görünür.</>
             : <>🌱 <b>{seciliProgram!.ad}</b> — yalnız bu programın kartları. Burada kurduğun kartlar Benim ajandam&apos;a da düşer.</>}
           tarih={tarih} hafta={hafta} haftaBas={haftaBasi(tarih)} onGun={(t) => { setTarih(t); setGorunum('gun'); }} />
       ) : hafta ? (
-        <HaftaGorunumu bas={haftaBasi(tarih)} onAc={(satir, t) => setDetay({ satir, tarih: t })} onEkle={setEkle} onGun={(t) => { setTarih(t); setGorunum('gun'); }} />
+        <HaftaGorunumu bas={haftaBasi(tarih)} filtre={filtre} setFiltre={setFiltre} pMap={pMap} onAc={(satir, t) => setDetay({ satir, tarih: t })} onEkle={setEkle} onGun={(t) => { setTarih(t); setGorunum('gun'); }} />
       ) : (
         <Kap
           baslik="Gün"
           eylemler={<button type="button" className="rt-ikon" onClick={() => setEkle(tarih)} aria-label="Kart ekle">＋</button>}
         >
+          <KaynakCipleri satirlar={satirlar} filtre={filtre} setFiltre={setFiltre} pMap={pMap} />
           {satirlar.length === 0 && <p className="rt-muted">Bu gün için kart yok.</p>}
-          <SiraliListe satirlar={satirlar} tarih={tarih} onAc={(s) => setDetay({ satir: s, tarih })} />
+          {satirlar.length > 0 && filtre.tur && !satirlar.some((s) => uyar(kaynakBilgi(s.kart, pMap), filtre)) && <p className="rt-muted">Bu kaynaktan bugün kart yok.</p>}
+          <SiraliListe satirlar={satirlar.filter((s) => uyar(kaynakBilgi(s.kart, pMap), filtre))} tarih={tarih} onAc={(s) => setDetay({ satir: s, tarih })} />
         </Kap>
       )}
 
@@ -121,9 +137,10 @@ export default function AjandaPane() {
 
 // Haftalık görünüm (28 eylül — iPad/geniş ekran). Her gün kendi kabında; kaplar en az
 // genişlik kuralıyla yan yana dizilir, sığmayanlar alt satıra kayar (CSS grid auto-fill).
-function HaftaGorunumu({ bas, onAc, onEkle, onGun }: { bas: string; onAc: (s: GunSatiri, t: string) => void; onEkle: (t: string) => void; onGun: (t: string) => void }) {
+function HaftaGorunumu({ bas, filtre, setFiltre, pMap, onAc, onEkle, onGun }: { bas: string; filtre: Filtre; setFiltre: (f: Filtre) => void; pMap: Map<string, ProgramRow>; onAc: (s: GunSatiri, t: string) => void; onEkle: (t: string) => void; onGun: (t: string) => void }) {
   const gunler = Array.from({ length: 7 }, (_, i) => tarihEkle(bas, i));
-  const veri = useCanli(() => Promise.all(gunler.map((t) => gununKartlari(t))), [bas], [] as GunSatiri[][]);
+  const hamVeri = useCanli(() => Promise.all(gunler.map((t) => gununKartlari(t))), [bas], [] as GunSatiri[][]);
+  const veri = hamVeri.map((g) => g.filter((s) => uyar(kaynakBilgi(s.kart, pMap), filtre)));
   const t0 = bugun();
   // Uzun basıp başka güne bırak (2 ekim): tek günlük, taşınabilir kartlarda. Tekrar eden kart
   // detaydaki "Başka güne taşı" ile taşınır (orada serinin nasıl kayacağı anlatılıyor).
@@ -144,6 +161,8 @@ function HaftaGorunumu({ bas, onAc, onEkle, onGun }: { bas: string; onAc: (s: Gu
     },
   });
   return (
+    <>
+    <KaynakCipleri satirlar={hamVeri.flat()} filtre={filtre} setFiltre={setFiltre} pMap={pMap} />
     <div className={`rt-hafta${tasi ? ' suruklu' : ''}`}>
       {gunler.map((t, i) => {
         const d = tarihParse(t);
@@ -171,6 +190,36 @@ function HaftaGorunumu({ bas, onAc, onEkle, onGun }: { bas: string; onAc: (s: Gu
         );
       })}
       {tasi && <div className="rt-hayalet" style={{ left: tasi.x, top: tasi.y }}>{tasi.ad}</div>}
+    </div>
+    </>
+  );
+}
+
+// Kaynak çipleri: yalnız görünen kartlarda bulunan kaynaklar; sayılarıyla. Bir türe dokununca
+// (birden çok kaynak adı varsa) altında adlar açılır. Tek kaynak varsa ve filtre yoksa gizli.
+function KaynakCipleri({ satirlar, filtre, setFiltre, pMap }: { satirlar: GunSatiri[]; filtre: Filtre; setFiltre: (f: Filtre) => void; pMap: Map<string, ProgramRow> }) {
+  const bilgiler = satirlar.map((s) => kaynakBilgi(s.kart, pMap));
+  const sayi = new Map<KaynakTur, number>();
+  for (const b of bilgiler) sayi.set(b.tur, (sayi.get(b.tur) ?? 0) + 1);
+  if (sayi.size < 2 && !filtre.tur) return null;
+  const adlar = filtre.tur ? Array.from(new Set(bilgiler.filter((b) => b.tur === filtre.tur && b.ad).map((b) => b.ad as string))) : [];
+  return (
+    <div className="rt-kaynak-filtre">
+      <div className="rt-kaynak-cipler">
+        <button type="button" className={`rt-chip${!filtre.tur ? ' on' : ''}`} onClick={() => setFiltre({ tur: null, ad: null })}>Tümü <span className="say">{satirlar.length}</span></button>
+        {KAYNAK_TUR.filter(([t]) => sayi.has(t) || filtre.tur === t).map(([t, ic, ad]) => (
+          <button key={t} type="button" className={`rt-chip${filtre.tur === t ? ' on' : ''}`} onClick={() => setFiltre(filtre.tur === t ? { tur: null, ad: null } : { tur: t, ad: null })}>
+            {ic} {ad} <span className="say">{sayi.get(t) ?? 0}</span>
+          </button>
+        ))}
+      </div>
+      {adlar.length > 1 && (
+        <div className="rt-kaynak-cipler alt">
+          {adlar.map((a) => (
+            <button key={a} type="button" className={`rt-chip${filtre.ad === a ? ' on' : ''}`} onClick={() => setFiltre({ tur: filtre.tur, ad: filtre.ad === a ? null : a })}>{a}</button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -295,7 +344,8 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
   useTik(bekliyor, 15000);
   const adetB = kart.tip === 'yap' ? kart.bloklar.find((b): b is Extract<Blok, { tur: 'sayi' }> => b.tur === 'sayi' && b.bicim === 'adet') : undefined;
   const adetV = adetB ? Number((kayit?.degerler ?? {})[adetB.anahtar]) || 0 : 0;
-  const meta = [yapildi && kayit?.zaman ? `✓ ${saatMetni(kayit.zaman)}` : '', kart.saatler.join(' · ') + (kart.hatirlatma ? ' 🔔' : ''), bagli && kart.kaynak_etiket ? `${kart.kaynak_modul === 'dis' ? '🔗' : uzak ? '🤝' : '🌱'} ${kart.kaynak_etiket}` : ''].filter(Boolean).join(' · ');
+  const aileKarti = useCanli(async () => (kart.geri_bildirim === 'uzak' ? (await db.program.get((kart.kaynak_ref ?? '').split('/')[0]))?.uzak?.disiplin === 'aile' : false), [kart.kaynak_ref], false);
+  const meta = [yapildi && kayit?.zaman ? `✓ ${saatMetni(kayit.zaman)}` : '', kart.saatler.join(' · ') + (kart.hatirlatma ? ' 🔔' : ''), bagli && kart.kaynak_etiket ? `${kart.kaynak_modul === 'dis' ? '🔗' : aileKarti ? '👪' : uzak ? '🤝' : '🌱'} ${kart.kaynak_etiket}` : ''].filter(Boolean).join(' · ');
   const yeniGuncel = !!kart.isaret && Date.now() - kart.isaret < 3 * 86400000;
   // A9 — değer düzeltme süresi (koçun izni): süre geçtiyse yapılmış kart değiştirilemez.
   const kilitli = !!kayit?.yapildi && kart.izinler.duzeltme_gun !== null && gunFarki(tarih, bugun()) > kart.izinler.duzeltme_gun;
@@ -417,6 +467,7 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
   const [uygula, setUygula] = useState(false);
   const [detaySure, setDetaySure] = useState<number | null>(null);
   const [menuAcik, setMenuAcik] = useState(false);
+  const aileDetay = useCanli(async () => (kart.geri_bildirim === 'uzak' ? (await db.program.get((kart.kaynak_ref ?? '').split('/')[0]))?.uzak?.disiplin === 'aile' : false), [kart.kaynak_ref], false);
   const [degerAc, setDegerAc] = useState(false);
   const dsk = sayacAnahtari(kart.id, tarih);
   const dSayac = useSayac(dsk);
@@ -501,7 +552,9 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
         } : undefined}
       />
       {bagli && (kart.geri_bildirim === 'uzak'
-        ? <p className="rt-muted">🤝 Koçunun kartı · <b>{kart.kaynak_etiket}</b>. İşaretin ve girdiğin değerler yalnız koçuna gider.</p>
+        ? aileDetay
+          ? <p className="rt-muted">👪 <b>{kart.kaynak_etiket}</b> verdi. İşaretin ve girdiğin değerler yalnız ona gider.</p>
+          : <p className="rt-muted">🤝 Koçunun kartı · <b>{kart.kaynak_etiket}</b>. İşaretin ve girdiğin değerler yalnız koçuna gider.</p>
         : kart.kaynak_modul === 'dis'
           ? <p className="rt-muted">🔗 <b>{kart.kaynak_etiket}</b> uygulamasından geliyor; içeriğini ve gününü o uygulama yönetir. İşaretin ve girdiğin değerler ona geri yazılır.</p>
           : <p className="rt-muted">Bu kart <b>{kart.kaynak_etiket}</b> programından geliyor; içeriği ve günü programdan yönetilir.</p>)}

@@ -9,8 +9,9 @@ import { useCanli } from '@/lib/canli';
 import { bugun, tarihEtiket } from '@/lib/paket';
 import { kartPaketi, paketiAl, programPaketi, type PaylasimPaketi } from '@/lib/paylasim';
 import { yol } from '@/lib/alan';
+import { seciliDanisanAyarla } from '@/lib/seciliDanisan';
 import {
-  aileAktifMi, aileAyril, aileDavet, aileKur, aileYanit, benimAileRolum, disiplinAdi, konusmaAile, konusmaIliski,
+  aileAktifMi, aileAyril, aileGorevIliski, aileDavet, aileKur, aileYanit, benimAileRolum, disiplinAdi, konusmaAile, konusmaIliski,
   okunduIsaretle, sohbetGonder, useDanismanlik,
 } from '@/lib/danismanlik';
 import { Chips, Kap, Modal, OnayKutusu } from './ortak';
@@ -301,7 +302,7 @@ export function AileAyarlari() {
     <Kap baslik="Aile">
       {!aile ? (
         <>
-          <p className="rt-muted">Ailenle (en fazla 3 kişi) yazışır, birbirinize kart ve program gönderirsiniz. Kimse kimsenin Ajanda&apos;sını ya da programlarını görmez.</p>
+          <p className="rt-muted">Ailenle (en fazla 3 kişi) yazışır, birbirinize görev verirsiniz. Yalnız verdiğin görevlerin durumunu görürsün; kimse kimsenin Ajanda&apos;sının geri kalanını görmez.</p>
           <div className="rt-satir" style={{ flexWrap: 'nowrap' }}>
             <input className="rt-inp" placeholder="Grup adı, ör. Öztürkmen ailesi" value={ad} onChange={(e) => setAd(e.target.value)} />
             <button type="button" className="rt-btn primary" disabled={!ad.trim()} onClick={() => calistir(() => aileKur(ad.trim()), 'Grup kuruldu. Şimdi ailenden birini davet et.')}>Kur</button>
@@ -313,6 +314,13 @@ export function AileAyarlari() {
           {aile.uyeler.filter((u) => u.durum !== 'ayrildi').map((u) => (
             <div key={u.uye} className="rt-kaynak">
               <div className="rt-konu" style={{ cursor: 'default' }}><span>{u.ad}{u.uye === d.uid ? ' (sen)' : ''}</span><span className="rt-muted">{u.rol === 'yonetici' ? 'yönetici' : u.durum === 'davet' ? 'davet bekliyor' : 'üye'}</span></div>
+              {u.uye !== d.uid && u.durum === 'aktif' && ben?.durum === 'aktif' && (
+                <button type="button" className="rt-btn" onClick={() => calistir(async () => {
+                  const id = await aileGorevIliski(u.uye);
+                  seciliDanisanAyarla(id);
+                  window.dispatchEvent(new Event('ritos-ajandaya-git'));
+                })}>📋 Görev ver</button>
+              )}
               {ben?.rol === 'yonetici' && u.uye !== d.uid && <button type="button" className="rt-btn" onClick={() => setCikar(u.uye)}>Çıkar</button>}
             </div>
           ))}

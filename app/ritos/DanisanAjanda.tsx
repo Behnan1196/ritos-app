@@ -167,7 +167,8 @@ const TEKRAR_SURE: [string, string][] = [['7', '1 hafta'], ['14', '2 hafta'], ['
 
 function KocKartFormu({ h, tarih, k, onKapat }: { h: PlanHedef; tarih: string; k?: KocKarti; onKapat: () => void }) {
   // Kişisel programda kişinin kendi tek kart editörü (video, süre kaydı, zamanlayıcı…) kullanılır.
-  if (h.tur === 'program') return <ProgramKartFormu h={h} tarih={tarih} k={k} onKapat={onKapat} />;
+  // Aile içi görevler de (3 ekim) aynı tek kart editörüyle — öğün/ölçüm paleti koçluğa özgü.
+  if (h.tur === 'program' || h.il.disiplin === 'aile') return <ProgramKartFormu h={h} tarih={tarih} k={k} onKapat={onKapat} />;
   return <DanisanKartFormu il={h.il} h={h} tarih={tarih} k={k} onKapat={onKapat} />;
 }
 

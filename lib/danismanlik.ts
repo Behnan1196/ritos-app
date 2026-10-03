@@ -26,7 +26,7 @@ import { senkronKancalari } from './senkron';
 // ———————————————— disiplinler ve varsayılan izinler (D9) ————————————————
 
 export const DISIPLINLER: [string, string][] = [['sinav', 'Sınav koçluğu'], ['beslenme', 'Beslenme'], ['genel', 'Yaşam / genel koçluk']];
-export const disiplinAdi = (d: string) => DISIPLINLER.find(([k]) => k === d)?.[1] ?? d;
+export const disiplinAdi = (d: string) => (d === 'aile' ? 'Aile' : DISIPLINLER.find(([k]) => k === d)?.[1] ?? d);
 
 export function varsayilanIzin(disiplin: string): Izinler {
   // Sınav ve beslenme: gün değişmez, danışan kartı düzenleyemez/silemez; sıralayabilir.
@@ -69,6 +69,7 @@ export interface Tasima {
   aileAnahtarYaz(satirlar: { aile: string; uye: string; surum: number; saran: string; sarili: string }[]): Promise<void>;
   aileMesajGonder(aile: string, surum: number, veri: string): Promise<void>;
   aileMesajCek(aile: string, sonra: number): Promise<{ sira: number; gonderen: string; anahtar_surum: number; veri: string }[]>;
+  aileGorevIliski(uye: string): Promise<string>;
 }
 
 function hata(e: { message: string } | null) { if (e) throw new Error(e.message); }
@@ -141,6 +142,11 @@ function supabaseTasima(uid: string): Tasima {
       return (r.data as string | null) ?? null;
     },
     async sonlandir(id) { hata((await sb.rpc('cat_iliski_sonlandir', { p_id: id })).error); },
+    async aileGorevIliski(uye) {
+      const r = await sb.rpc('cat_aile_gorev_iliski', { p_uye: uye });
+      hata(r.error);
+      return r.data as string;
+    },
     async mesajGonder(iliski, alici, veri) {
       hata((await sb.from('cat_mesaj').insert({ iliski, gonderen: uid, alici, veri })).error);
     },
@@ -552,6 +558,15 @@ export async function davetYanit(kod: string, kabul: boolean): Promise<string | 
   if (kabul) await anahtarGaranti();
   const id = await tt.davetYanit(kod, kabul);
   await iliskileriCek();
+  return id;
+}
+
+// Aile içinde görev verme (3 ekim): veren → alan için 'aile' ilişkisi davetsiz kurulur (yoksa).
+export async function aileGorevIliski(uye: string): Promise<string> {
+  await anahtarGaranti();
+  const id = await tasimaVar().aileGorevIliski(uye);
+  await iliskileriCek();
+  tetikle();
   return id;
 }
 
