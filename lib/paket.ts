@@ -163,3 +163,12 @@ export function tarihEtiket(t: string): string {
   const d = tarihParse(t);
   return `${d.getDate()} ${AYLAR[d.getMonth()]}, ${GUN_ADLARI[d.getDay()]}`;
 }
+
+/** Türkçe tamlayan eki: "Ece" → "Ece'nin", "Ali" → "Ali'nin", "Can" → "Can'ın", "Ömür" → "Ömür'ün". */
+export function iyelik(ad: string): string {
+  const t = ad.trim();
+  const sesli = Array.from(t.toLocaleLowerCase('tr')).reverse().find((c) => 'aeıioöuü'.includes(c)) ?? 'e';
+  const u = 'aı'.includes(sesli) ? 'ın' : 'ei'.includes(sesli) ? 'in' : 'ou'.includes(sesli) ? 'un' : 'ün';
+  const son = t.slice(-1).toLocaleLowerCase('tr');
+  return `${t}'${'aeıioöuü'.includes(son) ? 'n' : ''}${u}`;
+}

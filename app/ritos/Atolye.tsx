@@ -10,8 +10,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { useCanli } from '@/lib/canli';
-import { db, type IliskiRow, type ProgramRow } from '@/lib/db';
-import { bugun, tarihEkle, tarihEtiket } from '@/lib/paket';
+import { db, type IliskiRow, type KutuphaneKartRow, type ProgramRow } from '@/lib/db';
+import { bugun, degerBloklari, iyelik, tarihEkle, tarihEtiket, tarihParse } from '@/lib/paket';
+import { danisanGunleri, gonderimAyarla, kocKartEkle, planDurumu, type KocKarti } from '@/lib/danisanAjanda';
+import { SURE_ANAHTAR } from './KartEditor';
 import { disiplinAdi, useDanismanlik } from '@/lib/danismanlik';
 import { useSeciliDanisan } from '@/lib/seciliDanisan';
 import type { PlanHedef } from '@/lib/danisanAjanda';
@@ -147,10 +149,146 @@ function Planlar({ genis }: { genis: boolean }) {
                   ? <>Ona verdiğin görevler ve durumları. İşaretleyince burada görürsün.</>
                   : <>Yalnız senin atadığın kartlar görünür.</>}
               tarih={tarih} hafta={hafta} haftaBas={haftaBasi(tarih)} onGun={(t) => { setTarih(t); setHafta(false); }} />
+            {!genis && <AtolyeAraclari h={h} haftaBas={haftaBasi(tarih)} />}
           </>
         )}
       </section>
+      {genis && h && (
+        <aside className="rt-atolye-sag">
+          <AtolyeAraclari h={h} haftaBas={haftaBasi(tarih)} />
+          <KutuphaneSurukle h={h} />
+        </aside>
+      )}
       {ayAcik && <AyTakvimi secili={tarih} onSec={(t) => { setTarih(t); setAyAcik(false); }} onKapat={() => setAyAcik(false)} />}
+    </div>
+  );
+}
+
+// ———————————————— Araçlar (3 ekim) ————————————————
+// Hedefin son 4 haftası kartlardan okunur: bu hafta, uyum, ölçümler. Danışan / aile için gönderim.
+
+const yuzde = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
+
+interface Seri { ad: string; birim: string; noktalar: { t: string; v: number }[] }
+
+function serileriCikar(kartlar: KocKarti[]): Seri[] {
+  const m = new Map<string, Seri>();
+  for (const k of kartlar) {
+    if (!k.degerler) continue;
+    const bloklar = degerBloklari(k.adim.bloklar);
+    const ekle = (anahtar: string, ad: string, birim: string) => {
+      const v = Number((k.degerler as Record<string, unknown>)[anahtar]);
+      if (!Number.isFinite(v)) return;
+      const key = anahtar === SURE_ANAHTAR ? `${k.adim.ad}|${anahtar}` : anahtar; // aynı ölçü (ör. kilo) farklı kartlardan tek seri
+      if (!m.has(key)) m.set(key, { ad, birim, noktalar: [] });
+      m.get(key)!.noktalar.push({ t: k.tarih, v });
+    };
+    for (const b of bloklar) if (b.tur === 'sayi') ekle(b.anahtar, b.etiket, b.bicim === 'olcek' ? '/5' : b.birim ?? '');
+    if (SURE_ANAHTAR in (k.degerler as object)) ekle(SURE_ANAHTAR, `${k.adim.ad} · süre`, 'dk');
+  }
+  return Array.from(m.values()).filter((x) => x.noktalar.length).map((x) => ({ ...x, noktalar: x.noktalar.sort((a, b) => a.t.localeCompare(b.t)) }));
+}
+
+function Kivrim({ n }: { n: number[] }) {
+  if (n.length < 2) return null;
+  const min = Math.min(...n), max = Math.max(...n), g = 90, y = 24;
+  const pts = n.map((v, i) => `${(i / (n.length - 1)) * g},${max === min ? y / 2 : y - 2 - ((v - min) / (max - min)) * (y - 4)}`).join(' ');
+  return <svg className="rt-kivrim" viewBox={`0 0 ${g} ${y}`} width={g} height={y} aria-hidden="true"><polyline points={pts} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>;
+}
+
+function AtolyeAraclari({ h, haftaBas }: { h: Hedef; haftaBas: string }) {
+  const gunler = Array.from({ length: 28 }, (_, i) => tarihEkle(haftaBas, i - 21));
+  const veri = useCanli(() => danisanGunleri(h.h, gunler), [h.id, haftaBas], {} as Record<string, KocKarti[]>);
+  const pd = useCanli(() => planDurumu(h.h), [h.id], null as Awaited<ReturnType<typeof planDurumu>>);
+  const [hata, setHata] = useState<string | null>(null);
+  const t0 = bugun();
+  const hafta = gunler.slice(21).flatMap((t) => veri[t] ?? []);
+  const haftalar = [0, 1, 2, 3].map((w) => {
+    const ks = gunler.slice(w * 7, w * 7 + 7).filter((t) => t <= t0).flatMap((t) => veri[t] ?? []);
+    return { bas: gunler[w * 7], yap: ks.filter((k) => k.yapildi).length, top: ks.length };
+  });
+  const seriler = serileriCikar(gunler.flatMap((t) => veri[t] ?? [])).slice(0, 5);
+  const kim = h.h.tur === 'danisan' ? h.h.il.danisan_ad : '';
+  const yap = hafta.filter((k) => k.yapildi).length;
+  return (
+    <div className="rt-araclar">
+      <div className="rt-arac">
+        <h4>Bu hafta</h4>
+        <div className="rt-buyuk">%{yuzde(yap, hafta.length)}<small>{yap}/{hafta.length} kart yapıldı</small></div>
+      </div>
+      <div className="rt-arac">
+        <h4>Son 4 hafta · bugüne kadar</h4>
+        {haftalar.map((w) => (
+          <div key={w.bas} className="rt-cizgi">
+            <span className="ad">{tarihParse(w.bas).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</span>
+            <span className="yol"><i style={{ width: `${yuzde(w.yap, w.top)}%` }} /></span>
+            <span className="d">{w.top ? `%${yuzde(w.yap, w.top)}` : '—'}</span>
+          </div>
+        ))}
+      </div>
+      <div className="rt-arac">
+        <h4>Ölçümler</h4>
+        {seriler.length === 0 && <p className="rt-muted">Son 4 haftada girilen değer yok. Karta 📏 ölçüm eklersen burada seri olarak görünür.</p>}
+        {seriler.map((x) => {
+          const n = x.noktalar.map((p) => p.v);
+          const son = n[n.length - 1], fark = son - n[0];
+          return (
+            <div key={x.ad} className="rt-seri">
+              <span className="ad">{x.ad}</span>
+              <Kivrim n={n} />
+              <span className="d"><b>{son.toLocaleString('tr-TR')}</b>{x.birim && x.birim !== '/5' ? ` ${x.birim}` : x.birim}{n.length > 1 && fark !== 0 && <small> {fark > 0 ? '↑' : '↓'}{Math.abs(Math.round(fark * 10) / 10).toLocaleString('tr-TR')}</small>}</span>
+            </div>
+          );
+        })}
+      </div>
+      {pd && (
+        <div className="rt-arac">
+          <h4>Gönderim</h4>
+          <div className="rt-gorunum rt-gonderim" role="group" aria-label="Gönderim">
+            <button type="button" className={pd.gonderim === 'hemen' ? 'on' : ''} onClick={() => gonderimAyarla(h.h, 'hemen').catch((e) => setHata((e as Error).message))}>Hemen gönder</button>
+            <button type="button" className={pd.gonderim === 'gonder' ? 'on' : ''} onClick={() => gonderimAyarla(h.h, 'gonder').catch((e) => setHata((e as Error).message))}>Gönder deyince</button>
+          </div>
+          <p className="rt-muted">{pd.gonderim === 'gonder'
+            ? `Değişiklikler taslak kalır; "Gönder" deyince ${iyelik(kim)} Ajanda'sına düşer.`
+            : `Her değişiklik birkaç saniye içinde ${iyelik(kim)} Ajanda'sına yansır.`}</p>
+          {hata && <p className="rt-hata">{hata}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Geniş ekranda: Kütüphane kartını haftanın bir gününe sürükle → seçili hedefin planına eklenir.
+function KutuphaneSurukle({ h }: { h: Hedef }) {
+  const kartlar = useCanli(() => db.kutuphane_kart.toArray(), [], [] as KutuphaneKartRow[]);
+  const [tasi, setTasi] = useState<{ k: KutuphaneKartRow; x: number; y: number } | null>(null);
+  const [mesaj, setMesaj] = useState<string | null>(null);
+  useEffect(() => {
+    if (!tasi) return;
+    const k = tasi.k;
+    const hareket = (e: PointerEvent) => setTasi((t) => (t ? { ...t, x: e.clientX, y: e.clientY } : t));
+    const birak = async (e: PointerEvent) => {
+      setTasi(null);
+      const gun = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest<HTMLElement>('[data-tarih]')?.dataset.tarih;
+      if (!gun) return;
+      try {
+        await kocKartEkle(h.h, gun, { tip: k.tip, ad: k.ad, bloklar: k.bloklar, ek: k.ek ?? null });
+        setMesaj(`"${k.ad}" ${tarihEtiket(gun)} gününe eklendi.`);
+      } catch (x) { setMesaj((x as Error).message); }
+    };
+    window.addEventListener('pointermove', hareket);
+    window.addEventListener('pointerup', birak, { once: true });
+    return () => { window.removeEventListener('pointermove', hareket); window.removeEventListener('pointerup', birak); };
+  }, [tasi?.k.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!kartlar.length) return null;
+  return (
+    <div className="rt-arac rt-kut-surukle">
+      <h4>📚 Kütüphane — haftaya sürükle</h4>
+      {mesaj && <p className="rt-tamam" onClick={() => setMesaj(null)}>{mesaj}</p>}
+      {kartlar.sort((a, b) => a.ad.localeCompare(b.ad, 'tr')).map((k) => (
+        <div key={k.id} className="rt-kut-oge" onPointerDown={(e) => { e.preventDefault(); setMesaj(null); setTasi({ k, x: e.clientX, y: e.clientY }); }}>{k.ad}</div>
+      ))}
+      {tasi && <div className="rt-hayalet" style={{ left: tasi.x, top: tasi.y }}>{tasi.k.ad}</div>}
     </div>
   );
 }

@@ -6,7 +6,7 @@
 //    sonunda ＋ ile yeni alan eklenir. Koçluk ayrıca açılmaz; ilk alan eklenince açılmış olur.
 //  • Widget açılınca danışmanlık ekranı: geniş ekranda sağ bölmede (solda seçili danışanın
 //    Ajanda'sı), telefonda tam ekran. Burada danışan yönetimi: seçim, davet, bekleyen davetler,
-//    sonlananlar. Danışana ait diğer bölümler (Özet, Ölçümler) şimdilik yer tutucu.
+//    sonlananlar. Plan, uyum ve ölçümler Atölye'de (3 ekim).
 // ————————————————————————————————————————————————————————————————
 
 import React, { useEffect, useState } from 'react';
@@ -76,7 +76,6 @@ function AlanEkleModal({ onKapat, onEklendi }: { onKapat: () => void; onEklendi:
   );
 }
 
-type AltSekme = 'plan' | 'ozet' | 'olcum';
 
 export function DanismanlikEkrani({ disiplin, dar, onKapat, onAjanda, onSinavPaketi }: {
   disiplin: string; dar: boolean; onKapat: () => void; onAjanda: () => void; onSinavPaketi?: () => void;
@@ -88,7 +87,6 @@ export function DanismanlikEkrani({ disiplin, dar, onKapat, onAjanda, onSinavPak
   const [secili, setSecili] = useSeciliDanisan();
   const [davet, setDavet] = useState(false);
   const [sonlananAcik, setSonlananAcik] = useState(false);
-  const [sekme, setSekme] = useState<AltSekme>('plan');
   const [bitir, setBitir] = useState(false);
   const [kaldir, setKaldir] = useState(false);
   const il = hepsi.find((x) => x.id === secili) ?? null;
@@ -131,18 +129,7 @@ export function DanismanlikEkrani({ disiplin, dar, onKapat, onAjanda, onSinavPak
             </span>
             {il.durum === 'aktif' && <button type="button" className="rt-btn primary" onClick={onAjanda}>🗂 Atölye&apos;de planla</button>}
           </div>
-          <div className="rt-alt-sekme">
-            {([['plan', 'Plan'], ['ozet', 'Özet'], ['olcum', 'Ölçümler']] as [AltSekme, string][]).map(([k, ad]) => (
-              <button key={k} type="button" className={sekme === k ? 'on' : ''} onClick={() => setSekme(k)}>{ad}</button>
-            ))}
-          </div>
-          <div className="rt-alt-ic">
-            {sekme === 'plan' && (
-              <p className="rt-muted">{dar ? '📅 Ajandası düğmesiyle danışanın haftasını açarsın' : '← Soldaki Ajanda artık danışanın haftasını gösteriyor'}: gün gün kart eklersin (öğün, ölçüm), günü değiştirmek için kartı sürüklersin.</p>
-            )}
-            {sekme === 'ozet' && <p className="rt-yer-tutucu">Yakında: hedefler, son hafta uyumu, son ölçümler ve notların tek bakışta.</p>}
-            {sekme === 'olcum' && <p className="rt-yer-tutucu">Yakında: danışanın gönderdiği ölçümler seri ve grafik olarak.</p>}
-          </div>
+          <p className="rt-muted">Haftasını planlamak, uyumunu ve ölçümlerini görmek için 🗂 Atölye.</p>
           {il.durum === 'aktif' && <button type="button" className="rt-linkbtn" onClick={() => setBitir(true)}>Danışmanlığı sonlandır</button>}
         </div>
       )}

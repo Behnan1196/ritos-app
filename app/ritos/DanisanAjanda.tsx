@@ -5,7 +5,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useCanli } from '@/lib/canli';
-import { hedefGrubu, danisanGunleri, haftaKartlari, haftaSablonKaydet, haftaUygula, kocKartEkle, kocKartGuncelle, kocKartSil, kocKartTasi, kocSeriBitir, sablonKartlari, type KocKarti, type KocKartTaslak, type KocTekrar, type PlanHedef } from '@/lib/danisanAjanda';
+import { hedefGrubu, danisanGunleri, planDurumu, planGonder, haftaKartlari, haftaSablonKaydet, haftaUygula, kocKartEkle, kocKartGuncelle, kocKartSil, kocKartTasi, kocSeriBitir, sablonKartlari, type KocKarti, type KocKartTaslak, type KocTekrar, type PlanHedef } from '@/lib/danisanAjanda';
 import { KartEditor } from './KartEditor';
 import type { AjandaKartRow } from '@/lib/db';
 import { disiplinAdi } from '@/lib/danismanlik';
@@ -32,6 +32,9 @@ export function DanisanAjandasi({ h, baslik, tarih, hafta, haftaBas, onGun }: { 
   const [haftaIs, setHaftaIs] = useState<null | 'uygula' | 'kaydet'>(null);
   const [bilgi, setBilgi] = useState<string | null>(null);
   const t0 = bugun();
+  // 3 ekim — taslak modu: gönderilmemiş değişiklikler ve Gönder.
+  const pd = useCanli(() => planDurumu(h), [hedefKey(h)], null as Awaited<ReturnType<typeof planDurumu>>);
+  const taslakModu = pd?.gonderim === 'gonder';
   async function gecenHafta() {
     setHata(null); setBilgi(null);
     try {
@@ -84,6 +87,12 @@ export function DanisanAjandasi({ h, baslik, tarih, hafta, haftaBas, onGun }: { 
           <button type="button" className="rt-chip" onClick={() => setHaftaIs('kaydet')}>💾 Haftayı şablon kaydet</button>
         </div>
       )}
+      {taslakModu && pd && pd.bekleyen > 0 && h.tur === 'danisan' && (
+        <div className="rt-taslak-cubuk">
+          <span>✏️ <b>{pd.bekleyen}</b> değişiklik taslakta — {h.il.danisan_ad} henüz görmüyor.</span>
+          <button type="button" className="rt-btn primary" onClick={async () => { setHata(null); try { await planGonder(h); setBilgi(`Gönderildi — ${h.il.danisan_ad}, Ajanda'sında görecek.`); } catch (e) { setHata((e as Error).message); } }}>Gönder</button>
+        </div>
+      )}
       {bilgi && <p className="rt-tamam" onClick={() => setBilgi(null)}>{bilgi}</p>}
       {hata && <p className="rt-hata" onClick={() => setHata(null)}>⚠ {hata}</p>}
       {hafta ? (
@@ -112,6 +121,7 @@ function KocKartSatiri({ k, onAc, onSurukle, suruklenen }: { k: KocKarti; onAc: 
         <button type="button" className="rt-kart-ad" onClick={onAc}>
           <span className="t">{olcumKarti(k.adim.bloklar) ? '📏 ' : ''}{k.adim.ad}</span>
           {deger && <span className="m">✓ {deger}</span>}
+          {k.taslak && <span className="m rt-taslak-etiket">taslak</span>}
           {!k.tekGun && <span className="m">🔁 {k.program.uzak?.plan || k.program.plan ? 'tekrar' : k.program.ad}</span>}
         </button>
         {onSurukle && <span className="rt-tutamac" aria-label="Başka güne sürükle" onPointerDown={(e) => { e.preventDefault(); onSurukle(); }}>⋮⋮</span>}

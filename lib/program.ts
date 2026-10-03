@@ -12,7 +12,7 @@ import { BAGLI_YEREL_IZIN, PAKET_SURUM, bugun, gunAktif, gunFarki, tarihEkle, ty
 // Danışmanlık kancaları (lib/danismanlik.ts doldurur). Koçun danışana atadığı programda değişiklik
 // koçun Ajanda'sına değil, danışana gider (D8).
 export const programKancalari: {
-  degisti?: (programId: string, etkin: string) => void;
+  degisti?: (programId: string, etkin: string, adimId?: string) => void;
   durduruldu?: (programId: string) => void;
 } = {};
 
@@ -54,7 +54,7 @@ export async function adimGuncelle(adimId: string, patch: Partial<ProgramAdimRow
 
 export async function calisanaYansit(programId: string, adim: ProgramAdimRow, etkin: string) {
   const p = await db.program.get(programId);
-  if (kocProgrami(p)) { programKancalari.degisti?.(programId, etkin); return; } // danışana gider
+  if (kocProgrami(p)) { programKancalari.degisti?.(programId, etkin, adim.id); return; } // danışana gider
   if (!p || !p.calisma_baslangic || !aktifMi(p) || p.calisma_bitis === bugun()) return; // durdurulmuş programa yansımaz
   await yenidenTeslim(`${programId}/${adim.id}`, etkin, adimPaketi(p, adim, p.calisma_baslangic));
   const adimlar = await db.program_adim.where('program_id').equals(programId).toArray();
@@ -95,7 +95,7 @@ export async function adimSil(adimId: string) {
   await db.program_adim.delete(adimId);
   if (!a) return;
   const p = await db.program.get(a.program_id);
-  if (kocProgrami(p)) programKancalari.degisti?.(a.program_id, bugun());
+  if (kocProgrami(p)) programKancalari.degisti?.(a.program_id, bugun(), a.id);
   // Kişisel çalışan program: adımın bugünden sonraki kartları Ajanda'dan kalkar (geçmiş kalır).
   else if (p?.calisma_baslangic) await kaynaktanCek(`${a.program_id}/${a.id}`, bugun());
 }

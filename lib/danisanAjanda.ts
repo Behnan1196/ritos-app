@@ -17,7 +17,7 @@
 
 import { db, type GeriBildirimRow, type IliskiRow, type ProgramAdimRow, type ProgramRow } from './db';
 import { adimEkle, adimGuncelle, adimSil, adimZamanlama, aktifMi, calisanaYansit, programGuncelle } from './program';
-import { disiplinAdi, danisanIzinleri, programGonder } from './danismanlik';
+import { disiplinAdi, danisanIzinleri, programGonder, taslakGonder } from './danismanlik';
 import { bugun, gunAktif, gunFarki, tarihEkle, type Blok, type PaketEk, type TemelTip } from './paket';
 
 export interface KocKarti {
@@ -27,6 +27,7 @@ export interface KocKarti {
   tekGun: boolean;           // yalnız tek günlük kart Ajanda'dan taşınır/silinir
   yapildi: boolean;
   degerler: Record<string, unknown> | null;
+  taslak: boolean;           // 3 ekim — gönderilmemiş değişiklik (Atölye taslak modu)
 }
 
 export type PlanHedef = { tur: 'danisan'; il: IliskiRow } | { tur: 'program'; programId: string };
@@ -35,7 +36,7 @@ export const hedefGrubu = (h: PlanHedef) => (h.tur === 'danisan' ? h.il.disiplin
 
 async function hedefProgramlari(h: PlanHedef): Promise<ProgramRow[]> {
   if (h.tur === 'program') { const p = await db.program.get(h.programId); return p ? [p] : []; }
-  return (await db.program.toArray()).filter((p) => p.uzak?.rol === 'koc' && p.uzak.iliski_id === h.il.id && p.uzak.durum !== 'ret' && p.uzak.durum !== 'ayrildi' && p.uzak.durum !== 'taslak');
+  return (await db.program.toArray()).filter((p) => p.uzak?.rol === 'koc' && p.uzak.iliski_id === h.il.id && p.uzak.durum !== 'ret' && p.uzak.durum !== 'ayrildi' && (p.uzak.durum !== 'taslak' || !!p.uzak.plan));
 }
 
 /** Programın takvim tabanı: çalışmanın başladığı gün (danışan kabul ettiyse onun), yoksa koçun seçtiği. */
@@ -66,6 +67,7 @@ export async function danisanGunleri(h: PlanHedef, tarihler: string[]): Promise<
         adim: a, program: p, tarih: t, tekGun: a.sure_gun === 1,
         yapildi: !!o && o.olay !== 'geri_alindi',
         degerler: o && o.olay === 'deger' ? o.degerler : null,
+        taslak: !!p.uzak?.bekleyen?.adimlar.includes(a.id) || (p.uzak?.durum === 'taslak'),
       });
     }
   }
@@ -121,7 +123,9 @@ export async function kocKartlariEkle(h: PlanHedef, liste: { tarih: string; kart
       basla_gun: gunFarki(taban(p), tarih), sure_gun: tekrar ? tekrar.gun : 1, gunler: tekrar?.gunler ?? null, saatler: kart.saatler ?? [],
     });
   }
-  if (yeni) await programGonder(p.id);
+  // Hiç gönderilmemiş plan: "hemen" modunda şimdi gider; "gönder deyince" modunda taslakta bekler.
+  const g = await db.program.get(p.id);
+  if ((yeni || g?.uzak?.durum === 'taslak') && g?.uzak?.gonderim !== 'gonder') await programGonder(p.id);
   return gecerli.length;
 }
 
@@ -201,4 +205,35 @@ export async function kocKartSil(k: KocKarti) {
   if (k.tarih < bugun()) throw new Error('Geçmiş günler değişmez.');
   if (k.yapildi) throw new Error('Yapılmış kart kaldırılmaz.');
   await adimSil(k.adim.id);
+}
+
+// ———————————————— 3 ekim — Atölye: gönderim modu ve taslak ————————————————
+
+export interface PlanDurumu { programId: string | null; gonderim: 'hemen' | 'gonder'; bekleyen: number; hicGonderilmedi: boolean }
+
+/** Danışanın (ya da aile üyesinin) plan programının gönderim durumu. Kişisel programda anlamı yok. */
+export async function planDurumu(h: PlanHedef): Promise<PlanDurumu | null> {
+  if (h.tur !== 'danisan') return null;
+  const p = (await db.program.toArray()).find((x) => x.uzak?.rol === 'koc' && x.uzak.iliski_id === h.il.id && x.uzak.plan && x.uzak.durum !== 'ret' && x.uzak.durum !== 'ayrildi');
+  if (!p?.uzak) return { programId: null, gonderim: 'hemen', bekleyen: 0, hicGonderilmedi: true };
+  const hic = p.uzak.durum === 'taslak';
+  const adimSay = hic ? await db.program_adim.where('program_id').equals(p.id).count() : 0;
+  return { programId: p.id, gonderim: p.uzak.gonderim ?? 'hemen', bekleyen: hic ? adimSay : (p.uzak.bekleyen?.adimlar.length ?? 0), hicGonderilmedi: hic };
+}
+
+/** Gönderim modunu değiştir. "Hemen"e dönülünce bekleyen taslak hemen gider. */
+export async function gonderimAyarla(h: PlanHedef, mod: 'hemen' | 'gonder') {
+  if (h.tur !== 'danisan') return;
+  const { p } = await planProgrami(h);
+  await db.program.update(p.id, { uzak: { ...p.uzak!, gonderim: mod }, guncellendi: Date.now() });
+  if (mod === 'hemen') {
+    const g = (await db.program.get(p.id))!;
+    const adimVar = (await db.program_adim.where('program_id').equals(p.id).count()) > 0;
+    if ((g.uzak?.bekleyen?.adimlar.length ?? 0) > 0 || (g.uzak?.durum === 'taslak' && adimVar)) await taslakGonder(p.id);
+  }
+}
+
+export async function planGonder(h: PlanHedef) {
+  const d = await planDurumu(h);
+  if (d?.programId) await taslakGonder(d.programId);
 }

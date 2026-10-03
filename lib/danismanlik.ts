@@ -660,16 +660,40 @@ export async function programGonder(programId: string, etkin = bugun()) {
 }
 
 // D8 — gönderilmiş programdaki değişiklik kendiliğinden gider (kısa gecikmeyle, toplu).
+// 3 ekim — Atölye taslak modu (uzak.gonderim === 'gonder'): değişiklik gitmez, uzak.bekleyen'de
+// birikir; koç "Gönder" deyince (taslakGonder) tek seferde gider.
 const bekleyenGuncelleme = new Map<string, { etkin: string; z: ReturnType<typeof setTimeout> }>();
-function kocDegisti(programId: string, etkin: string) {
+let taslakSirasi: Promise<unknown> = Promise.resolve(); // bekleyen listesine yazımlar sırayla (kayıp olmasın)
+function kocDegisti(programId: string, etkin: string, adimId?: string) {
   (async () => {
     const p = await db.program.get(programId);
-    if (!p?.uzak || p.uzak.rol !== 'koc' || (p.uzak.durum !== 'gonderildi' && p.uzak.durum !== 'kabul')) return;
+    if (!p?.uzak || p.uzak.rol !== 'koc' || p.uzak.durum === 'ret' || p.uzak.durum === 'ayrildi') return;
+    if (p.uzak.plan && p.uzak.gonderim === 'gonder') {
+      taslakSirasi = taslakSirasi.then(async () => {
+        const g = await db.program.get(programId);
+        if (!g?.uzak) return;
+        const b = g.uzak.bekleyen ?? { etkin, adimlar: [] };
+        const adimlar = adimId && !b.adimlar.includes(adimId) ? [...b.adimlar, adimId] : b.adimlar;
+        await db.program.update(programId, { uzak: { ...g.uzak, bekleyen: { etkin: b.etkin < etkin ? b.etkin : etkin, adimlar } }, guncellendi: Date.now() });
+      }).catch(() => {});
+      return;
+    }
+    if (p.uzak.durum !== 'gonderildi' && p.uzak.durum !== 'kabul') return;
     const onceki = bekleyenGuncelleme.get(programId);
     if (onceki) clearTimeout(onceki.z);
     const e = onceki && onceki.etkin < etkin ? onceki.etkin : etkin;
     bekleyenGuncelleme.set(programId, { etkin: e, z: setTimeout(() => { bekleyenGuncelleme.delete(programId); programGonder(programId, e).catch(() => {}); }, 1200) });
   })().catch(() => {});
+}
+
+/** Taslaktaki değişiklikleri gönder (ilk kez gönderilmemiş plan da böylece gider). */
+export async function taslakGonder(programId: string) {
+  await taslakSirasi;
+  const p = await db.program.get(programId);
+  if (!p?.uzak) return;
+  const etkin = p.uzak.bekleyen?.etkin ?? bugun();
+  await db.program.update(programId, { uzak: { ...p.uzak, bekleyen: null }, guncellendi: Date.now() });
+  await programGonder(programId, etkin < bugun() ? bugun() : etkin);
 }
 
 function kocDurdurdu(programId: string) {

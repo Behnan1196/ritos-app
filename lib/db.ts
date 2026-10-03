@@ -127,6 +127,9 @@ export interface UzakProgram {
   izinler: Izinler;              // danışanın Ajanda'sındaki kart izinleri (D9 varsayılanı)
   surum: number;                 // her gönderimde artar — eski güncelleme yenisini ezmesin
   plan?: boolean;                // 28 eylül — koçun Ajanda'dan yönettiği plan: takvim tarihleri mutlak, kendiliğinden bitmez
+  // 3 ekim — Atölye taslak planı (yalnız koç tarafında anlamlı; danışana gitmez):
+  gonderim?: 'hemen' | 'gonder'; // hemen (varsayılan): her değişiklik kısa gecikmeyle gider; gonder: "Gönder" deyince
+  bekleyen?: { etkin: string; adimlar: string[] } | null; // gönderilmemiş değişiklikler (en erken etkin gün, değişen kartlar)
 }
 
 export interface ProgramAdimRow {
