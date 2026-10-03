@@ -229,7 +229,7 @@ export function DavetModal({ onKapat, sabitDisiplin }: { onKapat: () => void; sa
   const secenekler = DISIPLINLER.filter(([k]) => !d.profil?.disiplinler.length || d.profil.disiplinler.includes(k));
   if (gonderildi) return (
     <Modal baslik="Danışan davet et" onKapat={onKapat}>
-      <p className="rt-tamam">Davet {gonderildi} adlı kişinin Sohbet&apos;ine gönderildi. Kabul edince danışanların arasında görünür.</p>
+      <p className="rt-tamam">Davet {gonderildi} adlı kişinin Gelenler&apos;ine gönderildi. Kabul edince danışanların arasında görünür.</p>
       <div className="rt-satir"><button type="button" className="rt-btn" onClick={onKapat}>Kapat</button></div>
     </Modal>
   );
@@ -247,7 +247,7 @@ export function DavetModal({ onKapat, sabitDisiplin }: { onKapat: () => void; sa
             ? <p className="rt-muted" style={{ marginTop: 10 }}>Bağlantı tek kullanımlık, 7 gün geçerli. Danışanın açınca hesabına giriş yapar (yoksa ücretsiz oluşturur) ve kabul eder. Yüz yüzeysen QR kodu okutabilir.</p>
             : (
               <>
-                <p className="rt-muted" style={{ marginTop: 10 }}>Danışanın Ritos hesabı varsa davet Sohbet&apos;ine düşer; oradan kabul eder.</p>
+                <p className="rt-muted" style={{ marginTop: 10 }}>Danışanın Ritos hesabı varsa davet Home › Gelenler&apos;e düşer; oradan kabul eder.</p>
                 <input className="rt-inp" type="email" placeholder="Danışanın e-postası" value={eposta} onChange={(e) => setEposta(e.target.value)} />
               </>
             )}

@@ -1,7 +1,8 @@
 'use client';
 
 // Sohbet (C1–C4) ve aile grubu (F1–F4) — 27 eylül. Motor: lib/danismanlik.ts.
-// Yalnız koç–danışan ve aile arasında; paylaşımın tek yeri burası.
+// 3 ekim: V1'de Sohbet sekmesi yok (anlık konuşma kişilerin kendi WhatsApp'ı / telefonu).
+// Kanal kalır: paylaşımlar ve davetler 📥 Gelenler'de (GelenlerEkrani). SohbetEkrani V2 için durur.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { db, type AileRow, type AjandaKartRow, type IliskiRow, type KlasorRow, type MesajRow, type ProgramRow, type KonusmaOkunduRow } from '@/lib/db';
@@ -88,6 +89,57 @@ export function SohbetEkrani() {
           {arsiv.map((x) => <button key={x.id} type="button" className="rt-gelen alindi" onClick={() => setAcik(x.id)}><span className="tx"><span className="t">{x.ad}</span><span className="s">{x.alt}</span></span></button>)}
         </details>
       )}
+    </div>
+  );
+}
+
+// ———————————————— 📥 Gelenler (3 ekim) ————————————————
+
+/** Bekleyen davetler + alınmamış paylaşımlar — Home satırı ve sekme rozeti için. */
+export function useGelenlerOzeti(): { davet: number; paylasim: number; toplam: number } {
+  const d = useDanismanlik();
+  const { davet } = useSohbetOzeti();
+  const paylasim = useCanli(() => db.mesaj.filter((m) => m.tur === 'paylasim' && !m.alindi && m.gonderen !== d.uid).count(), [d.uid], 0);
+  return { davet, paylasim, toplam: davet + paylasim };
+}
+
+export function GelenlerEkrani({ onGeri }: { onGeri?: () => void }) {
+  const d = useDanismanlik();
+  const konusmalar = useKonusmalar();
+  const ozet = useGelenlerOzeti();
+  const hepsi = useCanli(() => db.mesaj.filter((m) => m.tur === 'paylasim' && m.gonderen !== d.uid).toArray(), [d.uid], [] as MesajRow[])
+    .sort((a, b) => b.zaman - a.zaman);
+  const [al, setAl] = useState<MesajRow | null>(null);
+  const yeni = hepsi.filter((m) => !m.alindi);
+  const alinan = hepsi.filter((m) => m.alindi);
+  const nereden = (m: MesajRow) => konusmalar.find((k) => k.id === m.konusma)?.ad.replace(/^\S+ /, '') ?? '';
+  const satir = (m: MesajRow) => {
+    const p = m.paket as PaylasimPaketi | null;
+    if (!p) return null;
+    return (
+      <div key={m.id} className={`rt-gelen${m.alindi ? ' alindi' : ''}`}>
+        <span className="tx">
+          <span className="t">{p.tur === 'program' ? '🌱' : '🗂'} {p.ad}</span>
+          <span className="s">{m.gonderen_ad}{m.konusma.startsWith('a:') ? ` · ${nereden(m)}` : ''} · {saat(m.zaman)}</span>
+        </span>
+        {m.alindi ? <span className="rt-tamam">Alındı</span> : <button type="button" className="rt-btn primary" onClick={() => setAl(m)}>Al</button>}
+      </div>
+    );
+  };
+  return (
+    <div className="rt-gelenler">
+      <div className="rt-dan-bas">
+        {onGeri && <button type="button" className="rt-geri" onClick={onGeri}>‹ Home</button>}
+        <b>📥 Gelenler</b>
+      </div>
+      <BekleyenDavetler />
+      <AileDavetleri />
+      {yeni.map(satir)}
+      {ozet.toplam === 0 && <p className="rt-muted">Yeni bir şey yok. Koçun, danışanın ya da ailen sana kart ya da program gönderince, davetler de burada görünür.</p>}
+      {alinan.length > 0 && (
+        <details className="rt-belgeler"><summary>Alınanlar ({alinan.length})</summary>{alinan.map(satir)}</details>
+      )}
+      {al && <AlModal m={al} onKapat={() => setAl(null)} />}
     </div>
   );
 }
@@ -201,7 +253,7 @@ export function PaylasDugmesi({ paketUret }: { paketUret: () => Promise<Paylasim
             <>
               <p className="rt-muted">Yalnız tanım gider; işaretlerin ve girdiğin değerler gitmez.</p>
               {konusmalar.map((k) => (
-                <button key={k.id} type="button" className="rt-gelen" onClick={async () => { const p = await paketUret(); if (!p) return; await sohbetGonder(k.id, { paket: p }); setMesaj(`${k.ad.replace(/^\S+ /, '')} sohbetine gönderildi.`); }}>
+                <button key={k.id} type="button" className="rt-gelen" onClick={async () => { const p = await paketUret(); if (!p) return; await sohbetGonder(k.id, { paket: p }); setMesaj(`${k.ad.replace(/^\S+ /, '')} için gönderildi; Gelenler'inde görecek.`); }}>
                   <span className="tx"><span className="t">{k.ad}</span><span className="s">{k.alt}</span></span>
                 </button>
               ))}
@@ -302,7 +354,7 @@ export function AileAyarlari() {
     <Kap baslik="Aile">
       {!aile ? (
         <>
-          <p className="rt-muted">Ailenle (en fazla 3 kişi) yazışır, birbirinize görev verirsiniz. Yalnız verdiğin görevlerin durumunu görürsün; kimse kimsenin Ajanda&apos;sının geri kalanını görmez.</p>
+          <p className="rt-muted">Ailenle (en fazla 3 kişi) birbirinize görev verir, ortak liste tutarsınız. Yalnız verdiğin görevlerin durumunu görürsün; kimse kimsenin Ajanda&apos;sının geri kalanını görmez.</p>
           <div className="rt-satir" style={{ flexWrap: 'nowrap' }}>
             <input className="rt-inp" placeholder="Grup adı, ör. Öztürkmen ailesi" value={ad} onChange={(e) => setAd(e.target.value)} />
             <button type="button" className="rt-btn primary" disabled={!ad.trim()} onClick={() => calistir(() => aileKur(ad.trim()), 'Grup kuruldu. Şimdi ailenden birini davet et.')}>Kur</button>
@@ -318,7 +370,7 @@ export function AileAyarlari() {
                 <button type="button" className="rt-btn" onClick={() => calistir(async () => {
                   const id = await aileGorevIliski(u.uye);
                   seciliDanisanAyarla(id);
-                  window.dispatchEvent(new Event('ritos-ajandaya-git'));
+                  window.dispatchEvent(new Event('ritos-atolyeye-git'));
                 })}>📋 Görev ver</button>
               )}
               {ben?.rol === 'yonetici' && u.uye !== d.uid && <button type="button" className="rt-btn" onClick={() => setCikar(u.uye)}>Çıkar</button>}
@@ -328,7 +380,7 @@ export function AileAyarlari() {
           {ben?.rol === 'yonetici' && aktifSay < 3 && (
             <div className="rt-satir" style={{ flexWrap: 'nowrap', marginTop: 8 }}>
               <input className="rt-inp" type="email" placeholder="Davet için e-posta" value={eposta} onChange={(e) => setEposta(e.target.value)} />
-              <button type="button" className="rt-btn primary" disabled={!/\S+@\S+\.\S+/.test(eposta)} onClick={() => calistir(async () => { const n = await aileDavet(aile.id, eposta.trim()); setEposta(''); setMesaj(`${n} davet edildi; Sohbet'inde görecek.`); })}>Davet et</button>
+              <button type="button" className="rt-btn primary" disabled={!/\S+@\S+\.\S+/.test(eposta)} onClick={() => calistir(async () => { const n = await aileDavet(aile.id, eposta.trim()); setEposta(''); setMesaj(`${n} davet edildi; Gelenler'inde görecek.`); })}>Davet et</button>
             </div>
           )}
           <div className="rt-satir" style={{ marginTop: 8 }}>

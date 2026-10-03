@@ -5,7 +5,10 @@
 //  • Hesap zorunlu: hesap açık değilse giriş ekranı (hesapsız kullanım kaldırıldı).
 //  • Home'u biz tasarlarız: Odak alanları, (varsa) koçun, Danışmanlık ve Sınav (koç).
 //    Kullanıcının widget ızgarası V2 — kod app/ritos/v2/SeninAlanin.tsx'te kapalı durur.
-//  • Geniş ekranda Ajanda solda sabit, sağda sekmeler; dar ekranda alt sekme çubuğu.
+//  • 3 ekim: alt menü Home · Günüm · Atölye · Ayarlar. Sohbet yok (📥 Gelenler Home'da);
+//    Kütüphane Atölye'nin içinde.
+//  • Geniş ekranda: üstte Günüm | Atölye. Günüm'de ajanda solda, sağda Home/Ayarlar;
+//    Atölye tam genişlik. Dar ekranda alt sekme çubuğu.
 // ————————————————————————————————————————————————————————————————
 
 import React, { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -16,13 +19,13 @@ import { OrtakListeWidget } from './ritos/OrtakListe';
 import { useBildirimPlani } from '@/lib/bildirim';
 import { useDisKartlar } from '@/lib/disKart';
 import { OdakAlanlari } from './ritos/KisiselGelisim';
-import Kutuphane from './ritos/Kutuphane';
+import Atolye from './ritos/Atolye';
 import { V2 } from '@/lib/surum';
 import { SinavTool, useSinavOzeti } from './ritos/Sinav';
 import { DavetKarsilama, KoclarimSatiri } from './ritos/Danismanlik';
 import { DanismanlikEkrani, DanismanlikSatiri, danismanlikBaslik, DISIPLIN_IKON } from './ritos/DanismanlikEkrani';
 import { SenkronIsareti, useGelenSenkron } from './ritos/Paylasim';
-import { SohbetEkrani, useSohbetOzeti } from './ritos/Sohbet';
+import { GelenlerEkrani, useGelenlerOzeti } from './ritos/Sohbet';
 import { OlcumlerSatiri } from './ritos/Olcum';
 import { NotlarWidget } from './ritos/Notlar';
 import { AyarlarPane, GirisEkrani, SifreSifirlaEkrani, useKurtarmaHatirlat } from './ritos/Hesap';
@@ -34,7 +37,8 @@ const NARROW_BREAKPOINT = 760;
 const TEST = process.env.NEXT_PUBLIC_RITOS_TEST === '1';
 
 type ToolId = 'sinav';
-type Sekme = 'home' | 'ajanda' | 'gelisim' | 'sohbet' | 'ayarlar';
+type Sekme = 'home' | 'gunum' | 'atolye' | 'ayarlar' | 'gelenler';
+type Sag = 'home' | 'ayarlar' | 'gelenler'; // geniş ekranda Günüm'ün yanındaki bölme
 
 const TOOL_META: Record<ToolId, { icon: string; title: string }> = {
   sinav: { icon: '📚', title: 'Sınav paketi' },
@@ -59,7 +63,8 @@ function RitosUygulama() {
   useGelenSenkron();
   const [isNarrow, setIsNarrow] = useState(false);
   const [ratio, setRatio] = useState(58);
-  const [sekme, setSekme] = useState<Sekme>('ajanda');
+  const [sekme, setSekme] = useState<Sekme>('gunum');
+  const [sag, setSag] = useState<Sag>('home');
   const [activeTool, setActiveTool] = useState<ToolId | null>(null);
   // Açık danışmanlık alanı: geniş ekranda sağ bölmede, telefonda tam ekran (28 eylül).
   const [danismanlik, setDanismanlik] = useState<string | null>(null);
@@ -68,9 +73,12 @@ function RitosUygulama() {
   // Başka ekrandan "Ajanda'ya git" (ör. Kişisel Gelişim › Planla): telefonda Ajanda sekmesine geçilir;
   // geniş ekranda Ajanda zaten solda.
   useEffect(() => {
-    const f = () => { if (window.innerWidth < NARROW_BREAKPOINT) setSekme('ajanda'); };
+    const f = () => setSekme('gunum');
+    // Atölye'ye git (ör. Ayarlar › Aile › Görev ver, Danışmanlık › Atölye'de planla): hedef önceden seçilir.
+    const a = () => { setDanismanlik(null); setSekme('atolye'); };
     window.addEventListener('ritos-ajandaya-git', f);
-    return () => window.removeEventListener('ritos-ajandaya-git', f);
+    window.addEventListener('ritos-atolyeye-git', a);
+    return () => { window.removeEventListener('ritos-ajandaya-git', f); window.removeEventListener('ritos-atolyeye-git', a); };
   }, []);
 
   useEffect(() => {
@@ -80,13 +88,15 @@ function RitosUygulama() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const home = <HomeEkrani onDanismanlik={(k) => { setDanismanlik(k); if (isNarrow) return; setSekme('home'); }} onGelisim={() => setSekme('gelisim')} onSohbet={() => setSekme('sohbet')} />;
+  const gelenlereGit = () => { if (isNarrow) setSekme('gelenler'); else setSag('gelenler'); };
+  const homeyaDon = () => { if (isNarrow) setSekme('home'); else setSag('home'); };
+  const home = <HomeEkrani onDanismanlik={(k) => { setDanismanlik(k); if (!isNarrow) setSag('home'); }} onGelenler={gelenlereGit} />;
   const danEkrani = (dar: boolean) => danismanlik && (
     <DanismanlikEkrani
       disiplin={danismanlik}
       dar={dar}
       onKapat={() => setDanismanlik(null)}
-      onAjanda={() => { setDanismanlik(null); setSekme('ajanda'); }}
+      onAjanda={() => { setDanismanlik(null); setSekme('atolye'); }}
       onSinavPaketi={sinav.kurulu ? () => setActiveTool('sinav') : undefined}
     />
   );
@@ -99,16 +109,15 @@ function RitosUygulama() {
       <div className="tool-body"><div className="side-content" style={{ height: '100%', overflowY: 'auto' }}>{danEkrani(true)}</div></div>
     </div>
   );
-  const sohbet = useSohbetOzeti();
+  const gelenler = useGelenlerOzeti();
   const kurtarma = useKurtarmaHatirlat();
   const rozet = (k: Sekme) => (
-    k === 'sohbet' && sohbet.toplam + sohbet.davet > 0 ? <i className="rt-sekme-rozet">{sohbet.toplam + sohbet.davet}</i>
+    k === 'home' && gelenler.toplam > 0 ? <i className="rt-sekme-rozet">{gelenler.toplam}</i>
       : k === 'ayarlar' && kurtarma ? <i className="rt-sekme-rozet nokta" aria-label="Hesabını güvenceye al" />
       : null
   );
   const sagSekme = (s: Sekme) => (
-    s === 'gelisim' ? <Kutuphane />
-      : s === 'sohbet' ? <SohbetEkrani />
+    s === 'gelenler' ? <GelenlerEkrani onGeri={homeyaDon} />
       : s === 'ayarlar' ? <AyarlarPane />
       : home
   );
@@ -128,10 +137,10 @@ function RitosUygulama() {
       {isNarrow ? (
         <div className="mobile-app">
           <div className="mobile-hd"><b>Ritos</b><SenkronIsareti /></div>
-          <div className="mobile-main">{sekme === 'ajanda' ? <AjandaPane /> : sagSekme(sekme)}</div>
+          <div className="mobile-main">{sekme === 'gunum' ? <AjandaPane /> : sekme === 'atolye' ? <Atolye genis={false} /> : sagSekme(sekme)}</div>
           <div className="mobile-nav">
-            {([['home', '🏠', 'Home'], ['ajanda', '📅', 'Ajanda'], ['gelisim', '📚', 'Kütüphane'], ['sohbet', '💬', 'Sohbet'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sekme, string, string][]).map(([k, ic, ad]) => (
-              <button key={k} className={sekme === k ? 'on' : ''} onClick={() => setSekme(k)}><span className="ic">{ic}{rozet(k)}</span>{ad}</button>
+            {([['home', '🏠', 'Home'], ['gunum', '☀️', 'Günüm'], ['atolye', '🗂', 'Atölye'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sekme, string, string][]).map(([k, ic, ad]) => (
+              <button key={k} className={(sekme === 'gelenler' ? 'home' : sekme) === k ? 'on' : ''} onClick={() => setSekme(k)}><span className="ic">{ic}{rozet(k)}</span>{ad}</button>
             ))}
           </div>
           {danOverlay}
@@ -139,22 +148,33 @@ function RitosUygulama() {
         </div>
       ) : (
         <>
-          <div className="topbar"><b>Ritos</b><SenkronIsareti /></div>
-          <SplitPane
-            ratio={ratio}
-            setRatio={setRatio}
-            left={<AjandaPane />}
-            right={(
-              <>
-                <div className="side-content">{danismanlik && (sekme === 'home' || sekme === 'ajanda') ? danEkrani(false) : sagSekme(sekme === 'ajanda' ? 'home' : sekme)}</div>
-                <div className="side-tabs">
-                  {([['home', '🏠', 'Home'], ['gelisim', '📚', 'Kütüphane'], ['sohbet', '💬', 'Sohbet'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sekme, string, string][]).map(([k, ic, ad]) => (
-                    <button key={k} className={(sekme === 'ajanda' ? 'home' : sekme) === k ? 'on' : ''} onClick={() => { if (k === 'home') setDanismanlik(null); setSekme(k); }}><span>{ic}{rozet(k)}</span>{ad}</button>
-                  ))}
-                </div>
-              </>
-            )}
-          />
+          <div className="topbar">
+            <b>Ritos</b>
+            <div className="rt-ust-mod" role="tablist" aria-label="Çalışma alanı">
+              <button type="button" role="tab" aria-selected={sekme !== 'atolye'} className={sekme !== 'atolye' ? 'on' : ''} onClick={() => setSekme('gunum')}>☀️ Günüm</button>
+              <button type="button" role="tab" aria-selected={sekme === 'atolye'} className={sekme === 'atolye' ? 'on' : ''} onClick={() => setSekme('atolye')}>🗂 Atölye</button>
+            </div>
+            <SenkronIsareti />
+          </div>
+          {sekme === 'atolye' ? (
+            <div className="rt-atolye-tam"><Atolye genis /></div>
+          ) : (
+            <SplitPane
+              ratio={ratio}
+              setRatio={setRatio}
+              left={<AjandaPane />}
+              right={(
+                <>
+                  <div className="side-content">{danismanlik && sag === 'home' ? danEkrani(false) : sagSekme(sag)}</div>
+                  <div className="side-tabs">
+                    {([['home', '🏠', 'Home'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sag, string, string][]).map(([k, ic, ad]) => (
+                      <button key={k} className={(sag === 'gelenler' ? 'home' : sag) === k ? 'on' : ''} onClick={() => { if (k === 'home') setDanismanlik(null); setSag(k); }}><span>{ic}{rozet(k)}</span>{ad}</button>
+                    ))}
+                  </div>
+                </>
+              )}
+            />
+          )}
           {arac}
         </>
       )}
@@ -205,8 +225,8 @@ function SplitPane({
 
 // ———————————————————————————————————— Home (V1: bizim tasarladığımız sabit düzen) ————————————————————————————————————
 
-function HomeEkrani({ onDanismanlik, onGelisim, onSohbet }: { onDanismanlik: (disiplin: string) => void; onGelisim: () => void; onSohbet: () => void }) {
-  const sohbet = useSohbetOzeti();
+function HomeEkrani({ onDanismanlik, onGelenler }: { onDanismanlik: (disiplin: string) => void; onGelenler: () => void }) {
+  const gelenler = useGelenlerOzeti();
   const [widgetEkle, setWidgetEkle] = useState(false);
   return (
     <div className="fixed-widgets">
@@ -214,13 +234,13 @@ function HomeEkrani({ onDanismanlik, onGelisim, onSohbet }: { onDanismanlik: (di
       <OrtakListeWidget />
       <BaglantiWidgetlari ekleAcik={widgetEkle} onEkleKapat={() => setWidgetEkle(false)} />
       {/* 30 eylül: alanlar V1'de yok (ileride üst klasörler alanlara karşılık gelebilir). */}
-      {V2 && <OdakAlanlari onAc={onGelisim} />}
+      {V2 && <OdakAlanlari onAc={() => window.dispatchEvent(new Event('ritos-atolyeye-git'))} />}
       <KoclarimSatiri />
       <OlcumlerSatiri />
-      {(sohbet.toplam > 0 || sohbet.davet > 0) && (
-        <button type="button" className="wrow tool" onClick={onSohbet}>
-          <span className="ic">💬</span>
-          <span className="tx"><span className="t">Sohbet</span><span className="s">{[sohbet.davet ? `${sohbet.davet} davet` : '', sohbet.toplam ? `${sohbet.toplam} okunmamış mesaj` : ''].filter(Boolean).join(' · ')}</span></span>
+      {gelenler.toplam > 0 && (
+        <button type="button" className="wrow tool" onClick={onGelenler}>
+          <span className="ic">📥</span>
+          <span className="tx"><span className="t">Gelenler</span><span className="s">{[gelenler.davet ? `${gelenler.davet} davet` : '', gelenler.paylasim ? `${gelenler.paylasim} yeni paylaşım` : ''].filter(Boolean).join(' · ')}</span></span>
           <span className="chev">›</span>
         </button>
       )}

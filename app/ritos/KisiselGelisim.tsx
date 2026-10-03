@@ -351,7 +351,7 @@ function PlanSatiri({ p }: { p: ProgramRow }) {
   return (
     <div className="rt-plan-satiri">
       <span className="rt-muted">{hafta.toplam ? <>Bu hafta <b>{hafta.yapildi}/{hafta.toplam}</b> kart yapıldı</> : 'Kartlarını Ajanda\u2019da planlarsın; tekrar, geçen haftayı kopyala ve görev planı (şablon) orada.'}</span>
-      <button type="button" className="rt-btn primary" onClick={() => { setOdak(`p:${p.id}`); window.dispatchEvent(new Event('ritos-ajandaya-git')); }}>📅 Planla</button>
+      <button type="button" className="rt-btn primary" onClick={() => { setOdak(`p:${p.id}`); window.dispatchEvent(new Event('ritos-atolyeye-git')); }}>🗂 Planla</button>
     </div>
   );
 }

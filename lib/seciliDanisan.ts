@@ -1,5 +1,5 @@
-// Koçun o an çalıştığı danışan (28 eylül). Ajanda (sol) ile danışmanlık ekranı (sağ) aynı seçimi
-// paylaşır: sağda danışan seçilince solda onun Ajanda'sı açılır. Oturum boyunca korunur.
+// Atölye'de seçili hedef (danışan / aile üyesi / "p:<program>"). Danışmanlık ekranı ve Atölye aynı
+// seçimi paylaşır (3 ekim; önceden Ajanda odağıydı). Oturum boyunca korunur.
 import { useEffect, useState } from 'react';
 
 const ANAH = 'ritos-ajanda-kisi';

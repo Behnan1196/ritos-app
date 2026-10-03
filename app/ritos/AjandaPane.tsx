@@ -17,13 +17,9 @@ import { sayacAnahtari, sayacBaslat, sayacBitir, sayacDuraklat, sayacMetni, saya
 import { gorevler, type BDugum } from '@/lib/belge';
 import { KlasorSecModal } from './Kutuphane';
 import { ajandadanKaydet } from '@/lib/kutuphane';
-import { DanisanAjandasi } from './DanisanAjanda';
-import { useDanismanlik } from '@/lib/danismanlik';
-import { db, type IliskiRow, type ProgramRow } from '@/lib/db';
-import type { PlanHedef } from '@/lib/danisanAjanda';
-import { benAile, disiplinAdi, ortakGonder } from '@/lib/danismanlik';
-import { useSeciliDanisan } from '@/lib/seciliDanisan';
-import { KAYNAK_TUR, filtreOku, filtreYaz, kaynakBilgi, uyar, type Filtre, type KaynakTur } from '@/lib/kaynakFiltre';
+import { db, type ProgramRow } from '@/lib/db';
+import { benAile, ortakGonder } from '@/lib/danismanlik';
+import { KAYNAK_TUR, filtreVar, filtreOku, filtreYaz, kaynakBilgi, uyar, type Filtre, type KaynakTur } from '@/lib/kaynakFiltre';
 
 // A1–A9 (ilk dilim). Ajanda yalnızca kart satırlarını bilir; kaynağın içini bilmez.
 const GORUNUM_ANAH = 'ritos-ajanda-gorunum';
@@ -34,7 +30,7 @@ function gorunumOku(): 'gun' | 'hafta' {
 export function haftaBasi(t: string) {
   return tarihEkle(t, -((tarihParse(t).getDay() + 6) % 7));
 }
-function haftaEtiket(bas: string) {
+export function haftaEtiket(bas: string) {
   const a = tarihParse(bas), b = tarihParse(tarihEkle(bas, 6));
   const ay = (d: Date) => d.toLocaleDateString('tr-TR', { month: 'short' });
   return a.getMonth() === b.getMonth() ? `${a.getDate()}–${b.getDate()} ${ay(b)}` : `${a.getDate()} ${ay(a)} – ${b.getDate()} ${ay(b)}`;
@@ -49,7 +45,7 @@ export default function AjandaPane() {
   const [ayAcik, setAyAcik] = useState(false);
   const [detay, setDetay] = useState<{ satir: GunSatiri; tarih: string } | null>(null);
   // Kaynak filtresi (3 ekim) — seçim cihazda hatırlanır.
-  const [filtre, setFiltreS] = useState<Filtre>({ tur: null, ad: null });
+  const [filtre, setFiltreS] = useState<Filtre>({ turler: [], ad: null });
   useEffect(() => { setFiltreS(filtreOku()); }, []);
   const setFiltre = (f: Filtre) => { setFiltreS(f); filtreYaz(f); };
   const tumProgramlar = useCanli(() => db.program.toArray(), [], [] as ProgramRow[]);
@@ -59,39 +55,8 @@ export default function AjandaPane() {
   const hafta = gorunum === 'hafta';
   const adim = hafta ? 7 : 1;
   const bugunGorunur = hafta ? haftaBasi(tarih) === haftaBasi(t0) : tarih === t0;
-  // Koç: Ajanda'nın başında "kimin ajandası" seçimi (28 eylül). Danışan seçilince aynı gün/hafta
-  // görünümünde o danışana atadığın kartlar ve durumları görünür.
-  const dn = useDanismanlik();
-  const verdiklerim = useCanli(async () => (await db.iliski.toArray()).filter((i) => i.durum === 'aktif' && i.koc === dn.uid), [dn.uid], [] as IliskiRow[]);
-  const danisanlar = verdiklerim.filter((i) => i.disiplin !== 'aile');
-  const ailem = verdiklerim.filter((i) => i.disiplin === 'aile'); // 3 ekim — aile içinde görev verdiklerim
-  // Seçim danışmanlık ekranıyla ortak ve oturum boyunca korunur (lib/seciliDanisan).
-  const [kisi, setKisi] = useSeciliDanisan();
-  // Kişisel programlar da odaklanabilir (28 eylül): "p:<id>" — yalnız o programın kartları, planlama araçlarıyla.
-  const programlar = useCanli(() => db.program.filter((p) => !p.uzak && !p.sablon).toArray(), [], [] as ProgramRow[]);
-  const secili = verdiklerim.find((i) => i.id === kisi) ?? null;
-  const seciliProgram = kisi.startsWith('p:') ? programlar.find((p) => p.id === kisi.slice(2)) ?? null : null;
-  const hedef: PlanHedef | null = secili ? { tur: 'danisan', il: secili } : seciliProgram ? { tur: 'program', programId: seciliProgram.id } : null;
-  const odakVar = (dn.profil?.koc && danisanlar.length > 0) || programlar.length > 0 || ailem.length > 0;
-
   return (
     <div className="rt-ajanda">
-      {odakVar && (
-        <div className={`rt-kisi-sec${hedef ? ' danisan' : ''}`}>
-          <select value={hedef ? kisi : ''} onChange={(e) => setKisi(e.target.value)} aria-label="Ajanda odağı">
-            <option value="">📅 Benim ajandam</option>
-            {programlar.length > 0 && <optgroup label="Programlarım">
-              {programlar.sort((a, b) => a.ad.localeCompare(b.ad, 'tr')).map((p) => <option key={p.id} value={`p:${p.id}`}>🌱 {p.ad}</option>)}
-            </optgroup>}
-            {ailem.length > 0 && <optgroup label="Ailem — verdiğim görevler">
-              {ailem.map((i) => <option key={i.id} value={i.id}>👪 {i.danisan_ad}</option>)}
-            </optgroup>}
-            {dn.profil?.koc && danisanlar.length > 0 && <optgroup label="Danışanlarım">
-              {danisanlar.map((i) => <option key={i.id} value={i.id}>🤝 {i.danisan_ad}</option>)}
-            </optgroup>}
-          </select>
-        </div>
-      )}
       <div className="rt-daterow">
         <button className="arrow" onClick={() => setTarih(tarihEkle(tarih, -adim))} aria-label={hafta ? 'Önceki hafta' : 'Önceki gün'}>‹</button>
         <button className="rt-dlabel" onClick={() => setAyAcik(true)}>
@@ -105,16 +70,7 @@ export default function AjandaPane() {
         </div>
       </div>
 
-      {hedef ? (
-        <DanisanAjandasi
-          h={hedef}
-          baslik={secili
-            ? secili.disiplin === 'aile'
-              ? <>👪 <b>{secili.danisan_ad}</b> — ona verdiğin görevler ve durumları. Kart ekle; işaretleyince burada görürsün.</>
-              : <>🤝 <b>{secili.danisan_ad}</b> · {disiplinAdi(secili.disiplin)} — yalnız senin atadığın kartlar görünür.</>
-            : <>🌱 <b>{seciliProgram!.ad}</b> — yalnız bu programın kartları. Burada kurduğun kartlar Benim ajandam&apos;a da düşer.</>}
-          tarih={tarih} hafta={hafta} haftaBas={haftaBasi(tarih)} onGun={(t) => { setTarih(t); setGorunum('gun'); }} />
-      ) : hafta ? (
+      {hafta ? (
         <HaftaGorunumu bas={haftaBasi(tarih)} filtre={filtre} setFiltre={setFiltre} pMap={pMap} onAc={(satir, t) => setDetay({ satir, tarih: t })} onEkle={setEkle} onGun={(t) => { setTarih(t); setGorunum('gun'); }} />
       ) : (
         <Kap
@@ -123,7 +79,7 @@ export default function AjandaPane() {
         >
           <KaynakCipleri satirlar={satirlar} filtre={filtre} setFiltre={setFiltre} pMap={pMap} />
           {satirlar.length === 0 && <p className="rt-muted">Bu gün için kart yok.</p>}
-          {satirlar.length > 0 && filtre.tur && !satirlar.some((s) => uyar(kaynakBilgi(s.kart, pMap), filtre)) && <p className="rt-muted">Bu kaynaktan bugün kart yok.</p>}
+          {satirlar.length > 0 && filtreVar(filtre) && !satirlar.some((s) => uyar(kaynakBilgi(s.kart, pMap), filtre)) && <p className="rt-muted">Seçili kaynaklardan bugün kart yok.</p>}
           <SiraliListe satirlar={satirlar.filter((s) => uyar(kaynakBilgi(s.kart, pMap), filtre))} tarih={tarih} onAc={(s) => setDetay({ satir: s, tarih })} />
         </Kap>
       )}
@@ -201,14 +157,20 @@ function KaynakCipleri({ satirlar, filtre, setFiltre, pMap }: { satirlar: GunSat
   const bilgiler = satirlar.map((s) => kaynakBilgi(s.kart, pMap));
   const sayi = new Map<KaynakTur, number>();
   for (const b of bilgiler) sayi.set(b.tur, (sayi.get(b.tur) ?? 0) + 1);
-  if (sayi.size < 2 && !filtre.tur) return null;
-  const adlar = filtre.tur ? Array.from(new Set(bilgiler.filter((b) => b.tur === filtre.tur && b.ad).map((b) => b.ad as string))) : [];
+  if (sayi.size < 2 && !filtreVar(filtre)) return null;
+  // Çoklu seçim (3 ekim): türe dokununca seçime eklenir/çıkar. Adlar yalnız tek tür seçiliyken açılır.
+  const tek = filtre.turler.length === 1 ? filtre.turler[0] : null;
+  const adlar = tek ? Array.from(new Set(bilgiler.filter((b) => b.tur === tek && b.ad).map((b) => b.ad as string))) : [];
+  const degistir = (t: KaynakTur) => {
+    const turler = filtre.turler.includes(t) ? filtre.turler.filter((x) => x !== t) : [...filtre.turler, t];
+    setFiltre({ turler, ad: null });
+  };
   return (
     <div className="rt-kaynak-filtre">
       <div className="rt-kaynak-cipler">
-        <button type="button" className={`rt-chip${!filtre.tur ? ' on' : ''}`} onClick={() => setFiltre({ tur: null, ad: null })}>Tümü <span className="say">{satirlar.length}</span></button>
-        {KAYNAK_TUR.filter(([t]) => sayi.has(t) || filtre.tur === t).map(([t, ic, ad]) => (
-          <button key={t} type="button" className={`rt-chip${filtre.tur === t ? ' on' : ''}`} onClick={() => setFiltre(filtre.tur === t ? { tur: null, ad: null } : { tur: t, ad: null })}>
+        <button type="button" className={`rt-chip${!filtreVar(filtre) ? ' on' : ''}`} onClick={() => setFiltre({ turler: [], ad: null })}>Tümü <span className="say">{satirlar.length}</span></button>
+        {KAYNAK_TUR.filter(([t]) => sayi.has(t) || filtre.turler.includes(t)).map(([t, ic, ad]) => (
+          <button key={t} type="button" aria-pressed={filtre.turler.includes(t)} className={`rt-chip${filtre.turler.includes(t) ? ' on' : ''}`} onClick={() => degistir(t)}>
             {ic} {ad} <span className="say">{sayi.get(t) ?? 0}</span>
           </button>
         ))}
@@ -216,7 +178,7 @@ function KaynakCipleri({ satirlar, filtre, setFiltre, pMap }: { satirlar: GunSat
       {adlar.length > 1 && (
         <div className="rt-kaynak-cipler alt">
           {adlar.map((a) => (
-            <button key={a} type="button" className={`rt-chip${filtre.ad === a ? ' on' : ''}`} onClick={() => setFiltre({ tur: filtre.tur, ad: filtre.ad === a ? null : a })}>{a}</button>
+            <button key={a} type="button" className={`rt-chip${filtre.ad === a ? ' on' : ''}`} onClick={() => setFiltre({ turler: filtre.turler, ad: filtre.ad === a ? null : a })}>{a}</button>
           ))}
         </div>
       )}
@@ -599,7 +561,7 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
   );
 }
 
-function AyTakvimi({ secili, onSec, onKapat }: { secili: string; onSec: (t: string) => void; onKapat: () => void }) {
+export function AyTakvimi({ secili, onSec, onKapat }: { secili: string; onSec: (t: string) => void; onKapat: () => void }) {
   const [ay, setAy] = useState(() => { const d = tarihParse(secili); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const ilk = new Date(ay.getFullYear(), ay.getMonth(), 1);
   const gunSayisi = new Date(ay.getFullYear(), ay.getMonth() + 1, 0).getDate();

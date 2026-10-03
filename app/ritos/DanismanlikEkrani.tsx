@@ -93,7 +93,7 @@ export function DanismanlikEkrani({ disiplin, dar, onKapat, onAjanda, onSinavPak
   const [kaldir, setKaldir] = useState(false);
   const il = hepsi.find((x) => x.id === secili) ?? null;
 
-  // Geniş ekranda ilk açılışta ilk danışan seçilir; soldaki Ajanda hemen onu gösterir.
+  // Geniş ekranda ilk açılışta ilk danışan seçilir (seçim Atölye ile ortak).
   useEffect(() => {
     if (!dar && !il && aktifler.length) setSecili(aktifler[0].id);
   }, [dar, il, aktifler.length]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -108,7 +108,7 @@ export function DanismanlikEkrani({ disiplin, dar, onKapat, onAjanda, onSinavPak
       )}
 
       <Kap baslik={`Danışanlar${aktifler.length ? ` · ${aktifler.length}` : ''}`} eylemler={<button type="button" className="rt-btn primary" onClick={() => setDavet(true)}>＋ Davet et</button>}>
-        {aktifler.length === 0 && <p className="rt-muted">Henüz danışanın yok. E-postasıyla davet et; davet onun Sohbet&apos;ine düşer, kabul edince burada görünür.</p>}
+        {aktifler.length === 0 && <p className="rt-muted">Henüz danışanın yok. E-postasıyla davet et; davet onun Gelenler&apos;ine düşer, kabul edince burada görünür.</p>}
         <div className="rt-dan-liste">
           {aktifler.map((x) => <DanisanSatiri key={x.id} il={x} secili={x.id === secili} onAc={() => setSecili(x.id === secili && dar ? '' : x.id)} />)}
         </div>
@@ -129,7 +129,7 @@ export function DanismanlikEkrani({ disiplin, dar, onKapat, onAjanda, onSinavPak
               <b>{il.danisan_ad}</b>
               <span className="rt-muted">{il.durum === 'aktif' ? `${new Date(il.olusturuldu).toLocaleDateString('tr-TR')}'den beri` : 'sonlandı'}</span>
             </span>
-            {dar && il.durum === 'aktif' && <button type="button" className="rt-btn primary" onClick={onAjanda}>📅 Ajandası</button>}
+            {il.durum === 'aktif' && <button type="button" className="rt-btn primary" onClick={onAjanda}>🗂 Atölye&apos;de planla</button>}
           </div>
           <div className="rt-alt-sekme">
             {([['plan', 'Plan'], ['ozet', 'Özet'], ['olcum', 'Ölçümler']] as [AltSekme, string][]).map(([k, ad]) => (

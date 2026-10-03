@@ -796,3 +796,34 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-ortak-madde.alindi .kutu{background:var(--green);border-color:var(--green);}
 .rt-ortak-madde.alindi .t{text-decoration:line-through;color:var(--muted);}
 .rt-linkbtn.tehlike{color:var(--red);}
+
+/* ---------- 3 ekim: Günüm | Atölye, Gelenler ---------- */
+.rt-ust-mod{display:flex;gap:2px;background:#3d3a32;border-radius:9px;padding:2px;margin-left:8px;}
+.rt-ust-mod button{border:none;background:none;font:inherit;font-size:12.5px;font-weight:700;color:#c8bfac;padding:5px 12px;border-radius:7px;cursor:pointer;}
+.rt-ust-mod button.on{background:#efe9dd;color:var(--ink);}
+.rt-atolye-tam{flex:1;min-height:0;display:flex;flex-direction:column;}
+.rt-atolye{display:flex;flex-direction:column;min-height:0;}
+.rt-atolye.genis{flex:1;}
+.rt-atolye-ust{display:flex;align-items:center;margin:0 0 10px;}
+.rt-atolye.genis .rt-atolye-ust{padding:10px 16px 0;margin:0;}
+.rt-atolye-alt{margin-left:0;}
+.rt-atolye-alt button{font-size:13px;padding:6px 14px;}
+.rt-atolye.genis .rt-atolye-kut{flex:1;min-height:0;overflow-y:auto;padding:12px 16px;max-width:760px;}
+.rt-hedef-cipler{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin:0 0 10px;scrollbar-width:none;}
+.rt-hedef-cipler::-webkit-scrollbar{display:none;}
+.rt-hedef-cipler .rt-chip{flex:0 0 auto;white-space:nowrap;}
+.rt-hedef-cipler .rt-chip.on{background:var(--green2);border-color:var(--green);font-weight:700;}
+.rt-hedef-bas{font-size:14px;margin:0 0 6px;}
+.rt-atolye.genis .rt-atolye-plan{flex:1;min-height:0;display:grid;grid-template-columns:190px minmax(0,1fr);margin-top:10px;border-top:1px solid var(--line);}
+.rt-atolye-sol{border-right:1px solid var(--line);overflow-y:auto;padding:10px;}
+.rt-atolye.genis .rt-atolye-orta{overflow-y:auto;padding:12px 16px 20px;}
+.rt-grup-ad{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:12px 4px 4px;}
+.rt-atolye-sol > div:first-child .rt-grup-ad{margin-top:0;}
+.rt-hedef-sat{width:100%;display:flex;align-items:center;gap:8px;border:0;background:none;border-radius:9px;padding:7px 8px;text-align:left;font:inherit;font-size:13px;cursor:pointer;color:var(--ink);}
+.rt-hedef-sat:hover{background:#f6f2ea;}
+.rt-hedef-sat.on{background:var(--green2);font-weight:700;}
+.rt-hedef-sat .ad{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rt-atolye.genis .rt-hafta{grid-template-columns:repeat(7,minmax(0,1fr));}
+.rt-atolye-bos{padding:8px 4px;}
+.rt-atolye.genis .rt-atolye-bos{padding:16px;}
+.rt-gelenler .rt-dan-bas{margin-bottom:10px;}
