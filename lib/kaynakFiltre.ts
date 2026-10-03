@@ -17,6 +17,7 @@ export interface Filtre { tur: KaynakTur | null; ad: string | null } // tur null
 
 export function kaynakBilgi(k: AjandaKartRow, programlar: Map<string, ProgramRow>): KaynakBilgi {
   if (k.kaynak_modul === 'dis') return { tur: 'uygulama', ad: k.kaynak_etiket };
+  if (k.kaynak_modul === 'ortak') return { tur: 'aile', ad: 'Ortak' };
   if (k.kaynak_modul === 'danismanlik' || k.geri_bildirim === 'uzak') {
     const p = programlar.get((k.kaynak_ref ?? '').split('/')[0]);
     return { tur: p?.uzak?.disiplin === 'aile' ? 'aile' : 'koc', ad: k.kaynak_etiket };

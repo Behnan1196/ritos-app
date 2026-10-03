@@ -12,6 +12,7 @@ import React, { useEffect, useRef, useState, type ReactNode } from 'react';
 import AjandaPane from './ritos/AjandaPane';
 import { useBeklemeIzleyici, useSayacIzleyici } from '@/lib/sayac';
 import { BaglantiWidgetlari } from './ritos/Baglanti';
+import { OrtakListeWidget } from './ritos/OrtakListe';
 import { useBildirimPlani } from '@/lib/bildirim';
 import { useDisKartlar } from '@/lib/disKart';
 import { OdakAlanlari } from './ritos/KisiselGelisim';
@@ -210,6 +211,7 @@ function HomeEkrani({ onDanismanlik, onGelisim, onSohbet }: { onDanismanlik: (di
   return (
     <div className="fixed-widgets">
       <NotlarWidget />
+      <OrtakListeWidget />
       <BaglantiWidgetlari ekleAcik={widgetEkle} onEkleKapat={() => setWidgetEkle(false)} />
       {/* 30 eylül: alanlar V1'de yok (ileride üst klasörler alanlara karşılık gelebilir). */}
       {V2 && <OdakAlanlari onAc={onGelisim} />}

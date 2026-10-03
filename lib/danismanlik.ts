@@ -13,6 +13,7 @@
 //    aynı mesajı işlese de çift kayıt oluşmaz.
 // ————————————————————————————————————————————————————————————————
 
+import { ortakUygula, type OrtakOp } from './ortak';
 import { useEffect, useState } from 'react';
 import { db, type AileRow, type AileUyesi, type GeriBildirimRow, type IliskiRow, type MesajRow, type ProgramAdimRow, type ProgramRow, type UzakProgram } from './db';
 import { supabase } from './supabase';
@@ -299,7 +300,8 @@ type MesajIcerik =
   | { tur: 'kabul'; program_id: string; baslangic: string }
   | { tur: 'ret'; program_id: string }
   | { tur: 'gb'; olaylar: GeriBildirimRow[] }
-  | { tur: 'sohbet'; mesaj: MesajRow };
+  | { tur: 'sohbet'; mesaj: MesajRow }
+  | { tur: 'ortak'; op: OrtakOp };
 
 export interface KocPaketi { tur: 'koc_program'; iliski_id: string; koc_id: string; koc_ad: string; disiplin: string; program: ProgramOzeti }
 
@@ -843,6 +845,7 @@ async function aileMesajlariCek(a: AileRow) {
         try {
           const ic = await coz<MesajIcerik>(k, m.veri);
           if (ic.tur === 'sohbet') await sohbetMesajiKaydet(ic.mesaj, konusmaAile(a.id));
+          else if (ic.tur === 'ortak') await ortakUygula(ic.op, a.id);
         } catch (e) { console.warn('[ritos] aile mesajı çözülemedi', e); }
       }
       sira = Number(m.sira);
@@ -850,6 +853,23 @@ async function aileMesajlariCek(a: AileRow) {
     }
     if (liste.length < 200) return;
   }
+}
+
+// ———————————————— aile ortak listeleri / kartları (3 ekim) ————————————————
+
+/** Aktif aile grubum (yoksa null). */
+export async function aktifAilem(): Promise<AileRow | null> {
+  return (await db.aile.toArray()).find((a) => aileAktifMi(a)) ?? null;
+}
+export const benAile = () => ({ kim: uid ?? '', kim_ad: durum.profil?.ad ?? 'Ben' });
+
+/** Ortak işlem: önce bu cihazda uygulanır, sonra aile kanalına şifreli gider. */
+export async function ortakGonder(op: OrtakOp) {
+  const a = await aktifAilem();
+  if (!a) throw new Error('Aile grubunda değilsin.');
+  await ortakUygula(op, a.id);
+  await kuyruk('', '', { tur: 'ortak', op }, a.id);
+  tetikle(200);
 }
 
 export async function aileKur(ad: string) {
@@ -881,6 +901,10 @@ senkronKancalari.basla = (k, a) => danismanlikBaslat(k, a);
 senkronKancalari.tur = danismanlikTur;
 senkronKancalari.dur = danismanlikDurdur;
 ajandaKancalari.uzakGeriBildirim = geriBildirimKuyrugu;
+ajandaKancalari.ortakOlay = (kart, tarih, yapildi) => {
+  if (!kart.ortak) return;
+  void ortakGonder({ o: 'yapildi', id: kart.id.replace(/^o-/, ''), tarih, yapildi, ...benAile(), zaman: Date.now() }).catch(() => {});
+};
 programKancalari.degisti = kocDegisti;
 programKancalari.durduruldu = kocDurdurdu;
 

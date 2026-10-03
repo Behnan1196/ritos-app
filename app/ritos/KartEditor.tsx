@@ -31,6 +31,7 @@ import { YansitDugmesi } from './Yansit';
 import { GorevFormu, gorevTeslim, useSinavOzeti } from './Sinav';
 import type { GorevTaslak } from '@/lib/sinavGorev';
 import { V2 } from '@/lib/surum';
+import { aktifAilem, benAile, ortakGonder } from '@/lib/danismanlik';
 
 // Açıklama stilli (Tiptap, sade araç çubuğu) — madde, numaralı liste, checklist, kalın, vurgu, tablo.
 const ZenginEditor = dynamic(() => import('./NotEditor').then((m) => m.ZenginEditor), { ssr: false, loading: () => <p className="rt-muted">…</p> });
@@ -154,6 +155,10 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
   const [hatirlatma, setHatirlatma] = useState<Hatirlatma | null>(kart?.hatirlatma ?? null);
   const [bekle, setBekle] = useState<number | null>(kart?.bekle ?? null);
   const [panel, setPanel] = useState<Panel | null>(null);
+  // Aile ortak kartı (3 ekim): yeni kartta, aile grubundaysan — herkesin ajandasına düşer.
+  const aile = useCanli(aktifAilem, [], null);
+  const [ortak, setOrtak] = useState(false);
+  const ortakSecilebilir = !!aile && !kart && !onPlan && !tarihsiz && !sinav;
   const [secici, setSecici] = useState(false);
   const tarihGoster = !onPlan && (!kart || kart.izinler.gun_degistir);
   const bildirimGoster = !onPlan && !sinav;
@@ -259,6 +264,11 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
       const z = zamanlama(kart.baslangic);
       await kartGuncelle(kart.id, { tip: 'yap', ad: ad.trim(), bloklar: bloklarUret(), bitis: z.bitis, gunler: z.gunler, saatler: z.saatler, hatirlatma: z.hatirlatma, bekle: z.bekle });
       if (tarihGoster && tarihSec && tarihSec !== tarih) await kartTasi(kart.id, tarih, tarihSec);
+    } else if (ortak && ortakSecilebilir) {
+      const z = zamanlama(tarihSec || tarih);
+      try {
+        await ortakGonder({ o: 'kart', id: crypto.randomUUID(), ad: ad.trim(), bloklar: bloklarUret(), tarih: z.baslangic, saatler: z.saatler, hatirlatma: z.hatirlatma ?? null, ...benAile(), zaman: Date.now() });
+      } catch (e) { setHataM((e as Error).message); return; }
     } else {
       const paket: KartPaketi = {
         surum: PAKET_SURUM,
@@ -507,7 +517,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
       {zamanBolumu && (
         <div className="rt-zaman">
           <div className="rt-zrow">
-            {!tekrarYok && zc('tekrar', '🔁', tekrarMetni, 'Tekrar')}
+            {!tekrarYok && !ortak && zc('tekrar', '🔁', tekrarMetni, 'Tekrar')}
             {bildirimGoster && zc('bildirim', '🔔', bildirim, 'Bildirim')}
             {V2 && bildirimGoster && zc('bekle', '⏳', bekle ? `${bekle} dk bekle` : null, 'Sonra bekle')}
           </div>
@@ -520,6 +530,12 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
         </div>
       )}
 
+      {ortakSecilebilir && (
+        <label className="rt-satir rt-bil-sec">
+          <input type="checkbox" checked={ortak} onChange={(e) => { setOrtak(e.target.checked); if (e.target.checked) setTekrar(false); }} />
+          <span>👪 Ortak kart — <b>{aile!.ad}</b> grubunda herkesin ajandasına düşer <span className="rt-muted">(biri üstlenir, işaretlenince herkeste işaretlenir)</span></span>
+        </label>
+      )}
       {geri && (
         <div className="rt-geri">
           <span>{ICERIK.find(([x]) => x === geri.t)![1].split(' ').slice(1).join(' ')} silindi</span>

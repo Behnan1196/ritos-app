@@ -21,7 +21,7 @@ import { DanisanAjandasi } from './DanisanAjanda';
 import { useDanismanlik } from '@/lib/danismanlik';
 import { db, type IliskiRow, type ProgramRow } from '@/lib/db';
 import type { PlanHedef } from '@/lib/danisanAjanda';
-import { disiplinAdi } from '@/lib/danismanlik';
+import { benAile, disiplinAdi, ortakGonder } from '@/lib/danismanlik';
 import { useSeciliDanisan } from '@/lib/seciliDanisan';
 import { KAYNAK_TUR, filtreOku, filtreYaz, kaynakBilgi, uyar, type Filtre, type KaynakTur } from '@/lib/kaynakFiltre';
 
@@ -345,7 +345,7 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
   const adetB = kart.tip === 'yap' ? kart.bloklar.find((b): b is Extract<Blok, { tur: 'sayi' }> => b.tur === 'sayi' && b.bicim === 'adet') : undefined;
   const adetV = adetB ? Number((kayit?.degerler ?? {})[adetB.anahtar]) || 0 : 0;
   const aileKarti = useCanli(async () => (kart.geri_bildirim === 'uzak' ? (await db.program.get((kart.kaynak_ref ?? '').split('/')[0]))?.uzak?.disiplin === 'aile' : false), [kart.kaynak_ref], false);
-  const meta = [yapildi && kayit?.zaman ? `✓ ${saatMetni(kayit.zaman)}` : '', kart.saatler.join(' · ') + (kart.hatirlatma ? ' 🔔' : ''), bagli && kart.kaynak_etiket ? `${kart.kaynak_modul === 'dis' ? '🔗' : aileKarti ? '👪' : uzak ? '🤝' : '🌱'} ${kart.kaynak_etiket}` : ''].filter(Boolean).join(' · ');
+  const meta = [yapildi && kayit?.zaman ? `✓ ${saatMetni(kayit.zaman)}` : '', kart.saatler.join(' · ') + (kart.hatirlatma ? ' 🔔' : ''), bagli && kart.kaynak_etiket ? `${kart.kaynak_modul === 'dis' ? '🔗' : aileKarti || kart.kaynak_modul === 'ortak' ? '👪' : uzak ? '🤝' : '🌱'} ${kart.kaynak_etiket}` : ''].filter(Boolean).join(' · ');
   const yeniGuncel = !!kart.isaret && Date.now() - kart.isaret < 3 * 86400000;
   // A9 — değer düzeltme süresi (koçun izni): süre geçtiyse yapılmış kart değiştirilemez.
   const kilitli = !!kayit?.yapildi && kart.izinler.duzeltme_gun !== null && gunFarki(tarih, bugun()) > kart.izinler.duzeltme_gun;
@@ -521,7 +521,8 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
   const tasinir = kart.izinler.gun_degistir && (!bagli || kart.geri_bildirim === 'uzak');
   const silinir = !bagli && kart.izinler.sil;
   const paylasilir = !bagli;
-  const menuVar = tasinir || silinir || paylasilir || kaydedilir;
+  const ortakSilinir = !!kart.ortak;
+  const menuVar = tasinir || silinir || paylasilir || kaydedilir || ortakSilinir;
   const ust = (
     <span className="rt-detay-ust">
       {duzenlenir && <button type="button" className="rt-x" onClick={() => setDuzenle(true)} aria-label="Düzenle" title="Düzenle">✎</button>}
@@ -532,6 +533,7 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
           {kaydedilir && <button type="button" onClick={() => { setMenuAcik(false); setKutKaydet(true); }}>📚 Kütüphaneye kaydet</button>}
           {paylasilir && <PaylasDugmesi paketUret={() => kartPaketi(kart)} />}
           {silinir && <button type="button" className="tehlike" onClick={() => { setMenuAcik(false); if (tekrarli) setSilAcik(true); else setTekSil(true); }}>🗑 Kaldır</button>}
+          {ortakSilinir && <button type="button" className="tehlike" onClick={() => { setMenuAcik(false); setTekSil(true); }}>🗑 Herkesten kaldır</button>}
         </span>
       )}
     </span>
@@ -555,7 +557,9 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
         ? aileDetay
           ? <p className="rt-muted">👪 <b>{kart.kaynak_etiket}</b> verdi. İşaretin ve girdiğin değerler yalnız ona gider.</p>
           : <p className="rt-muted">🤝 Koçunun kartı · <b>{kart.kaynak_etiket}</b>. İşaretin ve girdiğin değerler yalnız koçuna gider.</p>
-        : kart.kaynak_modul === 'dis'
+        : kart.ortak
+          ? <OrtakKartBilgi kart={kart} yapildi={!!kayitCanli?.yapildi} />
+          : kart.kaynak_modul === 'dis'
           ? <p className="rt-muted">🔗 <b>{kart.kaynak_etiket}</b> uygulamasından geliyor; içeriğini ve gününü o uygulama yönetir. İşaretin ve girdiğin değerler ona geri yazılır.</p>
           : <p className="rt-muted">Bu kart <b>{kart.kaynak_etiket}</b> programından geliyor; içeriği ve günü programdan yönetilir.</p>)}
 
@@ -571,7 +575,7 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
           else await yapildiAyarla(kart.id, tarih, true);
         }}>✓ Yapıldı</button>
       )}
-      {tekSil && <OnayKutusu metin="Kart silinsin mi?" evet="Sil" onVazgec={() => setTekSil(false)} onEvet={() => kartKaldir(kart.id, tarih, 'tamamen').then(onKapat)} />}
+      {tekSil && <OnayKutusu metin={kart.ortak ? 'Ortak kart herkesin ajandasından kaldırılsın mı?' : 'Kart silinsin mi?'} evet="Sil" onVazgec={() => setTekSil(false)} onEvet={() => (kart.ortak ? ortakGonder({ o: 'kart-sil', id: kart.id.replace(/^o-/, ''), zaman: Date.now() }) : kartKaldir(kart.id, tarih, 'tamamen')).then(onKapat)} />}
       {tasiAcik && (
         <>
           <label className="rt-alan"><span>Yeni gün</span><input className="rt-inp" type="date" value={yeniTarih} onChange={(e) => setYeniTarih(e.target.value)} /></label>
@@ -705,5 +709,25 @@ function OlcekSec({ deger, ruh, onSec }: { deger: string; ruh: boolean; onSec: (
         <button key={n} type="button" className={deger === String(n) ? 'on' : ''} onClick={(e) => { e.preventDefault(); onSec(String(n)); }} aria-label={String(n)}>{ruh ? yuz[n - 1] : n}</button>
       ))}
     </span>
+  );
+}
+
+// Aile ortak kartı (3 ekim): kim ekledi, kim üstlendi; üstlen / bırak.
+function OrtakKartBilgi({ kart, yapildi }: { kart: import('@/lib/db').AjandaKartRow; yapildi: boolean }) {
+  const o = kart.ortak!;
+  const ben = benAile();
+  const id = kart.id.replace(/^o-/, '');
+  const benUstlendim = o.ustlenen === ben.kim;
+  return (
+    <div className="rt-ortak-bilgi">
+      <p className="rt-muted">👪 Ortak kart · {o.olusturan === ben.kim ? <><b>Sen</b> ekledin.</> : <><b>{o.olusturan_ad}</b> ekledi.</>} {yapildi && o.yapan_ad ? <>✓ <b>{o.yapan_ad}</b> yaptı.</> : o.ustlenen ? <><b>{benUstlendim ? 'Sen' : o.ustlenen_ad}</b> üstlendi.</> : 'Henüz kimse üstlenmedi.'}</p>
+      {!yapildi && (
+        <div className="rt-satir">
+          {!benUstlendim
+            ? <button type="button" className="rt-btn" onClick={() => ortakGonder({ o: 'ustlen', id, kim: ben.kim, kim_ad: ben.kim_ad, zaman: Date.now() })}>🙋 Ben üstleniyorum</button>
+            : <button type="button" className="rt-btn" onClick={() => ortakGonder({ o: 'ustlen', id, kim: null, kim_ad: null, zaman: Date.now() })}>Bırak</button>}
+        </div>
+      )}
+    </div>
   );
 }

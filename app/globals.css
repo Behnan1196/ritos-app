@@ -783,3 +783,16 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-kaynak-cipler .say{font-size:11px;opacity:.7;margin-left:2px;}
 .rt-kaynak-cipler.alt .rt-chip{font-size:12px;padding:4px 10px;background:transparent;}
 .rt-kaynak-cipler.alt .rt-chip.on{background:var(--green2);color:var(--ink);border-color:var(--green);}
+/* Aile ortak listeleri */
+.rt-ortak-w{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;}
+.rt-ortak-w .rt-notlar-hd b{flex:0 0 auto;}
+.rt-ortak-aile{flex:1;font-size:12px;}
+.rt-ortak-maddeler{display:flex;flex-direction:column;}
+.rt-ortak-madde{display:flex;align-items:center;gap:10px;border:0;border-bottom:1px solid var(--line);background:none;padding:9px 2px;font:inherit;font-size:14px;color:var(--ink);cursor:pointer;text-align:left;}
+.rt-ortak-madde:last-child{border-bottom:0;}
+.rt-ortak-madde .kutu{width:20px;height:20px;border:2px solid var(--line);border-radius:6px;flex:0 0 auto;display:grid;place-items:center;font-size:12px;color:#fff;}
+.rt-ortak-madde .t{flex:1;min-width:0;}
+.rt-ortak-madde .kim{font-size:11.5px;color:var(--muted);}
+.rt-ortak-madde.alindi .kutu{background:var(--green);border-color:var(--green);}
+.rt-ortak-madde.alindi .t{text-decoration:line-through;color:var(--muted);}
+.rt-linkbtn.tehlike{color:var(--red);}

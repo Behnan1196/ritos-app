@@ -60,7 +60,7 @@ export interface Hatirlatma {
   saat?: string | null;
 }
 
-export type KaynakModul = 'ajanda' | 'program' | 'hatirlatici' | 'gelenler' | 'danismanlik' | 'dis'; // dis: aynı Supabase'i kullanan dış uygulama (cat_dis_kart)
+export type KaynakModul = 'ajanda' | 'program' | 'hatirlatici' | 'gelenler' | 'danismanlik' | 'dis' | 'ortak'; // ortak: aile ortak kartı // dis: aynı Supabase'i kullanan dış uygulama (cat_dis_kart)
 
 export interface Izinler {
   ac: boolean;              // kartı açma (bazı atanmış kartlarda kapalı — A5)

@@ -63,6 +63,7 @@ export interface AjandaKartRow {
   ek?: PaketEk | null;           // alan paketi bilgisi (26 eylül) — indekssiz
   isaret?: number | null;        // D8 — koç güncelledi (zaman); kartta kısa süre "güncellendi" görünür
   hatirlatma?: Hatirlatma | null; // bildirim ayarı (30 eylül) — indekssiz
+  ortak?: { aile: string; olusturan: string; olusturan_ad: string; ustlenen: string | null; ustlenen_ad: string | null; yapan_ad: string | null } | null; // aile ortak kartı (3 ekim)
   bekle?: number | null;         // yapıldıktan sonra bekleme (dk, 2 ekim) — indekssiz
   atla?: string[];               // tekrar eden kartın "yalnız bu gün" kaldırılan günleri (A7) — indekssiz, göç gerektirmez
   guncellendi: number;
@@ -344,6 +345,14 @@ export interface BaglantiRow {
   guncellendi: number;
 }
 
+// Aile ortak listeleri (3 ekim) — aile kanalındaki şifreli işlemlerden (op) her cihazda kurulur;
+// senkronlanmaz (kaynağı kanal). Silinen kayıt iz olarak kalır ki geç gelen işlem onu diriltmesin.
+export interface OrtakListeRow { id: string; aile: string; ad: string; olusturan: string; zaman: number; silindi?: boolean }
+export interface OrtakMaddeRow {
+  id: string; liste: string; metin: string; ekleyen: string; zaman: number;
+  isaretli: boolean; isaret_kim: string | null; isaret_zaman: number; silindi?: boolean;
+}
+
 export interface AileUyesi { uye: string; ad: string; rol: 'yonetici' | 'uye'; durum: 'davet' | 'aktif' | 'ayrildi' }
 export interface AileRow {
   id: string;
@@ -393,6 +402,8 @@ export class RitosDB extends Dexie {
   kutuphane_kart!: EntityTable<KutuphaneKartRow, 'id'>;
   not!: EntityTable<NotRow, 'id'>;
   baglanti!: EntityTable<BaglantiRow, 'id'>;
+  ortak_liste!: EntityTable<OrtakListeRow, 'id'>;
+  ortak_madde!: EntityTable<OrtakMaddeRow, 'id'>;
 
   /** Sunucudan gelen değişiklik uygulanırken true — kancalar bunu yerel değişiklik saymaz. */
   uzaktan = false;
@@ -687,6 +698,38 @@ export class RitosDB extends Dexie {
       kutuphane_kart: 'id, klasor_id',
       not: 'id, guncellendi',
       baglanti: 'id, sira',
+    });
+    this.version(15).stores({
+      home_widget: 'id, type',
+      ayar: 'anahtar',
+      ajanda_kart: 'id, kaynak_modul, kaynak_ref, baslangic',
+      ajanda_kayit: 'id, kart_id, tarih',
+      geri_bildirim: 'id, kart_id, kaynak_ref, zaman',
+      program: 'id, klasor_id',
+      program_adim: 'id, program_id',
+      klasor: 'id, ust_id',
+      gelen: 'id, gelis, alindi',
+      kisi: 'id, son',
+      bekleyen: 'anahtar, zaman',
+      alan_degerlendirme: 'id, alan_id, zaman',
+      katalog: 'kod, paket',
+      paket_kurulum: 'id',
+      katalog_duzen: 'id, sinav',
+      kaynak: 'id',
+      konu_durum: 'id',
+      iliski: 'id, durum',
+      giden: 'id, zaman',
+      iliski_ayar: 'id',
+      mesaj: 'id, konusma, zaman',
+      konusma_okundu: 'id',
+      aile: 'id',
+      olcu_tanim: 'id',
+      olcum: 'id, olcu_id, tarih, kart_id',
+      kutuphane_kart: 'id, klasor_id',
+      not: 'id, guncellendi',
+      baglanti: 'id, sira',
+      ortak_liste: 'id, aile',
+      ortak_madde: 'id, liste',
     });
 
     // Senkronlanan tablolardaki her yerel değişikliği "bekleyen"e işaretle.
