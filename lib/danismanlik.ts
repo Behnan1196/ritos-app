@@ -301,7 +301,8 @@ type MesajIcerik =
   | { tur: 'ret'; program_id: string }
   | { tur: 'gb'; olaylar: GeriBildirimRow[] }
   | { tur: 'sohbet'; mesaj: MesajRow }
-  | { tur: 'ortak'; op: OrtakOp };
+  | { tur: 'ortak'; op: OrtakOp }
+  | { tur: 'hafta_notu'; program_id: string; hafta: string; metin: string; zaman: number }; // 3 ekim
 
 export interface KocPaketi { tur: 'koc_program'; iliski_id: string; koc_id: string; koc_ad: string; disiplin: string; program: ProgramOzeti }
 
@@ -374,6 +375,15 @@ async function mesajIsle(il: IliskiRow, m: MesajIcerik) {
     if (m.tur === 'durdur') {
       const p = await db.program.get(m.program_id);
       if (p?.uzak?.rol === 'danisan' && aktifMi(p)) await durdur(p.id);
+      return;
+    }
+    if (m.tur === 'hafta_notu') {
+      const p = await db.program.get(m.program_id);
+      if (p?.uzak?.rol !== 'danisan' || p.uzak.iliski_id !== il.id) return;
+      const notlar = { ...(p.hafta_notlari ?? {}) };
+      if ((notlar[m.hafta]?.zaman ?? 0) > m.zaman) return;
+      if (m.metin) notlar[m.hafta] = { metin: m.metin, zaman: m.zaman }; else delete notlar[m.hafta];
+      await db.program.update(p.id, { hafta_notlari: notlar, guncellendi: Date.now() });
       return;
     }
     return;
@@ -684,6 +694,22 @@ function kocDegisti(programId: string, etkin: string, adimId?: string) {
     const e = onceki && onceki.etkin < etkin ? onceki.etkin : etkin;
     bekleyenGuncelleme.set(programId, { etkin: e, z: setTimeout(() => { bekleyenGuncelleme.delete(programId); programGonder(programId, e).catch(() => {}); }, 1200) });
   })().catch(() => {});
+}
+
+/** 3 ekim — koçun haftalık değerlendirmesi: plan programında saklanır, danışana ayrı mesajla gider
+ *  (taslaktaki kartları beklemez). Boş metin notu kaldırır. */
+export async function haftaNotuGonder(programId: string, hafta: string, metin: string) {
+  const p = await db.program.get(programId);
+  if (!p?.uzak || p.uzak.rol !== 'koc') return;
+  if (p.uzak.durum === 'taslak') throw new Error('Önce planı gönder; değerlendirme planla birlikte görünür.');
+  const il = await db.iliski.get(p.uzak.iliski_id);
+  if (!il || il.durum !== 'aktif') throw new Error('Bu danışmanlık sonlanmış.');
+  const zaman = Date.now();
+  const notlar = { ...(p.hafta_notlari ?? {}) };
+  if (metin.trim()) notlar[hafta] = { metin: metin.trim(), zaman }; else delete notlar[hafta];
+  await db.program.update(programId, { hafta_notlari: notlar, guncellendi: zaman });
+  await kuyruk(il.id, il.danisan, { tur: 'hafta_notu', program_id: programId, hafta, metin: metin.trim(), zaman });
+  tetikle();
 }
 
 /** Taslaktaki değişiklikleri gönder (ilk kez gönderilmemiş plan da böylece gider). */

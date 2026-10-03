@@ -145,6 +145,21 @@ export async function yapildiAyarla(kartId: string, tarih: string, yapildi: bool
   if (!yapildi) await olcumSil(kartId, tarih);
 }
 
+// 3 ekim — karta kısa not (koçuna / görevi verene gider). Durumu değiştirmez; son yazılan geçerli.
+export async function yorumYaz(kartId: string, tarih: string, metin: string) {
+  const kart = await db.ajanda_kart.get(kartId);
+  if (!kart || kart.geri_bildirim !== 'uzak') return;
+  await yayinla(kart, tarih, 'yorum', { metin: metin.trim() });
+}
+
+/** Bu karta bu gün yazdığım son not (boşsa null). */
+export async function yorumOku(kartId: string, tarih: string): Promise<string | null> {
+  const son = (await db.geri_bildirim.where('kart_id').equals(kartId).toArray())
+    .filter((o) => o.tarih === tarih && o.olay === 'yorum').sort((a, b) => b.zaman - a.zaman)[0];
+  const m = (son?.degerler as { metin?: string } | null)?.metin;
+  return m ? m : null;
+}
+
 // A9 — Kaydet kartında değer gir (kaydedince yapıldı sayılır).
 export async function degerKaydet(kartId: string, tarih: string, degerler: Record<string, unknown>) {
   const kart = await db.ajanda_kart.get(kartId);

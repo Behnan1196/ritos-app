@@ -177,6 +177,7 @@ export async function ilerleme(programId: string): Promise<ProgramIlerleme> {
   // Her (adım, gün) için son olay kazanır.
   const durum = new Map<string, { yapildi: boolean; degerler: Record<string, unknown> | null; zaman: number }>();
   for (const o of olaylar) {
+    if (o.olay === 'yorum') continue;
     const adimId = (o.kaynak_ref ?? '').split('/')[1];
     const anahtar = `${adimId}|${o.tarih}`;
     const onceki = durum.get(anahtar);

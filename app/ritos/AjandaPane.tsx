@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ayOzeti, degerArttir, degerKaydet, yapildiZamani, gununKartlari, kartKaldir, kartTasi, listeIsaretle, siraDegistir, yapildiAyarla, type GunSatiri } from '@/lib/ajanda';
+import { ayOzeti, yorumOku, yorumYaz, degerArttir, degerKaydet, yapildiZamani, gununKartlari, kartKaldir, kartTasi, listeIsaretle, siraDegistir, yapildiAyarla, type GunSatiri } from '@/lib/ajanda';
 import { useCanli } from '@/lib/canli';
 import {
   bugun, degerBloklari, gunFarki, tarihEkle, tarihEtiket, tarihParse, tarihStr,
@@ -70,6 +70,7 @@ export default function AjandaPane() {
         </div>
       </div>
 
+      <HaftaNotlari haftaBas={haftaBasi(tarih)} />
       {hafta ? (
         <HaftaGorunumu bas={haftaBasi(tarih)} filtre={filtre} setFiltre={setFiltre} pMap={pMap} onAc={(satir, t) => setDetay({ satir, tarih: t })} onEkle={setEkle} onGun={(t) => { setTarih(t); setGorunum('gun'); }} />
       ) : (
@@ -524,6 +525,7 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
           : kart.kaynak_modul === 'dis'
           ? <p className="rt-muted">🔗 <b>{kart.kaynak_etiket}</b> uygulamasından geliyor; içeriğini ve gününü o uygulama yönetir. İşaretin ve girdiğin değerler ona geri yazılır.</p>
           : <p className="rt-muted">Bu kart <b>{kart.kaynak_etiket}</b> programından geliyor; içeriği ve günü programdan yönetilir.</p>)}
+      {kart.geri_bildirim === 'uzak' && <YorumAlani kartId={kart.id} tarih={tarih} kime={aileDetay ? kart.kaynak_etiket ?? 'görevi veren' : 'koçun'} />}
 
       {degerAc && (
         <DegerGir bloklar={kart.bloklar} ilk={kayitCanli?.degerler ?? null}
@@ -690,6 +692,50 @@ function OrtakKartBilgi({ kart, yapildi }: { kart: import('@/lib/db').AjandaKart
             : <button type="button" className="rt-btn" onClick={() => ortakGonder({ o: 'ustlen', id, kim: null, kim_ad: null, zaman: Date.now() })}>Bırak</button>}
         </div>
       )}
+    </div>
+  );
+}
+
+// ———————————————— 3 ekim — geri bildirim (danışan tarafı) ————————————————
+
+/** Koçun / görevi verenin kartına kısa not: işaretlerken ya da sonra. Yalnız ona gider. */
+function YorumAlani({ kartId, tarih, kime }: { kartId: string; tarih: string; kime: string }) {
+  const yorum = useCanli(() => yorumOku(kartId, tarih), [kartId, tarih], null as string | null);
+  const [acik, setAcik] = useState(false);
+  const [metin, setMetin] = useState('');
+  if (!acik) {
+    return yorum ? (
+      <div className="rt-yorum">
+        <span className="rt-yorum-metin">💬 {yorum}</span>
+        <button type="button" className="rt-linkbtn" onClick={() => { setMetin(yorum); setAcik(true); }}>Düzenle</button>
+      </div>
+    ) : <button type="button" className="rt-linkbtn rt-yorum-ac" onClick={() => { setMetin(''); setAcik(true); }}>💬 Not bırak</button>;
+  }
+  return (
+    <div className="rt-yorum acik">
+      <textarea className="rt-inp" rows={2} autoFocus maxLength={500} placeholder={`Kısa not — yalnız ${kime} görür (ör. "Yumurta yerine yoğurt yedim")`} value={metin} onChange={(e) => setMetin(e.target.value)} />
+      <div className="rt-satir">
+        <button type="button" className="rt-btn" onClick={() => setAcik(false)}>Vazgeç</button>
+        <button type="button" className="rt-btn primary" disabled={!metin.trim() && !yorum} onClick={async () => { await yorumYaz(kartId, tarih, metin); setAcik(false); }}>{metin.trim() ? 'Gönder' : 'Notu kaldır'}</button>
+      </div>
+    </div>
+  );
+}
+
+/** Koçun bu haftaya yazdığı değerlendirme(ler) — haftanın üstünde. */
+function HaftaNotlari({ haftaBas }: { haftaBas: string }) {
+  const notlar = useCanli(async () => (await db.program.toArray())
+    .filter((p) => p.uzak?.rol === 'danisan' && p.hafta_notlari?.[haftaBas])
+    .map((p) => ({ id: p.id, kim: p.uzak!.karsi_ad, aile: p.uzak!.disiplin === 'aile', metin: p.hafta_notlari![haftaBas].metin })), [haftaBas], [] as { id: string; kim: string; aile: boolean; metin: string }[]);
+  if (!notlar.length) return null;
+  return (
+    <div className="rt-hafta-notlari">
+      {notlar.map((n) => (
+        <div key={n.id} className="rt-hafta-notu">
+          <div className="kim">📝 {n.aile ? '👪' : '🤝'} <b>{n.kim}</b> · bu haftanın değerlendirmesi</div>
+          <div className="metin">{n.metin}</div>
+        </div>
+      ))}
     </div>
   );
 }

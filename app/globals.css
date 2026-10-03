@@ -862,3 +862,21 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-atolye.genis .rt-hafta .rt-kart-ad{padding:0;min-width:0;}
 .rt-atolye.genis .rt-hafta .rt-kart-ad .t{font-size:12px;line-height:1.25;overflow-wrap:anywhere;}
 .rt-atolye.genis .rt-hafta .rt-tutamac{padding:2px 0;font-size:12px;}
+
+/* ---------- 3 ekim: geri bildirim ---------- */
+.rt-yorum{display:flex;align-items:flex-start;gap:8px;background:#f6f2ea;border-radius:10px;padding:8px 10px;margin:8px 0;font-size:13px;}
+.rt-yorum.acik{flex-direction:column;align-items:stretch;background:transparent;padding:0;}
+.rt-yorum.acik textarea{width:100%;resize:vertical;font:inherit;font-size:13.5px;}
+.rt-yorum.acik .rt-satir{justify-content:flex-end;}
+.rt-yorum-metin{flex:1;white-space:pre-wrap;}
+.rt-yorum-ac{display:block;margin:8px 0;}
+.rt-yorum-m{color:#6b6250 !important;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;display:block;}
+.rt-hafta-notlari{display:flex;flex-direction:column;gap:6px;margin:0 0 10px;}
+.rt-hafta-notu{background:#eef4ea;border:1px solid #cfe0c6;border-radius:12px;padding:9px 12px;font-size:13.5px;}
+.rt-hafta-notu .kim{font-size:12px;color:var(--muted);margin-bottom:3px;}
+.rt-hafta-notu .metin{white-space:pre-wrap;}
+.rt-gb-not{display:flex;flex-direction:column;gap:1px;padding:6px 0;border-bottom:1px dashed var(--line);font-size:12.5px;}
+.rt-gb-not .ne{color:var(--muted);font-size:11.5px;text-transform:capitalize;}
+.rt-gb-not .metin{white-space:pre-wrap;}
+.rt-gb-deg{display:flex;flex-direction:column;gap:4px;margin-top:8px;font-size:12px;color:var(--muted);font-weight:700;}
+.rt-gb-deg textarea{width:100%;resize:vertical;font:inherit;font-size:13px;font-weight:400;color:var(--ink);}

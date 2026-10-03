@@ -103,7 +103,8 @@ export interface KartPaketi {
   ek?: PaketEk | null;                          // alan paketinin bilgisi (Sınav…)
 }
 
-export type GeriBildirimOlay = 'yapildi' | 'geri_alindi' | 'deger';
+// 'yorum' (3 ekim): karta bırakılan kısa not — durumu değiştirmez; durum okuyan yerler atlar.
+export type GeriBildirimOlay = 'yapildi' | 'geri_alindi' | 'deger' | 'yorum';
 
 export interface GeriBildirim {
   surum: typeof PAKET_SURUM;

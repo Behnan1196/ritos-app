@@ -121,6 +121,7 @@ function KocKartSatiri({ k, onAc, onSurukle, suruklenen }: { k: KocKarti; onAc: 
         <button type="button" className="rt-kart-ad" onClick={onAc}>
           <span className="t">{olcumKarti(k.adim.bloklar) ? '📏 ' : ''}{k.adim.ad}</span>
           {deger && <span className="m">✓ {deger}</span>}
+          {k.yorum && <span className="m rt-yorum-m">💬 {k.yorum}</span>}
           {k.taslak && <span className="m rt-taslak-etiket">taslak</span>}
           {!k.tekGun && <span className="m">🔁 {k.program.uzak?.plan || k.program.plan ? 'tekrar' : k.program.ad}</span>}
         </button>
@@ -147,6 +148,7 @@ function KocKartDetay({ h, k, onKapat }: { h: PlanHedef; k: KocKarti; onKapat: (
         <b>{k.yapildi ? 'Yapıldı' : gecmis ? 'Yapılmadı' : 'Bekliyor'}</b>
         {k.degerler && <> · {degerMetni(k.degerler, k.adim.bloklar)}</>}
       </p>
+      {k.yorum && <p className="rt-yorum"><span className="rt-yorum-metin">💬 {k.yorum}</span></p>}
       {hata && <p className="rt-hata">⚠ {hata}</p>}
       {!k.tekGun && <p className="rt-muted">Bu kart birden çok güne yayılıyor{k.program.uzak?.plan || k.program.plan ? '' : ` (${k.program.ad})`}.</p>}
       {!k.tekGun && !sil && <div className="rt-satir"><button type="button" className="rt-btn tehlike" onClick={() => setSil(true)}>Seriyi bugünden bitir</button></div>}

@@ -27,6 +27,7 @@ export interface KocKarti {
   tekGun: boolean;           // yalnız tek günlük kart Ajanda'dan taşınır/silinir
   yapildi: boolean;
   degerler: Record<string, unknown> | null;
+  yorum: string | null;      // 3 ekim — danışanın bu güne bıraktığı not
   taslak: boolean;           // 3 ekim — gönderilmemiş değişiklik (Atölye taslak modu)
 }
 
@@ -50,8 +51,10 @@ export async function danisanGunleri(h: PlanHedef, tarihler: string[]): Promise<
   const refler = adimlar.map((a) => `${a.program_id}/${a.id}`);
   const olaylar = await db.geri_bildirim.where('kaynak_ref').anyOf(refler).toArray();
   const son = new Map<string, GeriBildirimRow>();
+  const yorumlar = new Map<string, GeriBildirimRow>();
   for (const o of olaylar) {
     const k = `${o.kaynak_ref}|${o.tarih}`;
+    if (o.olay === 'yorum') { const y = yorumlar.get(k); if (!y || y.zaman < o.zaman) yorumlar.set(k, o); continue; }
     const v = son.get(k);
     if (!v || v.zaman < o.zaman) son.set(k, o);
   }
@@ -63,10 +66,12 @@ export async function danisanGunleri(h: PlanHedef, tarihler: string[]): Promise<
     for (const t of tarihler) {
       if (!gunAktif(z, t) || (bitti && t > bitti)) continue;
       const o = son.get(`${a.program_id}/${a.id}|${t}`);
+      const y = (yorumlar.get(`${a.program_id}/${a.id}|${t}`)?.degerler as { metin?: string } | null)?.metin || null;
       sonuc[t].push({
         adim: a, program: p, tarih: t, tekGun: a.sure_gun === 1,
         yapildi: !!o && o.olay !== 'geri_alindi',
         degerler: o && o.olay === 'deger' ? o.degerler : null,
+        yorum: y,
         taslak: !!p.uzak?.bekleyen?.adimlar.includes(a.id) || (p.uzak?.durum === 'taslak'),
       });
     }

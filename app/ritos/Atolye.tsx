@@ -12,6 +12,7 @@ import React, { useEffect, useState } from 'react';
 import { useCanli } from '@/lib/canli';
 import { db, type IliskiRow, type KutuphaneKartRow, type ProgramRow } from '@/lib/db';
 import { bugun, degerBloklari, iyelik, tarihEkle, tarihEtiket, tarihParse } from '@/lib/paket';
+import { haftaNotuGonder } from '@/lib/danismanlik';
 import { danisanGunleri, gonderimAyarla, kocKartEkle, planDurumu, type KocKarti } from '@/lib/danisanAjanda';
 import { SURE_ANAHTAR } from './KartEditor';
 import { disiplinAdi, useDanismanlik } from '@/lib/danismanlik';
@@ -241,6 +242,7 @@ function AtolyeAraclari({ h, haftaBas }: { h: Hedef; haftaBas: string }) {
           );
         })}
       </div>
+      {pd && <GeriBildirim h={h} haftaBas={haftaBas} kartlar={hafta} programId={pd.programId} hicGonderilmedi={pd.hicGonderilmedi} />}
       {pd && (
         <div className="rt-arac">
           <h4>Gönderim</h4>
@@ -289,6 +291,43 @@ function KutuphaneSurukle({ h }: { h: Hedef }) {
         <div key={k.id} className="rt-kut-oge" onPointerDown={(e) => { e.preventDefault(); setMesaj(null); setTasi({ k, x: e.clientX, y: e.clientY }); }}>{k.ad}</div>
       ))}
       {tasi && <div className="rt-hayalet" style={{ left: tasi.x, top: tasi.y }}>{tasi.k.ad}</div>}
+    </div>
+  );
+}
+
+// ———————————————— 3 ekim — geri bildirim (koç tarafı) ————————————————
+// Haftanın kart notları (danışanın yazdıkları) + koçun haftalık değerlendirmesi.
+
+function GeriBildirim({ h, haftaBas, kartlar, programId, hicGonderilmedi }: { h: Hedef; haftaBas: string; kartlar: KocKarti[]; programId: string | null; hicGonderilmedi: boolean }) {
+  const p = useCanli(async () => (programId ? (await db.program.get(programId)) ?? null : null), [programId], null as ProgramRow | null);
+  const kayitli = p?.hafta_notlari?.[haftaBas]?.metin ?? '';
+  const [metin, setMetin] = useState(kayitli);
+  const [durum, setDurum] = useState<string | null>(null);
+  useEffect(() => { setMetin(kayitli); setDurum(null); }, [haftaBas, kayitli]);
+  const notlar = kartlar.filter((k) => k.yorum).sort((a, b) => a.tarih.localeCompare(b.tarih));
+  const kim = h.h.tur === 'danisan' ? h.h.il.danisan_ad : '';
+  return (
+    <div className="rt-arac">
+      <h4>Geri bildirim</h4>
+      {notlar.length === 0 && <p className="rt-muted">Bu hafta karta not yok. {kim} kartı açıp &quot;💬 Not bırak&quot; ile yazar.</p>}
+      {notlar.map((k) => (
+        <div key={`${k.adim.id}|${k.tarih}`} className="rt-gb-not">
+          <span className="ne">{tarihParse(k.tarih).toLocaleDateString('tr-TR', { weekday: 'short' })} · {k.adim.ad}</span>
+          <span className="metin">💬 {k.yorum}</span>
+        </div>
+      ))}
+      <label className="rt-alan rt-gb-deg">Haftalık değerlendirme
+        <textarea className="rt-inp" rows={3} maxLength={1500} placeholder={`${kim} bu haftanın üstünde görür`} value={metin} onChange={(e) => { setMetin(e.target.value); setDurum(null); }} />
+      </label>
+      <div className="rt-satir">
+        {durum && <span className={durum.startsWith('⚠') ? 'rt-hata' : 'rt-tamam'}>{durum}</span>}
+        <button type="button" className="rt-btn primary" style={{ marginLeft: 'auto' }}
+          disabled={!programId || hicGonderilmedi || metin.trim() === kayitli}
+          onClick={async () => { try { await haftaNotuGonder(programId!, haftaBas, metin); setDurum(metin.trim() ? '✓ Gönderildi' : '✓ Kaldırıldı'); } catch (e) { setDurum('⚠ ' + (e as Error).message); } }}>
+          {kayitli && !metin.trim() ? 'Kaldır' : kayitli ? 'Güncelle' : 'Gönder'}
+        </button>
+      </div>
+      {(!programId || hicGonderilmedi) && <p className="rt-muted">Plan gönderilince değerlendirme yazabilirsin.</p>}
     </div>
   );
 }

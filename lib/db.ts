@@ -111,6 +111,7 @@ export interface ProgramRow {
   sablon?: boolean;              // D4 — koçun şablonu: başlatılmaz, yalnız atanır
   sablon_disiplin?: string | null; // D4 — şablonlar disipline göre gruplanır
   plan?: boolean;                // 28 eylül — kişisel program Ajanda'dan planlanır: tarihler mutlak, kendiliğinden bitmez
+  hafta_notlari?: Record<string, { metin: string; zaman: number }>; // 3 ekim — koçun haftalık değerlendirmesi (anahtar: haftanın pazartesisi)
   uzak?: UzakProgram | null;     // D5/D6 — danışana atanmış (koç tarafı) ya da koçtan gelen (danışan tarafı)
   guncellendi: number;
 }

@@ -142,6 +142,7 @@ export async function danisanAnalizi(programIdler: string[]): Promise<SinavAnali
     const olaylar = (await db.geri_bildirim.where('kaynak_ref').startsWith(`${pid}/`).toArray()).sort((a, b) => a.zaman - b.zaman);
     const son = new Map<string, AnalizKaydi>();
     for (const o of olaylar) {
+      if (o.olay === 'yorum') continue;
       const a = adimlar.get((o.kaynak_ref ?? '').split('/')[1]);
       if (!a?.ek || a.ek.paket !== 'sinav') continue;
       const anahtar = `${o.kaynak_ref}|${o.tarih}`;
