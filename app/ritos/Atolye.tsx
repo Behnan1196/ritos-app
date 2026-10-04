@@ -10,9 +10,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { useCanli } from '@/lib/canli';
-import { db, type IliskiRow, type KutuphaneKartRow, type ProgramRow } from '@/lib/db';
+import { db, type AileRow, type IliskiRow, type KutuphaneKartRow, type ProgramRow } from '@/lib/db';
 import { bugun, degerBloklari, iyelik, tarihEkle, tarihEtiket, tarihParse } from '@/lib/paket';
-import { haftaNotuGonder } from '@/lib/danismanlik';
+import { aileAktifMi, aileGorevIliski, haftaNotuGonder } from '@/lib/danismanlik';
 import { danisanGunleri, gonderimAyarla, kocKartEkle, planDurumu, type KocKarti } from '@/lib/danisanAjanda';
 import { SURE_ANAHTAR } from './KartEditor';
 import { disiplinAdi, useDanismanlik } from '@/lib/danismanlik';
@@ -28,6 +28,17 @@ type Alt = 'planlar' | 'kutuphane';
 const durum: { alt: Alt; tarih: string | null; hafta: boolean } = { alt: 'planlar', tarih: null, hafta: true };
 
 interface Hedef { id: string; grup: string; ic: string; ad: string; alt?: string; h: PlanHedef }
+/** 4 ekim — henüz görev verilmemiş aile üyesi: seçilince görev ilişkisi sessizce kurulur. */
+interface Aday { id: string; uye: string; ad: string }
+
+function useAdaylar(hedefler: Hedef[]): Aday[] {
+  const dn = useDanismanlik();
+  const aileler = useCanli(() => db.aile.toArray(), [], [] as AileRow[]);
+  const aile = aileler.find(aileAktifMi);
+  if (!aile) return [];
+  const var_ = new Set(hedefler.filter((x) => x.h.tur === 'danisan' && x.h.il.disiplin === 'aile').map((x) => (x.h as { il: IliskiRow }).il.danisan));
+  return aile.uyeler.filter((u) => u.uye !== dn.uid && u.durum === 'aktif' && !var_.has(u.uye)).map((u) => ({ id: `aile:${u.uye}`, uye: u.uye, ad: u.ad }));
+}
 
 function useHedefler(): Hedef[] {
   const dn = useDanismanlik();
@@ -76,19 +87,30 @@ function Planlar({ genis }: { genis: boolean }) {
   const [ayAcik, setAyAcik] = useState(false);
   const setTarih = (t: string) => { durum.tarih = t; setTarihS(t); };
   const setHafta = (h: boolean) => { durum.hafta = h; setHaftaS(h); };
+  const adaylar = useAdaylar(hedefler);
+  const [kuruluyor, setKuruluyor] = useState<string | null>(null);
+  const [kurHata, setKurHata] = useState<string | null>(null);
   const h = hedefler.find((x) => x.id === secili) ?? null;
 
   // Seçim yoksa (ya da seçili hedef artık yoksa) ilk hedef seçilir.
   useEffect(() => {
-    if (!h && hedefler.length) setSecili(hedefler[0].id);
-  }, [h, hedefler.length]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!h && !kuruluyor && hedefler.length) setSecili(hedefler[0].id);
+  }, [h, hedefler.length, kuruluyor]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!hedefler.length) {
+  // Aile üyesi ilk kez seçilince görev ilişkisi kurulur (ayrı bir "Görev ver" adımı yok).
+  const adaySec = async (a: Aday) => {
+    setKurHata(null); setKuruluyor(a.id);
+    try { const id = await aileGorevIliski(a.uye); setSecili(id); }
+    catch (e) { setKurHata(`${a.ad} için hazırlanamadı: ${(e as Error).message}`); }
+    finally { setKuruluyor(null); }
+  };
+
+  if (!hedefler.length && !adaylar.length) {
     return (
       <div className="rt-atolye-bos">
         <p className="rt-metin"><b>Henüz planlayacağın bir şey yok.</b></p>
         <ul className="rt-maddeler rt-muted">
-                    <li>Ailene görev ver: Ayarlar › Aile › 📋 Görev ver.</li>
+          <li>Aile grubu kur (Ayarlar › Aile); ailendekiler burada listelenir, görev verirsin.</li>
           <li>Danışanların varsa Home › Danışmanlık&apos;tan davet et.</li>
           <li>Aldığın programlar da burada planlanır.</li>
         </ul>
@@ -96,7 +118,12 @@ function Planlar({ genis }: { genis: boolean }) {
     );
   }
 
-  const gruplar = Array.from(new Set(hedefler.map((x) => x.grup)));
+  const gruplar = Array.from(new Set([...hedefler.map((x) => x.grup), ...(adaylar.length ? ['Ailem'] : [])]));
+  const adayDugme = (a: Aday, sinif: string) => (
+    <button key={a.id} type="button" className={`${sinif}${kuruluyor === a.id ? ' on' : ''}`} disabled={!!kuruluyor} onClick={() => adaySec(a)}>
+      {sinif === 'rt-chip' ? <>👪 {a.ad}</> : <><span className="ic">👪</span><span className="ad">{a.ad}</span></>}
+    </button>
+  );
   const t0 = bugun();
   const adim = hafta ? 7 : 1;
   const bugunGorunur = hafta ? haftaBasi(tarih) === haftaBasi(t0) : tarih === t0;
@@ -111,6 +138,7 @@ function Planlar({ genis }: { genis: boolean }) {
               <span className="ic">{x.ic}</span><span className="ad">{x.ad}</span>
             </button>
           ))}
+          {g === 'Ailem' && adaylar.map((a) => adayDugme(a, 'rt-hedef-sat'))}
         </div>
       ))}
     </aside>
@@ -119,6 +147,7 @@ function Planlar({ genis }: { genis: boolean }) {
       {hedefler.map((x) => (
         <button key={x.id} type="button" className={`rt-chip${x.id === h?.id ? ' on' : ''}`} onClick={() => setSecili(x.id)}>{x.ic} {x.ad}</button>
       ))}
+      {adaylar.map((a) => adayDugme(a, 'rt-chip'))}
     </div>
   );
 
@@ -126,7 +155,10 @@ function Planlar({ genis }: { genis: boolean }) {
     <div className="rt-atolye-plan">
       {secici}
       <section className="rt-atolye-orta">
-        {h && (
+        {kuruluyor && <p className="rt-muted">Hazırlanıyor…</p>}
+        {kurHata && <p className="rt-hata">⚠ {kurHata}</p>}
+        {!h && !kuruluyor && !kurHata && <p className="rt-muted">Kime plan yapacağını seç.</p>}
+        {h && !kuruluyor && (
           <>
             <div className="rt-hedef-bas"><b>{h.ic} {h.ad}</b>{h.alt && <span className="rt-muted"> · {h.alt}</span>}</div>
             <div className="rt-daterow">
@@ -145,7 +177,7 @@ function Planlar({ genis }: { genis: boolean }) {
               key={h.id}
               h={h.h}
               baslik={h.h.tur === 'program'
-                ? <>Yalnız bu programın kartları. Burada kurduğun kartlar Günüm&apos;e de düşer.</>
+                ? <>Yalnız bu programın kartları. Burada kurduğun kartlar Ajandam&apos;a da düşer.</>
                 : h.grup === 'Ailem'
                   ? <>Ona verdiğin görevler ve durumları. İşaretleyince burada görürsün.</>
                   : <>Yalnız senin atadığın kartlar görünür.</>}

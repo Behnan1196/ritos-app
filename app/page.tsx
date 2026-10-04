@@ -38,7 +38,7 @@ const TEST = process.env.NEXT_PUBLIC_RITOS_TEST === '1';
 
 type ToolId = 'sinav';
 type Sekme = 'home' | 'gunum' | 'atolye' | 'ayarlar' | 'gelenler';
-type Sag = 'home' | 'ayarlar' | 'gelenler'; // geniş ekranda Günüm'ün yanındaki bölme
+type Sag = 'home' | 'ayarlar' | 'gelenler'; // geniş ekranda Ajandam'ın yanındaki bölme
 
 const TOOL_META: Record<ToolId, { icon: string; title: string }> = {
   sinav: { icon: '📚', title: 'Sınav paketi' },
@@ -131,6 +131,20 @@ function RitosUygulama() {
     </div>
   );
 
+  // Geniş ekran sekmeleri (4 ekim, B): Home · Atölye · Ayarlar sağ altta. Atölye seçilince ekranı kaplar.
+  const genisSekme: Sag | 'atolye' = sekme === 'atolye' ? 'atolye' : sag === 'gelenler' ? 'home' : sag;
+  const sekmeler = (
+    <div className="side-tabs">
+      {([['home', '🏠', 'Home'], ['atolye', '🗂', 'Atölye'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sag | 'atolye', string, string][]).map(([k, ic, ad]) => (
+        <button key={k} className={genisSekme === k ? 'on' : ''} onClick={() => {
+          if (k === 'atolye') { setSekme('atolye'); return; }
+          if (k === 'home') setDanismanlik(null);
+          setSekme('gunum'); setSag(k);
+        }}><span>{ic}{k !== 'atolye' && rozet(k)}</span>{ad}</button>
+      ))}
+    </div>
+  );
+
   return (
     <div className="shell">
       <DavetKarsilama />
@@ -139,7 +153,7 @@ function RitosUygulama() {
           <div className="mobile-hd"><b>Ritos</b><SenkronIsareti /></div>
           <div className="mobile-main">{sekme === 'gunum' ? <AjandaPane /> : sekme === 'atolye' ? <Atolye genis={false} /> : sagSekme(sekme)}</div>
           <div className="mobile-nav">
-            {([['home', '🏠', 'Home'], ['gunum', '☀️', 'Günüm'], ['atolye', '🗂', 'Atölye'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sekme, string, string][]).map(([k, ic, ad]) => (
+            {([['home', '🏠', 'Home'], ['gunum', '📅', 'Ajandam'], ['atolye', '🗂', 'Atölye'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sekme, string, string][]).map(([k, ic, ad]) => (
               <button key={k} className={(sekme === 'gelenler' ? 'home' : sekme) === k ? 'on' : ''} onClick={() => setSekme(k)}><span className="ic">{ic}{rozet(k)}</span>{ad}</button>
             ))}
           </div>
@@ -148,16 +162,13 @@ function RitosUygulama() {
         </div>
       ) : (
         <>
-          <div className="topbar">
-            <b>Ritos</b>
-            <div className="rt-ust-mod" role="tablist" aria-label="Çalışma alanı">
-              <button type="button" role="tab" aria-selected={sekme !== 'atolye'} className={sekme !== 'atolye' ? 'on' : ''} onClick={() => setSekme('gunum')}>☀️ Günüm</button>
-              <button type="button" role="tab" aria-selected={sekme === 'atolye'} className={sekme === 'atolye' ? 'on' : ''} onClick={() => setSekme('atolye')}>🗂 Atölye</button>
-            </div>
-            <SenkronIsareti />
-          </div>
+          <div className="topbar"><b>Ritos</b><SenkronIsareti /></div>
           {sekme === 'atolye' ? (
-            <div className="rt-atolye-tam"><Atolye genis /></div>
+            <>
+              {/* Atölye geniş ekranda tüm alanı kaplar; sekmeler aynı yerde (sağ altta) kalır. */}
+              <div className="rt-atolye-tam"><Atolye genis /></div>
+              <div className="rt-tam-sekmeler"><span style={{ width: ratio + '%' }} />{sekmeler}</div>
+            </>
           ) : (
             <SplitPane
               ratio={ratio}
@@ -166,11 +177,7 @@ function RitosUygulama() {
               right={(
                 <>
                   <div className="side-content">{danismanlik && sag === 'home' ? danEkrani(false) : sagSekme(sag)}</div>
-                  <div className="side-tabs">
-                    {([['home', '🏠', 'Home'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sag, string, string][]).map(([k, ic, ad]) => (
-                      <button key={k} className={(sag === 'gelenler' ? 'home' : sag) === k ? 'on' : ''} onClick={() => { if (k === 'home') setDanismanlik(null); setSag(k); }}><span>{ic}{rozet(k)}</span>{ad}</button>
-                    ))}
-                  </div>
+                  {sekmeler}
                 </>
               )}
             />

@@ -10,9 +10,8 @@ import { useCanli } from '@/lib/canli';
 import { bugun, tarihEtiket } from '@/lib/paket';
 import { kartPaketi, paketiAl, programPaketi, type PaylasimPaketi } from '@/lib/paylasim';
 import { yol } from '@/lib/alan';
-import { seciliDanisanAyarla } from '@/lib/seciliDanisan';
 import {
-  aileAktifMi, aileAyril, aileGorevIliski, aileDavet, aileKur, aileYanit, benimAileRolum, disiplinAdi, konusmaAile, konusmaIliski,
+  aileAktifMi, aileAyril, aileDavet, aileKur, aileYanit, benimAileRolum, disiplinAdi, konusmaAile, konusmaIliski,
   okunduIsaretle, sohbetGonder, useDanismanlik,
 } from '@/lib/danismanlik';
 import { Chips, Kap, Modal, OnayKutusu } from './ortak';
@@ -363,16 +362,10 @@ export function AileAyarlari() {
       ) : (
         <>
           <p className="rt-metin"><b>👪 {aile.ad}</b></p>
+          <p className="rt-muted">Görevleri 🗂 Atölye › Planlar&apos;dan verirsin; ailendekiler orada listelenir.</p>
           {aile.uyeler.filter((u) => u.durum !== 'ayrildi').map((u) => (
             <div key={u.uye} className="rt-kaynak">
               <div className="rt-konu" style={{ cursor: 'default' }}><span>{u.ad}{u.uye === d.uid ? ' (sen)' : ''}</span><span className="rt-muted">{u.rol === 'yonetici' ? 'yönetici' : u.durum === 'davet' ? 'davet bekliyor' : 'üye'}</span></div>
-              {u.uye !== d.uid && u.durum === 'aktif' && ben?.durum === 'aktif' && (
-                <button type="button" className="rt-btn" onClick={() => calistir(async () => {
-                  const id = await aileGorevIliski(u.uye);
-                  seciliDanisanAyarla(id);
-                  window.dispatchEvent(new Event('ritos-atolyeye-git'));
-                })}>📋 Görev ver</button>
-              )}
               {ben?.rol === 'yonetici' && u.uye !== d.uid && <button type="button" className="rt-btn" onClick={() => setCikar(u.uye)}>Çıkar</button>}
             </div>
           ))}
