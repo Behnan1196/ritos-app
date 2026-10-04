@@ -13,7 +13,7 @@ import { useCanli } from '@/lib/canli';
 import { db, type AileRow, type IliskiAyarRow, type IliskiRow, type KutuphaneKartRow, type ProgramRow } from '@/lib/db';
 import { bugun, degerBloklari, iyelik, tarihEkle, tarihEtiket, tarihParse } from '@/lib/paket';
 import { aileAktifMi, aileGorevIliski, kocOl, davetler, davetSil, haftaNotuGonder, iliskiBilgiYaz, type DavetSatir } from '@/lib/danismanlik';
-import { danisanGunleri, gonderimAyarla, haftaUygula, kocKartEkle, planDurumu, sablonKartlari, type KocKarti } from '@/lib/danisanAjanda';
+import { danisanGunleri, gonderimAyarla, haftaUygula, kocKartEkle, planDurumu, sablonKartlari, type HaftaKarti, type KocKarti } from '@/lib/danisanAjanda';
 import { SURE_ANAHTAR } from './KartEditor';
 import { disiplinAdi, useDanismanlik } from '@/lib/danismanlik';
 import { useSeciliDanisan } from '@/lib/seciliDanisan';
@@ -29,6 +29,7 @@ import { IKON_SECENEKLERI, VARSAYILAN_IKON, ikonOner } from '@/lib/programIkon';
 import { programGuncelle, programOlustur } from '@/lib/program';
 import { AKTIVITE, HIZLAR, beklenenKilo, beslenmeHesap, kiloDurumu, vkiEtiket, type HedefTur } from '@/lib/beslenme';
 import { HAZIR_OLCULER, OLC_ONEK, olcuBlok } from '@/lib/olcum';
+import { hazirKartlar, hazirSablonlariYenile, hazirSablonuAl, useHazirSablonlar, type HazirSablon } from '@/lib/hazirSablon';
 
 // 4 ekim (v6): üstte Planlar/Kütüphane düğmeleri yok. Telefonda ekranlar yığın gibi: liste → (kişi | alan | kütüphane),
 // her alt ekranın ilk satırı "‹ Geri  PLANLAR".
@@ -473,12 +474,13 @@ function AlanDosyasi({ alan }: { alan: string }) {
         ))}
       {etkin === 'sablon' && (
         <div className="rt-arac">
-          <h4>Hafta şablonları</h4>
+          <h4>Şablonlarım</h4>
           <HaftaSablonlari disiplin={alan} tam />
           {kisisel && <HaftaSablonlari disiplin="diger" tam />}
           <p className="rt-muted">Bir planın haftasını &quot;💾 Haftayı şablon kaydet&quot; ile buraya alırsın; &quot;📋 Şablon uygula&quot; bu alanın şablonlarını gösterir.</p>
         </div>
       )}
+      {etkin === 'sablon' && <HazirSablonlar alan={alan} />}
       {etkin === 'ayar' && (
         <div className="rt-arac">
           <h4>Alan</h4>
@@ -882,7 +884,9 @@ function BeslenmeBaslangic({ h, haftaBas, onBilgiler }: { h: Hedef; haftaBas: st
     const adimlar = p ? await db.program_adim.where('program_id').equals(p.id).toArray() : [];
     return { kart: adimlar.length, tarti: adimlar.some((a) => a.bloklar.some((bl) => bl.tur === 'sayi' && bl.anahtar === `${OLC_ONEK}kilo`)) };
   }, [il.id], null as { kart: number; tarti: boolean } | null);
-  const sablonlar = useHaftaSablonlari('beslenme');
+  const kendi = useHaftaSablonlari('beslenme');
+  const hazir = useHazirSablonlar('beslenme');
+  useEffect(() => { hazirSablonlariYenile().catch(() => {}); }, []);
   const [acik, setAcik] = useState(false);
   const [bilgi, setBilgi] = useState<string | null>(null);
   const [hata, setHata] = useState<string | null>(null);
@@ -891,14 +895,20 @@ function BeslenmeBaslangic({ h, haftaBas, onBilgiler }: { h: Hedef; haftaBas: st
   const { hesap } = beslenmeHesap(b);
   const adim1 = !!hesap, adim2 = plan.kart > (plan.tarti ? 1 : 0), adim3 = plan.tarti;
   if (adim1 && adim2 && adim3) return null;
-  const kcal = (p: ProgramRow) => { const m = /(\d[\d.]*)\s*kcal/i.exec(p.ad); return m ? Number(m[1].replace('.', '')) : null; };
+  const adKcal = (ad: string) => { const m = /(\d[\d.]*)\s*kcal/i.exec(ad); return m ? Number(m[1].replace('.', '')) : null; };
+  // Kendi şablonları + hazır şablonlar, hedef kaloriye yakınlığa göre.
+  type Sec = { id: string; ad: string; kcal: number | null; hazir: boolean; onayli?: boolean; kartlar: () => Promise<HaftaKarti[]> };
+  const sablonlar: Sec[] = [
+    ...kendi.map((p) => ({ id: p.id, ad: p.ad, kcal: adKcal(p.ad), hazir: false, kartlar: () => sablonKartlari(p.id) })),
+    ...hazir.map((x) => ({ id: x.kod, ad: x.ad, kcal: x.kcal ?? adKcal(x.ad), hazir: true, onayli: x.onayli, kartlar: async () => hazirKartlar(x) })),
+  ];
   const sirali = [...sablonlar].sort((a, x) => {
-    const ka = kcal(a), kx = kcal(x), hk = hesap?.hedefKcal ?? 0;
-    return (ka === null ? 1e9 : Math.abs(ka - hk)) - (kx === null ? 1e9 : Math.abs(kx - hk));
+    const hk = hesap?.hedefKcal ?? 0;
+    return (a.kcal === null ? 1e9 : Math.abs(a.kcal - hk)) - (x.kcal === null ? 1e9 : Math.abs(x.kcal - hk));
   });
-  const uygula = async (p: ProgramRow, hafta: number) => {
+  const uygula = async (p: Sec, hafta: number) => {
     setHata(null);
-    try { const n = await haftaUygula(h.h, await sablonKartlari(p.id), haftaBas, hafta); setBilgi(`"${p.ad}" ${hafta} haftaya uygulandı: ${n} kart.`); setAcik(false); }
+    try { const n = await haftaUygula(h.h, await p.kartlar(), haftaBas, hafta); setBilgi(`"${p.ad}" ${hafta} haftaya uygulandı: ${n} kart.`); setAcik(false); }
     catch (e) { setHata((e as Error).message); }
   };
   const tartiEkle = async () => {
@@ -925,10 +935,10 @@ function BeslenmeBaslangic({ h, haftaBas, onBilgiler }: { h: Hedef; haftaBas: st
       {acik && (
         <div className="rt-sablon-sec">
           {sirali.map((p, i) => {
-            const k = kcal(p), fark = k && hesap ? k - hesap.hedefKcal : null;
+            const k = p.kcal, fark = k && hesap ? k - hesap.hedefKcal : null;
             return (
               <div key={p.id} className="rt-sablon-oge">
-                <span className="tx"><b>{p.ad}</b>{fark !== null && <small>{fark === 0 ? 'hedefle aynı' : `hedeften ${fark > 0 ? '+' : ''}${fark} kcal${Math.abs(fark) > 50 ? ` · porsiyonları ~%${Math.round(Math.abs(fark) / k! * 100)} ${fark > 0 ? 'azalt' : 'artır'}` : ''}`}</small>}{i === 0 && k && hesap && <small className="oner"> · önerilen</small>}</span>
+                <span className="tx"><b>{p.ad}</b>{p.hazir && <small className="hazir">{p.onayli ? 'hazır · ✓ uzman onaylı' : 'hazır · örnek'}</small>}{fark !== null && <small>{fark === 0 ? 'hedefle aynı' : `hedeften ${fark > 0 ? '+' : ''}${fark} kcal${Math.abs(fark) > 50 ? ` · porsiyonları ~%${Math.round(Math.abs(fark) / k! * 100)} ${fark > 0 ? 'azalt' : 'artır'}` : ''}`}</small>}{i === 0 && k && hesap && <small className="oner"> · önerilen</small>}</span>
                 <button type="button" className="rt-btn" onClick={() => uygula(p, 1)}>1 hafta</button>
                 <button type="button" className="rt-btn" onClick={() => uygula(p, 4)}>4 hafta</button>
               </div>
@@ -999,6 +1009,36 @@ function KiloTakip({ h }: { h: Hedef }) {
           <br /><span>{durum.oneri}</span>
         </div>
       )}
+    </div>
+  );
+}
+
+
+// ———————————————— Hazır şablonlar (4 ekim) ————————————————
+
+function HazirSablonlar({ alan }: { alan: string }) {
+  const liste = useHazirSablonlar(alan);
+  const benim = useCanli(() => db.program.filter((p) => !!p.sablon && p.kimden === 'Ritos hazır şablon').toArray(), [], [] as ProgramRow[]);
+  const [mesaj, setMesaj] = useState<string | null>(null);
+  useEffect(() => { hazirSablonlariYenile().catch(() => {}); }, []);
+  if (!liste.length) return null;
+  const alindi = (s: HazirSablon) => benim.some((p) => p.ad === s.ad.replace(/\s*\(örnek\)\s*$/i, '') && p.sablon_disiplin === s.alan);
+  return (
+    <div className="rt-arac">
+      <h4>Hazır şablonlar</h4>
+      {liste.sort((a, b) => (a.kcal ?? 0) - (b.kcal ?? 0) || a.ad.localeCompare(b.ad, 'tr')).map((s) => (
+        <div key={s.kod} className="rt-hazir">
+          <span className="tx">
+            <b>{s.ad}</b>
+            {s.aciklama && <small>{s.aciklama}</small>}
+            <small>{s.kartlar.length} kart · {s.onayli ? <span className="onay">✓ uzman onaylı</span> : <span className="ornek">örnek · uzman onayı bekliyor</span>}</small>
+          </span>
+          {alindi(s) ? <span className="rt-tamam">✓ Alındı</span>
+            : <button type="button" className="rt-btn" onClick={async () => { await hazirSablonuAl(s); setMesaj(`"${s.ad}" şablonlarına eklendi.`); }}>Şablonlarıma al</button>}
+        </div>
+      ))}
+      {mesaj && <p className="rt-tamam">{mesaj}</p>}
+      <p className="rt-muted">Hazır şablonlar Ritos sunucusundan gelir; alınca kopyası senin olur, istediğin gibi düzenlersin.</p>
     </div>
   );
 }

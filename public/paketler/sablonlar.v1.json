@@ -1,0 +1,603 @@
+{
+ "surum": 1,
+ "sablonlar": [
+  {
+   "kod": "beslenme-1400",
+   "veri": {
+    "alan": "beslenme",
+    "ad": "1.400 kcal — dengeli hafta (örnek)",
+    "kcal": 1400,
+    "aciklama": "Sağlıklı yetişkin için genel örnek; iki gün tipi dönüşümlü. Klinik durumlarda uygun değildir.",
+    "kartlar": [
+     {
+      "gun": 0,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: 1 yumurta, 1 kibrit kutusu beyaz peynir, domates-salatalık-yeşillik, 1 ince dilim tam buğday ekmek\nAra: 1 porsiyon meyve\nÖğle: ızgara tavuk (avuç içi), bol salata (1 tk zeytinyağı), 4 yk bulgur pilavı\nAra: 1 su bardağı ayran\nAkşam: zeytinyağlı sebze yemeği (1 kase), 1 kase yoğurt, 1 ince dilim tam buğday ekmek"
+       }
+      ]
+     },
+     {
+      "gun": 0,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     },
+     {
+      "gun": 1,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: yulaf (4 yk yulaf ezmesi + 1 su bardağı süt + 1 tatlı kaşığı ceviz)\nAra: 1 porsiyon meyve\nÖğle: kuru baklagil yemeği (1 kase), cacık, 1 ince dilim tam buğday ekmek\nAra: 1 kase yoğurt\nAkşam: ızgara balık ya da köfte (avuç içi), bol salata (1 tk zeytinyağı), 4 yk tam buğday makarna"
+       }
+      ]
+     },
+     {
+      "gun": 1,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     },
+     {
+      "gun": 2,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: 1 yumurta, 1 kibrit kutusu beyaz peynir, domates-salatalık-yeşillik, 1 ince dilim tam buğday ekmek\nAra: 1 porsiyon meyve\nÖğle: ızgara tavuk (avuç içi), bol salata (1 tk zeytinyağı), 4 yk bulgur pilavı\nAra: 1 su bardağı ayran\nAkşam: zeytinyağlı sebze yemeği (1 kase), 1 kase yoğurt, 1 ince dilim tam buğday ekmek"
+       }
+      ]
+     },
+     {
+      "gun": 2,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     },
+     {
+      "gun": 3,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: yulaf (4 yk yulaf ezmesi + 1 su bardağı süt + 1 tatlı kaşığı ceviz)\nAra: 1 porsiyon meyve\nÖğle: kuru baklagil yemeği (1 kase), cacık, 1 ince dilim tam buğday ekmek\nAra: 1 kase yoğurt\nAkşam: ızgara balık ya da köfte (avuç içi), bol salata (1 tk zeytinyağı), 4 yk tam buğday makarna"
+       }
+      ]
+     },
+     {
+      "gun": 3,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     },
+     {
+      "gun": 4,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: 1 yumurta, 1 kibrit kutusu beyaz peynir, domates-salatalık-yeşillik, 1 ince dilim tam buğday ekmek\nAra: 1 porsiyon meyve\nÖğle: ızgara tavuk (avuç içi), bol salata (1 tk zeytinyağı), 4 yk bulgur pilavı\nAra: 1 su bardağı ayran\nAkşam: zeytinyağlı sebze yemeği (1 kase), 1 kase yoğurt, 1 ince dilim tam buğday ekmek"
+       }
+      ]
+     },
+     {
+      "gun": 4,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     },
+     {
+      "gun": 5,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: yulaf (4 yk yulaf ezmesi + 1 su bardağı süt + 1 tatlı kaşığı ceviz)\nAra: 1 porsiyon meyve\nÖğle: kuru baklagil yemeği (1 kase), cacık, 1 ince dilim tam buğday ekmek\nAra: 1 kase yoğurt\nAkşam: ızgara balık ya da köfte (avuç içi), bol salata (1 tk zeytinyağı), 4 yk tam buğday makarna"
+       }
+      ]
+     },
+     {
+      "gun": 5,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     },
+     {
+      "gun": 6,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: 1 yumurta, 1 kibrit kutusu beyaz peynir, domates-salatalık-yeşillik, 1 ince dilim tam buğday ekmek\nAra: 1 porsiyon meyve\nÖğle: ızgara tavuk (avuç içi), bol salata (1 tk zeytinyağı), 4 yk bulgur pilavı\nAra: 1 su bardağı ayran\nAkşam: zeytinyağlı sebze yemeği (1 kase), 1 kase yoğurt, 1 ince dilim tam buğday ekmek"
+       }
+      ]
+     },
+     {
+      "gun": 6,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "kod": "beslenme-1600",
+   "veri": {
+    "alan": "beslenme",
+    "ad": "1.600 kcal — dengeli hafta (örnek)",
+    "kcal": 1600,
+    "aciklama": "Sağlıklı yetişkin için genel örnek; iki gün tipi dönüşümlü. Klinik durumlarda uygun değildir.",
+    "kartlar": [
+     {
+      "gun": 0,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: 1 yumurta, 1 kibrit kutusu beyaz peynir, domates-salatalık-yeşillik, 2 ince dilim tam buğday ekmek\nAra: 1 porsiyon meyve\nÖğle: ızgara tavuk (avuç içi), bol salata (2 tk zeytinyağı), 6 yk bulgur pilavı\nAra: 1 su bardağı ayran\nAkşam: zeytinyağlı sebze yemeği (1 kase), 1 kase yoğurt, 2 ince dilim tam buğday ekmek"
+       }
+      ]
+     },
+     {
+      "gun": 0,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     },
+     {
+      "gun": 1,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: yulaf (6 yk yulaf ezmesi + 1 su bardağı süt + 1 tatlı kaşığı ceviz)\nAra: 1 porsiyon meyve\nÖğle: kuru baklagil yemeği (1 kase), cacık, 2 ince dilim tam buğday ekmek\nAra: 1 kase yoğurt\nAkşam: ızgara balık ya da köfte (avuç içi), bol salata (2 tk zeytinyağı), 6 yk tam buğday makarna"
+       }
+      ]
+     },
+     {
+      "gun": 1,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     },
+     {
+      "gun": 2,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: 1 yumurta, 1 kibrit kutusu beyaz peynir, domates-salatalık-yeşillik, 2 ince dilim tam buğday ekmek\nAra: 1 porsiyon meyve\nÖğle: ızgara tavuk (avuç içi), bol salata (2 tk zeytinyağı), 6 yk bulgur pilavı\nAra: 1 su bardağı ayran\nAkşam: zeytinyağlı sebze yemeği (1 kase), 1 kase yoğurt, 2 ince dilim tam buğday ekmek"
+       }
+      ]
+     },
+     {
+      "gun": 2,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     },
+     {
+      "gun": 3,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: yulaf (6 yk yulaf ezmesi + 1 su bardağı süt + 1 tatlı kaşığı ceviz)\nAra: 1 porsiyon meyve\nÖğle: kuru baklagil yemeği (1 kase), cacık, 2 ince dilim tam buğday ekmek\nAra: 1 kase yoğurt\nAkşam: ızgara balık ya da köfte (avuç içi), bol salata (2 tk zeytinyağı), 6 yk tam buğday makarna"
+       }
+      ]
+     },
+     {
+      "gun": 3,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     },
+     {
+      "gun": 4,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: 1 yumurta, 1 kibrit kutusu beyaz peynir, domates-salatalık-yeşillik, 2 ince dilim tam buğday ekmek\nAra: 1 porsiyon meyve\nÖğle: ızgara tavuk (avuç içi), bol salata (2 tk zeytinyağı), 6 yk bulgur pilavı\nAra: 1 su bardağı ayran\nAkşam: zeytinyağlı sebze yemeği (1 kase), 1 kase yoğurt, 2 ince dilim tam buğday ekmek"
+       }
+      ]
+     },
+     {
+      "gun": 4,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     },
+     {
+      "gun": 5,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: yulaf (6 yk yulaf ezmesi + 1 su bardağı süt + 1 tatlı kaşığı ceviz)\nAra: 1 porsiyon meyve\nÖğle: kuru baklagil yemeği (1 kase), cacık, 2 ince dilim tam buğday ekmek\nAra: 1 kase yoğurt\nAkşam: ızgara balık ya da köfte (avuç içi), bol salata (2 tk zeytinyağı), 6 yk tam buğday makarna"
+       }
+      ]
+     },
+     {
+      "gun": 5,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     },
+     {
+      "gun": 6,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: 1 yumurta, 1 kibrit kutusu beyaz peynir, domates-salatalık-yeşillik, 2 ince dilim tam buğday ekmek\nAra: 1 porsiyon meyve\nÖğle: ızgara tavuk (avuç içi), bol salata (2 tk zeytinyağı), 6 yk bulgur pilavı\nAra: 1 su bardağı ayran\nAkşam: zeytinyağlı sebze yemeği (1 kase), 1 kase yoğurt, 2 ince dilim tam buğday ekmek"
+       }
+      ]
+     },
+     {
+      "gun": 6,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "kod": "beslenme-1800",
+   "veri": {
+    "alan": "beslenme",
+    "ad": "1.800 kcal — dengeli hafta (örnek)",
+    "kcal": 1800,
+    "aciklama": "Sağlıklı yetişkin için genel örnek; iki gün tipi dönüşümlü. Klinik durumlarda uygun değildir.",
+    "kartlar": [
+     {
+      "gun": 0,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: 1 yumurta, 1 kibrit kutusu beyaz peynir, domates-salatalık-yeşillik, 2 ince dilim tam buğday ekmek\nAra: 1 porsiyon meyve + 10 çiğ badem\nÖğle: ızgara tavuk (avuç içi), bol salata (2 tk zeytinyağı), 8 yk bulgur pilavı\nAra: 1 su bardağı ayran\nAkşam: zeytinyağlı sebze yemeği (1 kase), 1 kase yoğurt, 2 ince dilim tam buğday ekmek"
+       }
+      ]
+     },
+     {
+      "gun": 0,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     },
+     {
+      "gun": 1,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: yulaf (8 yk yulaf ezmesi + 1 su bardağı süt + 1 tatlı kaşığı ceviz)\nAra: 1 porsiyon meyve + 10 çiğ badem\nÖğle: kuru baklagil yemeği (1 kase), cacık, 2 ince dilim tam buğday ekmek\nAra: 1 kase yoğurt\nAkşam: ızgara balık ya da köfte (avuç içi), bol salata (2 tk zeytinyağı), 8 yk tam buğday makarna"
+       }
+      ]
+     },
+     {
+      "gun": 1,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     },
+     {
+      "gun": 2,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: 1 yumurta, 1 kibrit kutusu beyaz peynir, domates-salatalık-yeşillik, 2 ince dilim tam buğday ekmek\nAra: 1 porsiyon meyve + 10 çiğ badem\nÖğle: ızgara tavuk (avuç içi), bol salata (2 tk zeytinyağı), 8 yk bulgur pilavı\nAra: 1 su bardağı ayran\nAkşam: zeytinyağlı sebze yemeği (1 kase), 1 kase yoğurt, 2 ince dilim tam buğday ekmek"
+       }
+      ]
+     },
+     {
+      "gun": 2,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     },
+     {
+      "gun": 3,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: yulaf (8 yk yulaf ezmesi + 1 su bardağı süt + 1 tatlı kaşığı ceviz)\nAra: 1 porsiyon meyve + 10 çiğ badem\nÖğle: kuru baklagil yemeği (1 kase), cacık, 2 ince dilim tam buğday ekmek\nAra: 1 kase yoğurt\nAkşam: ızgara balık ya da köfte (avuç içi), bol salata (2 tk zeytinyağı), 8 yk tam buğday makarna"
+       }
+      ]
+     },
+     {
+      "gun": 3,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     },
+     {
+      "gun": 4,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: 1 yumurta, 1 kibrit kutusu beyaz peynir, domates-salatalık-yeşillik, 2 ince dilim tam buğday ekmek\nAra: 1 porsiyon meyve + 10 çiğ badem\nÖğle: ızgara tavuk (avuç içi), bol salata (2 tk zeytinyağı), 8 yk bulgur pilavı\nAra: 1 su bardağı ayran\nAkşam: zeytinyağlı sebze yemeği (1 kase), 1 kase yoğurt, 2 ince dilim tam buğday ekmek"
+       }
+      ]
+     },
+     {
+      "gun": 4,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     },
+     {
+      "gun": 5,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: yulaf (8 yk yulaf ezmesi + 1 su bardağı süt + 1 tatlı kaşığı ceviz)\nAra: 1 porsiyon meyve + 10 çiğ badem\nÖğle: kuru baklagil yemeği (1 kase), cacık, 2 ince dilim tam buğday ekmek\nAra: 1 kase yoğurt\nAkşam: ızgara balık ya da köfte (avuç içi), bol salata (2 tk zeytinyağı), 8 yk tam buğday makarna"
+       }
+      ]
+     },
+     {
+      "gun": 5,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     },
+     {
+      "gun": 6,
+      "ad": "Günün menüsü",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Kahvaltı: 1 yumurta, 1 kibrit kutusu beyaz peynir, domates-salatalık-yeşillik, 2 ince dilim tam buğday ekmek\nAra: 1 porsiyon meyve + 10 çiğ badem\nÖğle: ızgara tavuk (avuç içi), bol salata (2 tk zeytinyağı), 8 yk bulgur pilavı\nAra: 1 su bardağı ayran\nAkşam: zeytinyağlı sebze yemeği (1 kase), 1 kase yoğurt, 2 ince dilim tam buğday ekmek"
+       }
+      ]
+     },
+     {
+      "gun": 6,
+      "ad": "Su — 8 bardak",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Gün içine yayarak; öğünlerden önce 1 bardak."
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "kod": "sinav-lgs-tekrar",
+   "veri": {
+    "alan": "sinav",
+    "ad": "LGS tekrar haftası (örnek)",
+    "aciklama": "Her gün matematik + bir ders, cumartesi deneme, pazar yanlış tekrarı.",
+    "kartlar": [
+     {
+      "gun": 0,
+      "ad": "Matematik — 30 soru",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Haftanın konusundan; yanlışları işaretle."
+       }
+      ]
+     },
+     {
+      "gun": 0,
+      "ad": "Fen — 20 soru",
+      "bloklar": []
+     },
+     {
+      "gun": 1,
+      "ad": "Matematik — 30 soru",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Haftanın konusundan; yanlışları işaretle."
+       }
+      ]
+     },
+     {
+      "gun": 1,
+      "ad": "Türkçe — paragraf 20 soru",
+      "bloklar": []
+     },
+     {
+      "gun": 2,
+      "ad": "Matematik — 30 soru",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Haftanın konusundan; yanlışları işaretle."
+       }
+      ]
+     },
+     {
+      "gun": 2,
+      "ad": "Fen — 20 soru",
+      "bloklar": []
+     },
+     {
+      "gun": 3,
+      "ad": "Matematik — 30 soru",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Haftanın konusundan; yanlışları işaretle."
+       }
+      ]
+     },
+     {
+      "gun": 3,
+      "ad": "İnkılap — 15 soru",
+      "bloklar": []
+     },
+     {
+      "gun": 4,
+      "ad": "Matematik — 30 soru",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Haftanın konusundan; yanlışları işaretle."
+       }
+      ]
+     },
+     {
+      "gun": 4,
+      "ad": "Türkçe — paragraf 20 soru",
+      "bloklar": []
+     },
+     {
+      "gun": 5,
+      "ad": "Deneme sınavı",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Süre tutarak tam deneme; ardından yanlışları konu konu not et."
+       }
+      ]
+     },
+     {
+      "gun": 6,
+      "ad": "Haftanın yanlışlarını tekrar",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "Deneme ve hafta içi yanlışlarından 20 soruyu yeniden çöz."
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "kod": "kisisel-5k-1",
+   "veri": {
+    "alan": "kisisel",
+    "ad": "Koşu — 5K başlangıç, 1. hafta (örnek)",
+    "aciklama": "Haftada 3 gün, yürüyüş aralıklı koşu.",
+    "kartlar": [
+     {
+      "gun": 0,
+      "ad": "Koşu — 1 dk koş / 2 dk yürü ×8",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "5 dk ısınma yürüyüşü, ardından 8 tekrar; 5 dk soğuma."
+       }
+      ]
+     },
+     {
+      "gun": 2,
+      "ad": "Koşu — 1 dk koş / 2 dk yürü ×8",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "5 dk ısınma yürüyüşü, ardından 8 tekrar; 5 dk soğuma."
+       }
+      ]
+     },
+     {
+      "gun": 4,
+      "ad": "Koşu — 1 dk koş / 2 dk yürü ×8",
+      "bloklar": [
+       {
+        "tur": "metin",
+        "metin": "5 dk ısınma yürüyüşü, ardından 8 tekrar; 5 dk soğuma."
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ]
+}

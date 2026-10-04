@@ -1033,3 +1033,10 @@ textarea.rt-inp{font-family:inherit;}
 .rt-kilo-durum.uygun{background:var(--green2);border:1px solid #cfe0c6;}
 .rt-kilo-durum.yavas,.rt-kilo-durum.hizli{background:#fdf3dc;border:1px solid #ecd49a;}
 .rt-kilo-durum.ters{background:#fbe9e5;border:1px solid #efc4ba;}
+.rt-hazir{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid #f1ece2;}
+.rt-hazir:first-of-type{border-top:0;}
+.rt-hazir .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
+.rt-hazir small{color:var(--muted);font-size:12px;}
+.rt-hazir .onay{color:var(--green);font-weight:700;}
+.rt-hazir .ornek{color:#a07a1c;}
+.rt-sablon-oge small.hazir{color:#a07a1c;}
