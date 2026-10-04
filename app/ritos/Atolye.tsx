@@ -13,12 +13,12 @@ import { useCanli } from '@/lib/canli';
 import { db, type AileRow, type IliskiAyarRow, type IliskiRow, type KutuphaneKartRow, type ProgramRow } from '@/lib/db';
 import { bugun, degerBloklari, iyelik, tarihEkle, tarihEtiket, tarihParse } from '@/lib/paket';
 import { aileAktifMi, aileGorevIliski, kocOl, davetler, davetSil, haftaNotuGonder, iliskiBilgiYaz, type DavetSatir } from '@/lib/danismanlik';
-import { danisanGunleri, gonderimAyarla, kocKartEkle, planDurumu, type KocKarti } from '@/lib/danisanAjanda';
+import { danisanGunleri, gonderimAyarla, haftaUygula, kocKartEkle, planDurumu, sablonKartlari, type KocKarti } from '@/lib/danisanAjanda';
 import { SURE_ANAHTAR } from './KartEditor';
 import { disiplinAdi, useDanismanlik } from '@/lib/danismanlik';
 import { useSeciliDanisan } from '@/lib/seciliDanisan';
 import type { PlanHedef } from '@/lib/danisanAjanda';
-import { DanisanAjandasi, HaftaSablonlari, KocKartFormu } from './DanisanAjanda';
+import { DanisanAjandasi, HaftaSablonlari, KocKartFormu, useHaftaSablonlari } from './DanisanAjanda';
 import { DavetModal, SonlandirModal } from './Danismanlik';
 import { SinavTool } from './Sinav';
 import { AyTakvimi, haftaBasi, haftaEtiket } from './AjandaPane';
@@ -27,6 +27,8 @@ import Kutuphane from './Kutuphane';
 import { Modal, OnayKutusu } from './ortak';
 import { IKON_SECENEKLERI, VARSAYILAN_IKON, ikonOner } from '@/lib/programIkon';
 import { programGuncelle, programOlustur } from '@/lib/program';
+import { AKTIVITE, HIZLAR, beklenenKilo, beslenmeHesap, kiloDurumu, vkiEtiket, type HedefTur } from '@/lib/beslenme';
+import { HAZIR_OLCULER, OLC_ONEK, olcuBlok } from '@/lib/olcum';
 
 // 4 ekim (v6): üstte Planlar/Kütüphane düğmeleri yok. Telefonda ekranlar yığın gibi: liste → (kişi | alan | kütüphane),
 // her alt ekranın ilk satırı "‹ Geri  PLANLAR".
@@ -114,7 +116,14 @@ function Planlar({ genis }: { genis: boolean }) {
   const sonlananlar = useCanli(async () => (await db.iliski.toArray()).filter((i) => i.koc === dn.uid && i.durum !== 'aktif' && i.disiplin !== 'aile'), [dn.uid], [] as IliskiRow[]);
   const h = hedefler.find((x) => x.id === secili) ?? null;
 
-  const sec = (id: string) => { setSecili(id); sonaEkle(id); git('hedef'); };
+  const sec = (id: string) => {
+    setSecili(id); sonaEkle(id); git('hedef');
+    // Beslenme danışanında bilgiler girilmemişse dosya Bilgiler'le açılır (önce hesap, sonra plan).
+    const x = hedefler.find((y) => y.id === id);
+    if (x?.h.tur === 'danisan' && x.h.il.disiplin === 'beslenme') {
+      db.iliski_ayar.get(x.h.il.id).then((a) => { if (!beslenmeHesap(a?.bilgiler ?? {}).hesap) { setDosya('bilgi'); setSag('bilgi'); } }).catch(() => {});
+    }
+  };
 
   // Seçili hedef yoksa: geniş ekranda ilk hedef seçilir; telefonda listeye dönülür.
   useEffect(() => {
@@ -195,6 +204,7 @@ function Planlar({ genis }: { genis: boolean }) {
           <button type="button" className={hafta ? 'on' : ''} onClick={() => setHafta(true)}>Hafta</button>
         </div>
       </div>
+      {h.h.tur === 'danisan' && h.h.il.disiplin === 'beslenme' && <BeslenmeBaslangic h={h} haftaBas={haftaBasi(tarih)} onBilgiler={() => setDosya('bilgi')} />}
       <div className="rt-hafta-is"><button type="button" className="rt-chip rt-kut-ekle" onClick={() => setKartEkle(true)}>＋ Kart ekle</button></div>
       <DanisanAjandasi
         key={h.id}
@@ -331,6 +341,7 @@ function DanisanBilgileri({ il }: { il: IliskiRow }) {
   return (
     <div className="rt-bilgiler">
       <p className="rt-muted">🔒 Bu bilgiler yalnız sende durur; {il.danisan_ad} görmez.</p>
+      {il.disiplin === 'beslenme' ? <BeslenmeFormu b={b} setB={(x) => { setB(x); setDurumMetni(null); }} /> : (
       <div className="rt-arac">
         <h4>{danismanlikBaslik(il.disiplin)}</h4>
         {alanlar.map(([k, ad, ipucu]) => (
@@ -340,6 +351,7 @@ function DanisanBilgileri({ il }: { il: IliskiRow }) {
           </label>
         ))}
       </div>
+      )}
       <div className="rt-arac">
         <h4>Koç notları</h4>
         <textarea className="rt-inp" rows={4} value={not} placeholder="Gözlemlerin, dikkat edilecekler…" onChange={(e) => { setNot(e.target.value); setDurumMetni(null); }} />
@@ -347,7 +359,9 @@ function DanisanBilgileri({ il }: { il: IliskiRow }) {
       <div className="rt-satir" style={{ justifyContent: 'flex-end' }}>
         {durumMetni && <span className="rt-tamam">{durumMetni}</span>}
         <button type="button" className="rt-btn primary" disabled={!degisti} onClick={async () => {
-          const temiz = Object.fromEntries(Object.entries(b).map(([k, v]) => [k, v.trim()]).filter(([, v]) => v));
+          const temiz: Record<string, string> = Object.fromEntries(Object.entries(b).map(([k, v]) => [k, v.trim()]).filter(([, v]) => v));
+          // Beslenme: hesap ilk kez tamamlanınca başlangıç tarihi yazılır (beklenen çizgi buradan başlar).
+          if (il.disiplin === 'beslenme' && !temiz.baslangic_tarihi && beslenmeHesap(temiz).hesap) temiz.baslangic_tarihi = bugun();
           await iliskiBilgiYaz(il, { bilgiler: temiz, notlar: not.trim() });
           setB(temiz); setNot(not.trim()); setDurumMetni('✓ Kaydedildi');
         }}>Kaydet</button>
@@ -525,6 +539,7 @@ function AtolyeAraclari({ h, haftaBas }: { h: Hedef; haftaBas: string }) {
   const yap = hafta.filter((k) => k.yapildi).length;
   return (
     <div className="rt-araclar">
+      {h.h.tur === 'danisan' && h.h.il.disiplin === 'beslenme' && <KiloTakip h={h} />}
       <div className="rt-arac">
         <h4>Bu hafta</h4>
         <div className="rt-buyuk">%{yuzde(yap, hafta.length)}<small>{yap}/{hafta.length} kart yapıldı</small></div>
@@ -784,5 +799,206 @@ function ProgramFormu({ id, onKapat, onOlustu }: { id?: string; onKapat: () => v
         </>
       )}
     </Modal>
+  );
+}
+
+// ———————————————— Beslenme (4 ekim): bilgiler + hesap, başlangıç adımları, kilo takibi ————————————————
+
+const sec2 = <T extends string>(liste: [T, string][], deger: string | undefined, onSec: (v: T) => void) => (
+  <div className="rt-chips">{liste.map(([v, a]) => <button key={v} type="button" className={`rt-chip${deger === v ? ' on' : ''}`} onClick={() => onSec(v)}>{a}</button>)}</div>
+);
+
+function BeslenmeFormu({ b, setB }: { b: Record<string, string>; setB: (b: Record<string, string>) => void }) {
+  const d = (k: string, v: string) => setB({ ...b, [k]: v });
+  const sayiAlan = (k: string, ad: string, birim: string, ipucu = '') => (
+    <label className="rt-bilgi-sat"><span>{ad}</span><input className="rt-inp" inputMode="decimal" value={b[k] ?? ''} placeholder={ipucu} onChange={(e) => d(k, e.target.value)} /><em className="birim">{birim}</em></label>
+  );
+  const hedef = b.hedef || '';
+  return (
+    <>
+      <div className="rt-arac">
+        <h4>Kişi</h4>
+        {sec2<'k' | 'e'>([['k', 'Kadın'], ['e', 'Erkek']], b.cinsiyet, (v) => d('cinsiyet', v))}
+        {sayiAlan('dogum_yili', 'Doğum yılı', '', 'ör. 1988')}
+        {sayiAlan('boy', 'Boy', 'cm')}
+        {sayiAlan('baslangic_kilo', 'Başlangıç kilosu', 'kg')}
+        <p className="rt-bilgi-bas">Aktivite</p>
+        <div className="rt-chips">{AKTIVITE.map(([v, a, ac]) => <button key={v} type="button" title={ac} className={`rt-chip${b.aktivite === v ? ' on' : ''}`} onClick={() => d('aktivite', v)}>{a}</button>)}</div>
+        {b.aktivite && <p className="rt-muted">{AKTIVITE.find(([v]) => v === b.aktivite)?.[2]}</p>}
+      </div>
+      <div className="rt-arac">
+        <h4>Hedef</h4>
+        {sec2<HedefTur>([['ver', 'Kilo ver'], ['koru', 'Koru'], ['al', 'Kilo al']], hedef, (v) => d('hedef', v))}
+        {hedef && hedef !== 'koru' && (
+          <>
+            {sayiAlan('hedef_kilo', 'Hedef kilo', 'kg')}
+            <p className="rt-bilgi-bas">Hız</p>
+            {sec2(HIZLAR.filter(([v]) => hedef === 'ver' || v !== '0.75'), b.hiz || '0.5', (v) => d('hiz', v))}
+          </>
+        )}
+      </div>
+      <div className="rt-arac">
+        <h4>Tercihler</h4>
+        <label className="rt-bilgi-sat"><span>Tercihler</span><input className="rt-inp" value={b.tercihler ?? ''} placeholder="ör. laktoz azaltılmış, ara öğün sever" onChange={(e) => d('tercihler', e.target.value)} /></label>
+        <label className="rt-bilgi-sat"><span>Kaçındıkları</span><input className="rt-inp" value={b.kacindiklari ?? ''} onChange={(e) => d('kacindiklari', e.target.value)} /></label>
+      </div>
+      <HesapKutusu b={b} setB={setB} />
+    </>
+  );
+}
+
+function HesapKutusu({ b, setB }: { b: Record<string, string>; setB?: (b: Record<string, string>) => void }) {
+  const { hesap, eksik } = beslenmeHesap(b);
+  if (!hesap) return <div className="rt-arac rt-hesap"><h4>Hesap</h4><p className="rt-muted">Hesap için eksik: {eksik.join(', ')}.</p></div>;
+  const tr = (n: number) => n.toLocaleString('tr-TR');
+  return (
+    <div className="rt-arac rt-hesap">
+      <h4>Hesap</h4>
+      <div className="rt-hesap-buyuk"><b>{tr(hesap.hedefKcal)}</b> kcal/gün{hesap.elle && <span className="rt-etk">elle</span>}</div>
+      <div className="rt-hesap-izgara">
+        <span>VKİ</span><b>{hesap.vki?.toLocaleString('tr-TR')} · {hesap.vki ? vkiEtiket(hesap.vki) : ''}</b>
+        <span>Bazal</span><b>{tr(hesap.bazal)} kcal</b>
+        <span>Günlük harcama</span><b>{tr(hesap.harcama)} kcal</b>
+        {hesap.hedef !== 'koru' && <><span>Önerilen</span><b>{tr(hesap.onerilen)} kcal ({hesap.hedef === 'ver' ? '−' : '+'}{tr(Math.abs(hesap.harcama - hesap.onerilen))})</b></>}
+        <span>Protein · yağ · karb.</span><b>{hesap.makro.protein} g · {hesap.makro.yag} g · {hesap.makro.karb} g</b>
+        <span>Su</span><b>{(hesap.su / 1000).toLocaleString('tr-TR')} L</b>
+        {hesap.sureHafta !== null && <><span>Hedefe tahmini</span><b>{hesap.sureHafta} hafta</b></>}
+      </div>
+      {setB && (
+        <label className="rt-bilgi-sat"><span>Elle düzelt</span><input className="rt-inp" inputMode="numeric" value={b.kalori_elle ?? ''} placeholder={String(hesap.onerilen)} onChange={(e) => setB({ ...b, kalori_elle: e.target.value })} /><em className="birim">kcal</em></label>
+      )}
+      {hesap.uyarilar.map((u) => <p key={u} className="rt-hata">⚠ {u}</p>)}
+      <p className="rt-muted">Mifflin-St Jeor ile hesaplanır; rehberdir, kararı sen verirsin. Klinik değerlendirme gerekiyorsa diyetisyen uygulamasında yap.</p>
+    </div>
+  );
+}
+
+/** Plan'ın başında: bilgiler → şablondan başlat → haftalık tartı. Hepsi bitince gizlenir. */
+function BeslenmeBaslangic({ h, haftaBas, onBilgiler }: { h: Hedef; haftaBas: string; onBilgiler: () => void }) {
+  const il = (h.h as { il: IliskiRow }).il;
+  const ayar = useCanli(async () => (await db.iliski_ayar.get(il.id)) ?? null, [il.id], undefined as IliskiAyarRow | null | undefined);
+  const plan = useCanli(async () => {
+    const p = (await db.program.toArray()).find((x) => x.uzak?.rol === 'koc' && x.uzak.iliski_id === il.id && x.uzak.plan && x.uzak.durum !== 'ret' && x.uzak.durum !== 'ayrildi');
+    const adimlar = p ? await db.program_adim.where('program_id').equals(p.id).toArray() : [];
+    return { kart: adimlar.length, tarti: adimlar.some((a) => a.bloklar.some((bl) => bl.tur === 'sayi' && bl.anahtar === `${OLC_ONEK}kilo`)) };
+  }, [il.id], null as { kart: number; tarti: boolean } | null);
+  const sablonlar = useHaftaSablonlari('beslenme');
+  const [acik, setAcik] = useState(false);
+  const [bilgi, setBilgi] = useState<string | null>(null);
+  const [hata, setHata] = useState<string | null>(null);
+  if (ayar === undefined || !plan) return null;
+  const b = ayar?.bilgiler ?? {};
+  const { hesap } = beslenmeHesap(b);
+  const adim1 = !!hesap, adim2 = plan.kart > (plan.tarti ? 1 : 0), adim3 = plan.tarti;
+  if (adim1 && adim2 && adim3) return null;
+  const kcal = (p: ProgramRow) => { const m = /(\d[\d.]*)\s*kcal/i.exec(p.ad); return m ? Number(m[1].replace('.', '')) : null; };
+  const sirali = [...sablonlar].sort((a, x) => {
+    const ka = kcal(a), kx = kcal(x), hk = hesap?.hedefKcal ?? 0;
+    return (ka === null ? 1e9 : Math.abs(ka - hk)) - (kx === null ? 1e9 : Math.abs(kx - hk));
+  });
+  const uygula = async (p: ProgramRow, hafta: number) => {
+    setHata(null);
+    try { const n = await haftaUygula(h.h, await sablonKartlari(p.id), haftaBas, hafta); setBilgi(`"${p.ad}" ${hafta} haftaya uygulandı: ${n} kart.`); setAcik(false); }
+    catch (e) { setHata((e as Error).message); }
+  };
+  const tartiEkle = async () => {
+    setHata(null);
+    const kilo = HAZIR_OLCULER.find((x) => x.id === 'kilo')!, bel = HAZIR_OLCULER.find((x) => x.id === 'bel')!;
+    try {
+      await kocKartEkle(h.h, bugun(), { ad: 'Haftalık tartı', bloklar: [{ tur: 'metin', metin: 'Sabah aç karnına, tuvaletten sonra.' }, olcuBlok(kilo), olcuBlok(bel)] }, { gun: null, gunler: [1] });
+      setBilgi('Her pazartesi "Haftalık tartı" kartı eklendi.');
+    } catch (e) { setHata((e as Error).message); }
+  };
+  return (
+    <div className="rt-arac rt-baslangic">
+      <h4>Başlangıç</h4>
+      <div className={`rt-adim${adim1 ? ' tamam' : ''}`}>
+        <span className="no">{adim1 ? '✓' : '1'}</span>
+        <span className="tx"><b>Bilgiler ve hesap</b>{hesap ? <small>{hesap.hedefKcal.toLocaleString('tr-TR')} kcal/gün · {hesap.hedef === 'ver' ? 'kilo verme' : hesap.hedef === 'al' ? 'kilo alma' : 'koruma'}</small> : <small>boy, kilo, aktivite, hedef</small>}</span>
+        {!adim1 && <button type="button" className="rt-btn primary" onClick={onBilgiler}>Doldur</button>}
+      </div>
+      <div className={`rt-adim${adim2 ? ' tamam' : ''}`}>
+        <span className="no">{adim2 ? '✓' : '2'}</span>
+        <span className="tx"><b>Şablondan başlat</b><small>{sablonlar.length ? 'hedef kaloriye en yakın şablon üstte' : 'henüz beslenme şablonu yok — bir haftayı kurup "Haftayı şablon kaydet" de'}</small></span>
+        {!adim2 && sablonlar.length > 0 && <button type="button" className="rt-btn" onClick={() => setAcik(!acik)}>{acik ? 'Kapat' : 'Seç'}</button>}
+      </div>
+      {acik && (
+        <div className="rt-sablon-sec">
+          {sirali.map((p, i) => {
+            const k = kcal(p), fark = k && hesap ? k - hesap.hedefKcal : null;
+            return (
+              <div key={p.id} className="rt-sablon-oge">
+                <span className="tx"><b>{p.ad}</b>{fark !== null && <small>{fark === 0 ? 'hedefle aynı' : `hedeften ${fark > 0 ? '+' : ''}${fark} kcal${Math.abs(fark) > 50 ? ` · porsiyonları ~%${Math.round(Math.abs(fark) / k! * 100)} ${fark > 0 ? 'azalt' : 'artır'}` : ''}`}</small>}{i === 0 && k && hesap && <small className="oner"> · önerilen</small>}</span>
+                <button type="button" className="rt-btn" onClick={() => uygula(p, 1)}>1 hafta</button>
+                <button type="button" className="rt-btn" onClick={() => uygula(p, 4)}>4 hafta</button>
+              </div>
+            );
+          })}
+          <p className="rt-muted">Şablon adında kalori yazarsan (ör. &quot;1.800 kcal — 1. hafta&quot;) hedefe göre sıralanır.</p>
+        </div>
+      )}
+      <div className={`rt-adim${adim3 ? ' tamam' : ''}`}>
+        <span className="no">{adim3 ? '✓' : '3'}</span>
+        <span className="tx"><b>Haftalık tartı</b><small>her pazartesi kilo ve bel — Gelişim&apos;de beklenen çizgiyle karşılaştırılır</small></span>
+        {!adim3 && <button type="button" className="rt-btn" onClick={tartiEkle}>Ekle</button>}
+      </div>
+      {bilgi && <p className="rt-tamam">{bilgi}</p>}
+      {hata && <p className="rt-hata">⚠ {hata}</p>}
+    </div>
+  );
+}
+
+/** Gelişim: kilo serisi ↔ beklenen çizgi; plana uygun mu. */
+function KiloTakip({ h }: { h: Hedef }) {
+  const il = (h.h as { il: IliskiRow }).il;
+  const ayar = useCanli(async () => (await db.iliski_ayar.get(il.id)) ?? null, [il.id], undefined as IliskiAyarRow | null | undefined);
+  const t0 = bugun();
+  const gunler = Array.from({ length: 84 }, (_, i) => tarihEkle(t0, i - 83));
+  const veri = useCanli(() => danisanGunleri(h.h, gunler), [h.id, t0], {} as Record<string, KocKarti[]>);
+  const b = ayar?.bilgiler ?? {};
+  const { hesap } = beslenmeHesap(b);
+  const noktalar = gunler.flatMap((t) => (veri[t] ?? []).map((k) => ({ t, v: Number((k.degerler as Record<string, unknown> | null)?.[`${OLC_ONEK}kilo`]) })))
+    .filter((p) => Number.isFinite(p.v) && p.v > 0);
+  if (!hesap) return <div className="rt-arac"><h4>Kilo takibi</h4><p className="rt-muted">Bilgiler sekmesinde boy, kilo, aktivite ve hedefi gir; beklenen çizgi buradan izlenir.</p></div>;
+  const son = noktalar[noktalar.length - 1];
+  // İlk 2 hafta su kaybı ve dalgalanma olağandır; değerlendirme sonrasına bırakılır.
+  const gecenGun = b.baslangic_tarihi && son ? Math.round((new Date(son.t).getTime() - new Date(b.baslangic_tarihi).getTime()) / 86400000) : 0;
+  const erken = !!son && gecenGun < 14;
+  const durum = son && !erken ? kiloDurumu(b, son) : null;
+  const bas = Number(String(b.baslangic_kilo).replace(',', '.'));
+  // Grafik: başlangıç tarihinden (ya da 12 hafta önceden) bugüne; beklenen çizgi + ölçümler
+  const ilk = b.baslangic_tarihi && b.baslangic_tarihi > gunler[0] ? b.baslangic_tarihi : gunler[0];
+  const xs = (t: string) => (new Date(t).getTime() - new Date(ilk).getTime()) / (new Date(t0).getTime() - new Date(ilk).getTime() || 1);
+  const bekl = [ilk, t0].map((t) => ({ t, v: beklenenKilo(b, t) ?? bas }));
+  const tum = [...noktalar.map((p) => p.v), ...bekl.map((p) => p.v), bas];
+  const mn = Math.min(...tum) - 0.5, mx = Math.max(...tum) + 0.5;
+  const W = 280, H = 90, px = (t: string) => 4 + xs(t) * (W - 8), py = (v: number) => H - 6 - ((v - mn) / (mx - mn)) * (H - 12);
+  const tr = (n: number) => n.toLocaleString('tr-TR');
+  return (
+    <div className="rt-arac rt-kilo-takip">
+      <h4>Kilo takibi</h4>
+      <div className="rt-kilo-ozet">
+        <span><small>Başlangıç</small><b>{tr(bas)} kg</b></span>
+        <span><small>Son</small><b>{son ? `${tr(son.v)} kg` : '—'}</b></span>
+        <span><small>Hedef</small><b>{b.hedef_kilo ? `${b.hedef_kilo} kg` : b.hedef === 'koru' ? 'koru' : '—'}</b></span>
+        <span><small>Kalori</small><b>{tr(hesap.hedefKcal)}</b></span>
+      </div>
+      {b.baslangic_tarihi ? (
+        <svg className="rt-kilo-grafik" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Kilo: beklenen çizgi ve ölçümler">
+          <line x1={px(bekl[0].t)} y1={py(bekl[0].v)} x2={px(bekl[1].t)} y2={py(bekl[1].v)} className="bekl" />
+          {noktalar.length > 1 && <polyline points={noktalar.filter((p) => p.t >= ilk).map((p) => `${px(p.t)},${py(p.v)}`).join(' ')} className="gercek" />}
+          {noktalar.filter((p) => p.t >= ilk).map((p) => <circle key={p.t} cx={px(p.t)} cy={py(p.v)} r="3" className="nokta" />)}
+        </svg>
+      ) : <p className="rt-muted">Başlangıç tarihi Bilgiler kaydedilince yazılır.</p>}
+      <p className="rt-muted rt-kilo-acik">— — beklenen · ● ölçüm</p>
+      {!son && <p className="rt-muted">Henüz kilo ölçümü yok. Plan&apos;daki &quot;Haftalık tartı&quot; kartı doldurulunca burada görünür.</p>}
+      {erken && <div className="rt-kilo-durum"><b>İlk iki hafta</b> · su kaybı ve dalgalanma olağan; plana uygunluk {tarihEtiket(tarihEkle(b.baslangic_tarihi!, 14))} sonrası değerlendirilir.</div>}
+      {durum && (
+        <div className={`rt-kilo-durum ${durum.tur}`}>
+          <b>{durum.tur === 'uygun' ? '✓ Plana uygun' : durum.tur === 'yavas' ? '⏳ Yavaş' : durum.tur === 'hizli' ? '⚡ Hızlı' : '⚠ Ters yönde'}</b> · {durum.metin}
+          <br /><span>{durum.oneri}</span>
+        </div>
+      )}
+    </div>
   );
 }

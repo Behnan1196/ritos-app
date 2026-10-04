@@ -996,3 +996,40 @@ textarea.rt-inp{font-family:inherit;}
 .rt-atolye:not(.genis) .rt-hafta-bos{display:none;}
 .rt-atolye:not(.genis) .rt-hafta-gun .rt-hafta-hd{padding-bottom:2px;}
 .rt-atolye:not(.genis) .rt-hafta{gap:6px;}
+
+/* ---------- 4 ekim: beslenme ---------- */
+.rt-bilgi-sat .birim{font-style:normal;color:var(--muted);font-size:12px;min-width:22px;}
+.rt-bilgi-bas{font-size:12px;color:var(--muted);margin:8px 0 4px;}
+.rt-bilgiler .rt-chips{margin:2px 0 6px;}
+.rt-hesap-buyuk{font-size:14px;margin:0 0 8px;}
+.rt-hesap-buyuk b{font-size:26px;font-weight:800;margin-right:4px;font-variant-numeric:tabular-nums;}
+.rt-hesap-buyuk .rt-etk{margin-left:6px;font-size:11px;background:#fdf3dc;color:#a07a1c;border-radius:8px;padding:1px 6px;}
+.rt-hesap-izgara{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;margin-bottom:8px;font-variant-numeric:tabular-nums;}
+.rt-hesap-izgara span{color:var(--muted);}
+.rt-baslangic{margin-bottom:10px;}
+.rt-adim{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid #f1ece2;}
+.rt-adim:first-of-type{border-top:0;}
+.rt-adim .no{width:24px;height:24px;border-radius:50%;background:#efe8da;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:0 0 auto;}
+.rt-adim.tamam .no{background:var(--green);color:#fff;}
+.rt-adim .tx{flex:1;min-width:0;display:flex;flex-direction:column;}
+.rt-adim .tx small{color:var(--muted);font-size:12px;}
+.rt-adim.tamam .tx b{color:var(--muted);}
+.rt-sablon-sec{background:#faf7f1;border-radius:10px;padding:6px 8px;margin:4px 0 6px;}
+.rt-sablon-oge{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px dashed var(--line);}
+.rt-sablon-oge .tx{flex:1;min-width:0;}
+.rt-sablon-oge small{display:block;color:var(--muted);font-size:11.5px;}
+.rt-sablon-oge small.oner{display:inline;color:var(--green);font-weight:700;}
+.rt-kilo-ozet{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;}
+.rt-kilo-ozet span{display:flex;flex-direction:column;font-variant-numeric:tabular-nums;}
+.rt-kilo-ozet small{font-size:11px;color:var(--muted);}
+.rt-kilo-ozet b{font-size:14px;}
+.rt-kilo-grafik{width:100%;height:auto;max-height:120px;display:block;}
+.rt-kilo-grafik .bekl{stroke:var(--muted);stroke-width:1.5;stroke-dasharray:4 3;fill:none;}
+.rt-kilo-grafik .gercek{stroke:var(--green);stroke-width:2;fill:none;}
+.rt-kilo-grafik .nokta{fill:var(--green);}
+.rt-kilo-acik{font-size:11px;margin:2px 0 6px;}
+.rt-kilo-durum{border-radius:10px;padding:8px 10px;font-size:13px;line-height:1.45;}
+.rt-kilo-durum span{color:var(--muted);font-size:12.5px;}
+.rt-kilo-durum.uygun{background:var(--green2);border:1px solid #cfe0c6;}
+.rt-kilo-durum.yavas,.rt-kilo-durum.hizli{background:#fdf3dc;border:1px solid #ecd49a;}
+.rt-kilo-durum.ters{background:#fbe9e5;border:1px solid #efc4ba;}
