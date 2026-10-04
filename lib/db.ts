@@ -110,6 +110,7 @@ export interface ProgramRow {
   kimden?: string;               // V1 (27 eylül): programı kim hazırladı — Kendim, Ayşe Hoca, X Kliniği (serbest metin)
   sablon?: boolean;              // D4 — koçun şablonu: başlatılmaz, yalnız atanır
   sablon_disiplin?: string | null; // D4 — şablonlar disipline göre gruplanır
+  notlar?: string;               // 4 ekim — Atölye › Bilgiler: kişisel program notları
   ikon?: string;                 // 4 ekim — programın simgesi (emoji, ör. 🎸); yoksa 🌱
   plan?: boolean;                // 28 eylül — kişisel program Ajanda'dan planlanır: tarihler mutlak, kendiliğinden bitmez
   hafta_notlari?: Record<string, { metin: string; zaman: number }>; // 3 ekim — koçun haftalık değerlendirmesi (anahtar: haftanın pazartesisi)
@@ -275,6 +276,8 @@ export interface GidenRow {
 export interface IliskiAyarRow {
   id: string;
   izinler: Izinler;
+  bilgiler?: Record<string, string>; // 4 ekim — Atölye › Bilgiler: alana göre temel alanlar (hedef kilo, hedef okul…); yalnız koçta
+  notlar?: string;                   // 4 ekim — koçun özel notu (danışana gitmez)
   guncellendi: number;
 }
 

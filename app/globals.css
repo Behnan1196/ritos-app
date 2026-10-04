@@ -926,3 +926,34 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-prog-duzenle{display:block;margin:-4px 0 8px;font-size:12.5px;}
 textarea.rt-inp{font-family:inherit;}
 .rt-atolye-bos > .rt-btn{margin:0 0 12px;}
+
+/* ---------- 4 ekim: kişi dosyası, Bilgiler, Kütüphane bölümleri ---------- */
+.rt-dosya-seg{display:flex;background:#efe8da;border-radius:11px;padding:3px;gap:3px;margin:0 0 10px;}
+.rt-dosya-seg button{flex:1;border:0;background:none;border-radius:8px;padding:7px 4px;font:inherit;font-size:13px;font-weight:700;color:#6b6250;cursor:pointer;}
+.rt-dosya-seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08);}
+.rt-hedef-sat.bekliyor{color:var(--muted);cursor:default;}
+.rt-hedef-sat .ek{font-size:11.5px;color:var(--muted);white-space:nowrap;margin-left:auto;}
+.rt-hedef-sat.bekliyor .ek{color:#a07a1c;}
+.rt-hedef-sat.bekliyor .rt-ikon{margin-left:4px;}
+.rt-hedef-sat.yeni{color:var(--green);font-weight:700;}
+.rt-hedef-sat.soluk{color:var(--muted);font-size:12.5px !important;}
+.rt-bilgiler{display:flex;flex-direction:column;gap:8px;}
+.rt-bilgiler .rt-arac{margin:0;}
+.rt-bilgi-sat{display:flex;align-items:center;gap:10px;padding:4px 0;font-size:13px;}
+.rt-bilgi-sat > span{width:130px;flex:0 0 auto;color:var(--muted);}
+.rt-bilgi-sat .rt-inp{flex:1;min-width:0;}
+.rt-bilgiler textarea{width:100%;resize:vertical;}
+.rt-prog-ozet{display:flex;align-items:center;gap:10px;margin-bottom:4px;}
+.rt-kut-liste{display:flex;flex-direction:column;gap:5px;margin:8px 0;max-height:50vh;overflow-y:auto;}
+.rt-kut-liste .rt-kut-oge{display:flex;align-items:center;gap:8px;cursor:default;}
+.rt-kut-liste .rt-kut-oge .t{flex:1;min-width:0;}
+.rt-kut-bolum{margin:0 0 10px;align-self:flex-start;}
+.rt-atolye-kut{display:flex;flex-direction:column;}
+.rt-sablon-bolum{display:flex;flex-direction:column;gap:8px;}
+.rt-gonderim-kutu{margin-top:12px;}
+.rt-atolye-sag .rt-dosya-seg{margin-bottom:10px;}
+.rt-atolye-sag .rt-araclar{margin-top:0;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .rt-dosya-seg{background:#33302a;} :root:not([data-theme="light"]) .rt-dosya-seg button.on{background:#282620;}}
+.rt-atolye-sag .rt-bilgi-sat{flex-direction:column;align-items:stretch;gap:3px;}
+.rt-atolye-sag .rt-bilgi-sat > span{width:auto;font-size:12px;}
+.rt-hedef-secici .rt-yeni-program{font-size:12.5px;text-align:left;text-decoration:none;}

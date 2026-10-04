@@ -593,9 +593,16 @@ export async function danisanIzinleri(il: IliskiRow): Promise<Izinler> {
   return (await db.iliski_ayar.get(il.id))?.izinler ?? varsayilanIzin(il.disiplin);
 }
 
+/** 4 ekim — Atölye › Bilgiler: danışana ait temel alanlar ve koç notu (yalnız koçun cihazlarında, senkronlu). */
+export async function iliskiBilgiYaz(il: IliskiRow, patch: { bilgiler?: Record<string, string>; notlar?: string }) {
+  const once = await db.iliski_ayar.get(il.id);
+  await db.iliski_ayar.put({ id: il.id, izinler: once?.izinler ?? varsayilanIzin(il.disiplin), ...(once ?? {}), ...patch, guncellendi: Date.now() });
+}
+
 /** İzinleri kaydet; istenirse bu danışanın gönderilmiş programlarına da uygula (bugünden itibaren). */
 export async function danisanIzinKaydet(il: IliskiRow, izinler: Izinler, mevcutlara: boolean): Promise<number> {
-  await db.iliski_ayar.put({ id: il.id, izinler, guncellendi: Date.now() });
+  const once = await db.iliski_ayar.get(il.id);
+  await db.iliski_ayar.put({ ...(once ?? {}), id: il.id, izinler, guncellendi: Date.now() });
   if (!mevcutlara) return 0;
   const ps = (await db.program.toArray()).filter((p) => p.uzak?.iliski_id === il.id && p.uzak.rol === 'koc' && p.uzak.durum !== 'ret' && p.uzak.durum !== 'ayrildi');
   for (const p of ps) {

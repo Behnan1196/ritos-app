@@ -228,13 +228,13 @@ export function DavetModal({ onKapat, sabitDisiplin }: { onKapat: () => void; sa
   const [hata, setHata] = useState<string | null>(null);
   const secenekler = DISIPLINLER.filter(([k]) => !d.profil?.disiplinler.length || d.profil.disiplinler.includes(k));
   if (gonderildi) return (
-    <Modal baslik="Danışan davet et" onKapat={onKapat}>
+    <Modal baslik={sabitDisiplin === 'sinav' ? 'Öğrenci davet et' : 'Danışan davet et'} onKapat={onKapat}>
       <p className="rt-tamam">Davet {gonderildi} adlı kişinin Gelenler&apos;ine gönderildi. Kabul edince danışanların arasında görünür.</p>
       <div className="rt-satir"><button type="button" className="rt-btn" onClick={onKapat}>Kapat</button></div>
     </Modal>
   );
   return (
-    <Modal baslik="Danışan davet et" onKapat={onKapat}>
+    <Modal baslik={sabitDisiplin === 'sinav' ? 'Öğrenci davet et' : 'Danışan davet et'} onKapat={onKapat}>
       {!sonuc ? (
         <>
           {!sabitDisiplin && <>

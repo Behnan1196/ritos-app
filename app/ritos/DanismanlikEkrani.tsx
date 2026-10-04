@@ -52,7 +52,7 @@ export function DanismanlikSatiri({ onAc }: { onAc: (disiplin: string) => void }
   );
 }
 
-function AlanEkleModal({ onKapat, onEklendi }: { onKapat: () => void; onEklendi: (k: string) => void }) {
+export function AlanEkleModal({ onKapat, onEklendi }: { onKapat: () => void; onEklendi: (k: string) => void }) {
   const d = useDanismanlik();
   const mevcut = d.profil?.koc ? d.profil.disiplinler : [];
   const secenekler = DISIPLINLER.filter(([k]) => !mevcut.includes(k));

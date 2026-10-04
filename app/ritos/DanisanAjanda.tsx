@@ -338,12 +338,14 @@ function SablonKaydetModal({ h, haftaBas, onKapat, onTamam }: { h: PlanHedef; ha
 }
 
 /** Danışmanlık ekranındaki şablon listesi: gör, adını değiştir, sil. */
-export function HaftaSablonlari({ disiplin }: { disiplin: string }) {
-  const sablonlar = useHaftaSablonlari(disiplin);
+export function HaftaSablonlari({ disiplin, tam }: { disiplin: string; tam?: boolean }) {
+  const hepsi = useHaftaSablonlari(disiplin);
+  // tam (4 ekim, Kütüphane): yalnız bu gruba kaydedilmişler; grubu olmayanlar 'diger'.
+  const sablonlar = tam ? hepsi.filter((p) => (p.sablon_disiplin ?? 'diger') === disiplin) : hepsi;
   const [acik, setAcik] = useState<ProgramRow | null>(null);
   return (
     <>
-      {sablonlar.length === 0 && <p className="rt-muted">Danışanın haftasını kurunca Ajanda&apos;daki &quot;💾 Haftayı şablon kaydet&quot; ile sakla; sonra &quot;📋 Şablon uygula&quot; ile başka haftalara ya da danışanlara uygula.</p>}
+      {sablonlar.length === 0 && !tam && <p className="rt-muted">Danışanın haftasını kurunca Ajanda&apos;daki &quot;💾 Haftayı şablon kaydet&quot; ile sakla; sonra &quot;📋 Şablon uygula&quot; ile başka haftalara ya da danışanlara uygula.</p>}
       <div className="rt-dan-liste">
         {sablonlar.sort((a, b) => a.ad.localeCompare(b.ad, 'tr')).map((p) => (
           <button key={p.id} type="button" className="rt-prog" onClick={() => setAcik(p)}><span className="t">{p.ad}</span><span className="m">şablon</span></button>
