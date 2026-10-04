@@ -883,3 +883,31 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-tam-sekmeler{display:flex;flex:0 0 auto;border-top:1px solid var(--line);background:#fff;}
 .rt-tam-sekmeler > span{flex:0 0 auto;}
 .rt-tam-sekmeler > .side-tabs{flex:1;border-top:0;}
+
+/* ---------- 4 ekim: hedef seçici ---------- */
+.rt-hedef-secici{display:flex;flex-direction:column;gap:4px;}
+.rt-secici-baslik{font-size:15px;font-weight:800;margin:2px 0 6px;}
+.rt-secici-ara{width:100%;margin:0 0 6px;}
+.rt-secici-son{margin:0 0 6px;}
+.rt-secici-son .rt-muted{font-size:11.5px;}
+.rt-secici-son .rt-hedef-cipler{margin:4px 0 0;}
+.rt-secici-grup{background:#fff;border:1px solid var(--line);border-radius:12px;padding:4px 6px;margin-bottom:6px;}
+.rt-hedef-secici button.rt-grup-ad{width:100%;display:flex;align-items:center;justify-content:space-between;border:0;background:none;font:inherit;font-size:12px;font-weight:700;color:var(--muted);text-transform:none;letter-spacing:0;padding:7px 6px;margin:0;cursor:pointer;}
+.rt-hedef-secici button.rt-grup-ad span:first-child{color:var(--ink);font-size:13px;}
+.rt-hedef-secici .say{font-weight:600;}
+.rt-hedef-secici:not(.kompakt) .rt-hedef-sat{padding:11px 8px;font-size:14.5px;border-top:1px solid #f1ece2;border-radius:0;}
+.rt-hedef-sat .chev{margin-left:auto;color:var(--muted);}
+.rt-hedef-sat:disabled{opacity:.6;}
+.rt-hedef-secici.kompakt .rt-secici-grup{background:none;border:0;padding:0;margin-bottom:4px;}
+.rt-hedef-secici.kompakt button.rt-grup-ad{padding:6px 4px;font-size:11px;}
+.rt-hedef-secici.kompakt button.rt-grup-ad span:first-child{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+.rt-hedef-satir{width:100%;display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin:0 0 10px;font:inherit;text-align:left;cursor:pointer;color:var(--ink);}
+.rt-hedef-satir .ic{font-size:20px;}
+.rt-hedef-satir .tx{flex:1;min-width:0;display:flex;flex-direction:column;}
+.rt-hedef-satir .tx b{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rt-hedef-satir .tx small{font-size:11.5px;color:var(--muted);}
+.rt-hedef-satir .degis{font-size:12.5px;color:var(--green);font-weight:700;white-space:nowrap;}
+.rt-hedef-secici button.rt-grup-ad{text-align:left;gap:6px;}
+.rt-hedef-secici button.rt-grup-ad span:first-child{flex:1;min-width:0;}
+.rt-hedef-secici .say{white-space:nowrap;}
+.rt-secici-son .rt-chip.on{background:var(--green2);border-color:var(--green);color:var(--ink);font-weight:700;}
