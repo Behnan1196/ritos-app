@@ -12,31 +12,31 @@ import React, { useEffect, useState } from 'react';
 import { useCanli } from '@/lib/canli';
 import { db, type AileRow, type IliskiAyarRow, type IliskiRow, type KutuphaneKartRow, type ProgramRow } from '@/lib/db';
 import { bugun, degerBloklari, iyelik, tarihEkle, tarihEtiket, tarihParse } from '@/lib/paket';
-import { aileAktifMi, aileGorevIliski, davetler, davetSil, haftaNotuGonder, iliskiBilgiYaz, type DavetSatir } from '@/lib/danismanlik';
+import { aileAktifMi, aileGorevIliski, kocOl, davetler, davetSil, haftaNotuGonder, iliskiBilgiYaz, type DavetSatir } from '@/lib/danismanlik';
 import { danisanGunleri, gonderimAyarla, kocKartEkle, planDurumu, type KocKarti } from '@/lib/danisanAjanda';
 import { SURE_ANAHTAR } from './KartEditor';
 import { disiplinAdi, useDanismanlik } from '@/lib/danismanlik';
 import { useSeciliDanisan } from '@/lib/seciliDanisan';
 import type { PlanHedef } from '@/lib/danisanAjanda';
-import { DanisanAjandasi, HaftaSablonlari } from './DanisanAjanda';
+import { DanisanAjandasi, HaftaSablonlari, KocKartFormu } from './DanisanAjanda';
 import { DavetModal, SonlandirModal } from './Danismanlik';
 import { SinavTool } from './Sinav';
 import { AyTakvimi, haftaBasi, haftaEtiket } from './AjandaPane';
 import { AlanEkleModal, DISIPLIN_IKON, danismanlikBaslik } from './DanismanlikEkrani';
 import Kutuphane from './Kutuphane';
-import { Modal } from './ortak';
+import { Modal, OnayKutusu } from './ortak';
 import { IKON_SECENEKLERI, VARSAYILAN_IKON, ikonOner } from '@/lib/programIkon';
 import { programGuncelle, programOlustur } from '@/lib/program';
 
-type Alt = 'planlar' | 'kutuphane';
-// Oturum boyunca korunan durum (sekme değişince bileşen kapanır; modül değişkeni kalır).
-// seciciAcik (4 ekim): telefonda Atölye'ye ilk girişte önce plan seçimi açılır.
+// 4 ekim (v6): üstte Planlar/Kütüphane düğmeleri yok. Telefonda ekranlar yığın gibi: liste → (kişi | alan | kütüphane),
+// her alt ekranın ilk satırı "‹ Geri  PLANLAR".
+type Ekran = 'liste' | 'hedef' | 'alan' | 'kut';
 type Dosya = 'plan' | 'gelisim' | 'bilgi';   // telefonda kişi dosyasının sekmesi
 type Sag = 'gelisim' | 'bilgi' | 'kut';       // geniş ekranda sağ bölme
-type KutBolum = 'kart' | 'sablon' | 'paket';
-const durum: { alt: Alt; tarih: string | null; hafta: boolean; seciciAcik: boolean; dosya: Dosya; sag: Sag; kut: KutBolum } = { alt: 'planlar', tarih: null, hafta: true, seciciAcik: true, dosya: 'plan', sag: 'gelisim', kut: 'kart' };
-// Başka ekrandan "Atölye'de planla" (hedef önceden seçili): seçici atlanır. Atölye henüz açık değilken de yakalanır.
-if (typeof window !== 'undefined') window.addEventListener('ritos-atolyeye-git', () => { durum.alt = 'planlar'; durum.seciciAcik = false; durum.dosya = 'plan'; });
+type AlanSek = 'malzeme' | 'sablon' | 'ayar';
+const durum: { ekran: Ekran; alan: string | null; alanSek: AlanSek; tarih: string | null; hafta: boolean; dosya: Dosya; sag: Sag } = { ekran: 'liste', alan: null, alanSek: 'malzeme', tarih: null, hafta: true, dosya: 'plan', sag: 'gelisim' };
+// Başka ekrandan "Atölye'de planla" (hedef önceden seçili): liste atlanır. Atölye henüz açık değilken de yakalanır.
+if (typeof window !== 'undefined') window.addEventListener('ritos-atolyeye-git', () => { durum.ekran = 'hedef'; durum.dosya = 'plan'; });
 
 const SON_ANAH = 'ritos-atolye-son';
 function sonlariOku(): string[] { try { return JSON.parse(localStorage.getItem(SON_ANAH) ?? '[]'); } catch { return []; } }
@@ -75,25 +75,7 @@ function useHedeflerHazir(): Hedef[] | null {
 }
 
 export default function Atolye({ genis }: { genis: boolean }) {
-  const [alt, setAltS] = useState<Alt>(durum.alt);
-  const setAlt = (a: Alt) => { durum.alt = a; setAltS(a); };
-  // Başka yerden "Atölye'de planla" gelince Planlar açılır (hedef önceden seçilmiştir).
-  useEffect(() => {
-    const f = () => setAlt('planlar');
-    window.addEventListener('ritos-atolyeye-git', f);
-    return () => window.removeEventListener('ritos-atolyeye-git', f);
-  }, []);
-  return (
-    <div className={`rt-atolye${genis ? ' genis' : ''}`}>
-      <div className="rt-atolye-ust">
-        <div className="rt-gorunum rt-atolye-alt" role="tablist" aria-label="Atölye">
-          <button type="button" role="tab" aria-selected={alt === 'planlar'} className={alt === 'planlar' ? 'on' : ''} onClick={() => setAlt('planlar')}>🗂 Planlar</button>
-          <button type="button" role="tab" aria-selected={alt === 'kutuphane'} className={alt === 'kutuphane' ? 'on' : ''} onClick={() => setAlt('kutuphane')}>📚 Kütüphane</button>
-        </div>
-      </div>
-      {alt === 'planlar' ? <Planlar genis={genis} /> : <KutuphaneBolumu genis={genis} />}
-    </div>
-  );
+  return <div className={`rt-atolye${genis ? ' genis' : ''}`}><Planlar genis={genis} /></div>;
 }
 
 function Planlar({ genis }: { genis: boolean }) {
@@ -102,11 +84,14 @@ function Planlar({ genis }: { genis: boolean }) {
   const hazir = hedeflerHazir !== null;
   const hedefler = hedeflerHazir ?? [];
   const [secili, setSecili] = useSeciliDanisan();
+  const [ekran, setEkranS] = useState<Ekran>(durum.ekran);
+  const [alan, setAlanS] = useState<string | null>(durum.alan);
   const [tarih, setTarihS] = useState(durum.tarih ?? bugun());
   const [hafta, setHaftaS] = useState(durum.hafta);
   const [dosya, setDosyaS] = useState<Dosya>(durum.dosya);
   const [sag, setSagS] = useState<Sag>(durum.sag);
   const [ayAcik, setAyAcik] = useState(false);
+  const git = (e: Ekran, a: string | null = null) => { durum.ekran = e; durum.alan = a; setEkranS(e); setAlanS(a); };
   const setTarih = (t: string) => { durum.tarih = t; setTarihS(t); };
   const setHafta = (h: boolean) => { durum.hafta = h; setHaftaS(h); };
   const setDosya = (d: Dosya) => { durum.dosya = d; setDosyaS(d); };
@@ -114,12 +99,11 @@ function Planlar({ genis }: { genis: boolean }) {
   const adaylar = useAdaylar(hedefler);
   const [kuruluyor, setKuruluyor] = useState<string | null>(null);
   const [progForm, setProgForm] = useState<null | { id?: string }>(null);
-  const [yeniBekle, setYeniBekle] = useState<string | null>(null); // yeni program listeye düşene kadar seçim ekranı açılmasın
+  const [yeniBekle, setYeniBekle] = useState<string | null>(null); // yeni program listeye düşene kadar liste açılmasın
   const [kurHata, setKurHata] = useState<string | null>(null);
   const [davet, setDavet] = useState<string | null>(null);      // hangi alana davet
   const [alanEkle, setAlanEkle] = useState(false);
-  const [kutEkle, setKutEkle] = useState(false);
-  // Danışmanlık alanları, bekleyen davetler ve sonlananlar (4 ekim — Home'daki Danışmanlık ekranından taşındı).
+  const [kartEkle, setKartEkle] = useState(false);
   const alanlar = dn.profil?.koc ? dn.profil.disiplinler : [];
   const [davetYenile, setDavetYenile] = useState(0);
   const [bekleyen, setBekleyen] = useState<DavetSatir[]>([]);
@@ -130,15 +114,14 @@ function Planlar({ genis }: { genis: boolean }) {
   const sonlananlar = useCanli(async () => (await db.iliski.toArray()).filter((i) => i.koc === dn.uid && i.durum !== 'aktif' && i.disiplin !== 'aile'), [dn.uid], [] as IliskiRow[]);
   const h = hedefler.find((x) => x.id === secili) ?? null;
 
-  const [seciciAcik, setSeciciAcikS] = useState(durum.seciciAcik);
-  const setSeciciAcik = (v: boolean) => { durum.seciciAcik = v; setSeciciAcikS(v); };
-  const sec = (id: string) => { setSecili(id); sonaEkle(id); setSeciciAcik(false); };
+  const sec = (id: string) => { setSecili(id); sonaEkle(id); git('hedef'); };
 
-  // Geniş ekranda liste hep görünür: seçim yoksa ilk hedef seçilir. Telefonda seçim ekranı açılır.
+  // Seçili hedef yoksa: geniş ekranda ilk hedef seçilir; telefonda listeye dönülür.
   useEffect(() => {
     if (h) { if (yeniBekle) setYeniBekle(null); return; }
     if (kuruluyor || yeniBekle || !hazir) return;
-    if (genis) { if (hedefler.length) setSecili(hedefler[0].id); } else setSeciciAcik(true);
+    if (genis) { if (hedefler.length) setSecili(hedefler[0].id); }
+    else if (ekran === 'hedef') git('liste');
   }, [h, hedefler.length, kuruluyor, genis, yeniBekle, hazir]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Aile üyesi ilk kez seçilince görev ilişkisi kurulur (ayrı bir "Görev ver" adımı yok).
@@ -154,29 +137,38 @@ function Planlar({ genis }: { genis: boolean }) {
       {progForm && <ProgramFormu id={progForm.id} onKapat={() => setProgForm(null)} onOlustu={(id) => { setProgForm(null); setYeniBekle(`p:${id}`); sec(`p:${id}`); }} />}
       {davet && <DavetModal sabitDisiplin={davet} onKapat={() => { setDavet(null); setDavetYenile((n) => n + 1); }} />}
       {alanEkle && <AlanEkleModal onKapat={() => setAlanEkle(false)} onEklendi={() => setAlanEkle(false)} />}
-      {kutEkle && h && <KutuphanedenEkle h={h} tarih={tarih < bugun() ? bugun() : tarih} onKapat={() => setKutEkle(false)} />}
+      {kartEkle && h && <KartEkle h={h} tarih={tarih < bugun() ? bugun() : tarih} onKapat={() => setKartEkle(false)} />}
       {ayAcik && <AyTakvimi secili={tarih} onSec={(t) => { setTarih(t); setAyAcik(false); }} onKapat={() => setAyAcik(false)} />}
     </>
   );
 
+  const seciliGorunsun = ekran === 'hedef' || (genis && ekran === 'liste');
   const secici = (
-    <HedefSecici hedefler={hedefler} adaylar={adaylar} seciliId={h?.id ?? null} kompakt={genis}
+    <HedefSecici hedefler={hedefler} adaylar={adaylar} seciliId={seciliGorunsun ? h?.id ?? null : null} kompakt={genis}
       kuruluyor={kuruluyor} onSec={(x) => sec(x.id)} onAday={adaySec} onYeniProgram={() => setProgForm({})}
       alanlar={alanlar} bekleyen={bekleyen} sonlananlar={sonlananlar}
-      onDavet={setDavet} onDavetIptal={async (kod) => { await davetSil(kod); setDavetYenile((n) => n + 1); }} onAlanEkle={() => setAlanEkle(true)} />
+      onDavet={setDavet} onDavetIptal={async (kod) => { await davetSil(kod); setDavetYenile((n) => n + 1); }} onAlanEkle={() => setAlanEkle(true)}
+      acikAlan={ekran === 'alan' ? alan : null} kutAcik={ekran === 'kut'}
+      onAlan={(a) => git('alan', a)} onKutuphane={() => git('kut')} />
   );
 
-  // Telefon: seçim açıkken yalnız seçici (ajanda görünmez); seçilince tek satıra iner.
   if (!hazir) return <div className="rt-atolye-plan" />;
-  if (!genis && (seciciAcik || !h) && !kuruluyor && !yeniBekle) {
-    return (
-      <div className="rt-atolye-plan">
-        {kurHata && <p className="rt-hata">⚠ {kurHata}</p>}
-        {h && <button type="button" className="rt-linkbtn" onClick={() => setSeciciAcik(false)}>‹ {h.ad} planına dön</button>}
-        {secici}
-        {modallar}
-      </div>
-    );
+  const geri = <div className="rt-geri-bar"><button type="button" className="rt-geri-dugme" onClick={() => git('liste')}>‹ Geri</button><span>PLANLAR</span></div>;
+
+  // ———— Telefon: ekran yığını ————
+  if (!genis) {
+    if (ekran === 'kut') return <div className="rt-atolye-plan">{geri}<Kutuphane />{modallar}</div>;
+    if (ekran === 'alan' && alan) return <div className="rt-atolye-plan">{geri}<AlanDosyasi alan={alan} />{modallar}</div>;
+    if (ekran === 'liste' || (!h && !kuruluyor && !yeniBekle)) {
+      return (
+        <div className="rt-atolye-plan">
+          {kurHata && <p className="rt-hata">⚠ {kurHata}</p>}
+          {kuruluyor && <p className="rt-muted">Hazırlanıyor…</p>}
+          {secici}
+          {modallar}
+        </div>
+      );
+    }
   }
 
   const t0 = bugun();
@@ -185,8 +177,9 @@ function Planlar({ genis }: { genis: boolean }) {
   const aileMi = h?.grup === 'Ailem';
   const dosyaSek: [Dosya, string][] = [['plan', '📅 Plan'], ['gelisim', '📈 Gelişim'], ...(aileMi ? [] : [['bilgi', '🗂 Bilgiler'] as [Dosya, string]])];
   const etkinDosya: Dosya = aileMi && dosya === 'bilgi' ? 'plan' : dosya;
-  const sagSek: [Sag, string][] = [['gelisim', '📈 Gelişim'], ...(aileMi ? [] : [['bilgi', '🗂 Bilgiler'] as [Sag, string]]), ['kut', '📚 Kütüphane']];
-  const etkinSag: Sag = aileMi && sag === 'bilgi' ? 'gelisim' : sag;
+  const programMi = h?.h.tur === 'program';
+  const sagSek: [Sag, string][] = [['gelisim', '📈 Gelişim'], ...(aileMi ? [] : [['bilgi', '🗂 Bilgiler'] as [Sag, string]]), ...(programMi || aileMi ? [['kut', '📚 Kütüphane'] as [Sag, string]] : [])];
+  const etkinSag: Sag = (aileMi && sag === 'bilgi') || (!programMi && !aileMi && sag === 'kut') ? 'gelisim' : sag;
 
   const plan = h && (
     <>
@@ -202,7 +195,7 @@ function Planlar({ genis }: { genis: boolean }) {
           <button type="button" className={hafta ? 'on' : ''} onClick={() => setHafta(true)}>Hafta</button>
         </div>
       </div>
-      <div className="rt-hafta-is"><button type="button" className="rt-chip rt-kut-ekle" onClick={() => setKutEkle(true)}>📚 Kütüphaneden ekle</button></div>
+      <div className="rt-hafta-is"><button type="button" className="rt-chip rt-kut-ekle" onClick={() => setKartEkle(true)}>＋ Kart ekle</button></div>
       <DanisanAjandasi
         key={h.id}
         h={h.h}
@@ -216,25 +209,16 @@ function Planlar({ genis }: { genis: boolean }) {
     </>
   );
 
-  return (
-    <div className="rt-atolye-plan">
-      {genis && <aside className="rt-atolye-sol" aria-label="Plan seçimi">{secici}</aside>}
-      <section className="rt-atolye-orta">
+  // ———— Telefon: kişi / program dosyası ————
+  if (!genis) {
+    return (
+      <div className="rt-atolye-plan">
+        {geri}
         {kuruluyor && <p className="rt-muted">Hazırlanıyor…</p>}
         {kurHata && <p className="rt-hata">⚠ {kurHata}</p>}
-        {!h && !kuruluyor && !kurHata && <p className="rt-muted">Soldan bir plan seç ya da yenisini oluştur.</p>}
-        {h && !kuruluyor && (genis ? (
+        {h && !kuruluyor && (
           <>
-            <div className="rt-hedef-bas"><b>{h.ic} {h.ad}</b>{h.alt && <span className="rt-muted"> · {h.alt}</span>}</div>
-            {plan}
-          </>
-        ) : (
-          <>
-            <button type="button" className="rt-hedef-satir" onClick={() => setSeciciAcik(true)} aria-label="Başka plan seç">
-              <span className="ic">{h.ic}</span>
-              <span className="tx"><b>{h.ad}</b><small>{h.grup}</small></span>
-              <span className="degis">Değiştir ▾</span>
-            </button>
+            <div className="rt-tek"><span className="ic">{h.ic}</span><span className="tx"><b>{h.ad}</b><small>{h.grup}</small></span></div>
             <div className="rt-dosya-seg" role="tablist" aria-label="Dosya">
               {dosyaSek.map(([k, ad]) => <button key={k} type="button" role="tab" aria-selected={etkinDosya === k} className={etkinDosya === k ? 'on' : ''} onClick={() => setDosya(k)}>{ad}</button>)}
             </div>
@@ -242,9 +226,30 @@ function Planlar({ genis }: { genis: boolean }) {
               : etkinDosya === 'gelisim' ? <AtolyeAraclari h={h} haftaBas={haftaBasi(tarih)} />
               : <Bilgiler h={h} onProgramDuzenle={(id) => setProgForm({ id })} />}
           </>
-        ))}
+        )}
+        {modallar}
+      </div>
+    );
+  }
+
+  // ———— Geniş ekran: solda liste, ortada plan / alan dosyası / kütüphane, sağda dosya bölmesi ————
+  const ortaPlan = ekran !== 'alan' && ekran !== 'kut';
+  return (
+    <div className="rt-atolye-plan">
+      <aside className="rt-atolye-sol" aria-label="Plan seçimi">{secici}</aside>
+      <section className="rt-atolye-orta">
+        {ekran === 'kut' ? <div className="rt-orta-dar"><Kutuphane /></div>
+          : ekran === 'alan' && alan ? <div className="rt-orta-dar"><AlanDosyasi alan={alan} /></div>
+          : (
+            <>
+              {kuruluyor && <p className="rt-muted">Hazırlanıyor…</p>}
+              {kurHata && <p className="rt-hata">⚠ {kurHata}</p>}
+              {!h && !kuruluyor && !kurHata && <p className="rt-muted">Soldan bir plan seç ya da yenisini oluştur.</p>}
+              {h && !kuruluyor && <><div className="rt-hedef-bas"><b>{h.ic} {h.ad}</b>{h.alt && <span className="rt-muted"> · {h.alt}</span>}</div>{plan}</>}
+            </>
+          )}
       </section>
-      {genis && h && !kuruluyor && (
+      {ortaPlan && h && !kuruluyor && (
         <aside className="rt-atolye-sag">
           <div className="rt-dosya-seg" role="tablist" aria-label="Yan bölme">
             {sagSek.map(([k, ad]) => <button key={k} type="button" role="tab" aria-selected={etkinSag === k} className={etkinSag === k ? 'on' : ''} onClick={() => setSag(k)}>{ad}</button>)}
@@ -256,6 +261,24 @@ function Planlar({ genis }: { genis: boolean }) {
       )}
       {modallar}
     </div>
+  );
+}
+
+// ———————————————— Kart ekle (4 ekim): önce alanın kart türleri ————————————————
+// Danışan: alanın paleti (beslenme: öğün/ölçüm/kart; sınav: sınav görevi/kart/ölçüm) — DanisanAjanda'daki form.
+// Kişisel program ve aile: yeni kart ya da Kütüphaneden.
+
+function KartEkle({ h, tarih, onKapat }: { h: Hedef; tarih: string; onKapat: () => void }) {
+  const [gun, setGun] = useState(tarih);
+  const [yol, setYol] = useState<null | 'yeni' | 'kut'>(h.h.tur === 'danisan' && h.grup !== 'Ailem' ? 'yeni' : null);
+  if (yol === 'yeni') return <KocKartFormu h={h.h} tarih={gun} onKapat={onKapat} />;
+  if (yol === 'kut') return <KutuphanedenEkle h={h} tarih={gun} onKapat={onKapat} />;
+  return (
+    <Modal baslik={`＋ ${h.ad} için kart`} onKapat={onKapat}>
+      <label className="rt-alan">Hangi gün<input className="rt-inp" type="date" min={bugun()} value={gun} onChange={(e) => setGun(e.target.value)} /></label>
+      <button type="button" className="rt-tur-kart" onClick={() => setYol('yeni')}><span className="ic">✏️</span><span><b>Yeni kart</b><small>başlık, açıklama, video, süre, ölçüm…</small></span></button>
+      <button type="button" className="rt-tur-kart" onClick={() => setYol('kut')}><span className="ic">📚</span><span><b>Kütüphaneden</b><small>kayıtlı kartlarından seç</small></span></button>
+    </Modal>
   );
 }
 
@@ -400,35 +423,58 @@ function KutuphanedenEkle({ h, tarih, onKapat }: { h: Hedef; tarih: string; onKa
   );
 }
 
-// ———————————————— Atölye › Kütüphane: Kartlar · Hafta şablonları · Sınav paketi (4 ekim) ————————————————
 
-function KutuphaneBolumu({ genis }: { genis: boolean }) {
+// ———————————————— Alan dosyası (4 ekim): Malzeme · Şablonlar · Ayarlar ————————————————
+// Her danışmanlık alanı kendi malzemesini kendi biçiminde taşır (sınav: katalog + kaynaklar = sınav paketi).
+// Kişisel programlarda yalnız Şablonlar.
+
+function AlanDosyasi({ alan }: { alan: string }) {
   const dn = useDanismanlik();
-  const alanlar = dn.profil?.koc ? dn.profil.disiplinler : [];
-  const sinav = alanlar.includes('sinav');
-  const [bolum, setBolumS] = useState<KutBolum>(durum.kut);
-  const setBolum = (b: KutBolum) => { durum.kut = b; setBolumS(b); };
-  const sablonlar = useCanli(() => db.program.filter((p) => !!p.sablon).toArray(), [], [] as ProgramRow[]);
-  const gruplar = Array.from(new Set(sablonlar.map((p) => p.sablon_disiplin ?? 'diger')));
-  const etkin: KutBolum = bolum === 'paket' && !sinav ? 'kart' : bolum;
-  const grupAdi = (g: string) => (g === 'kisisel' ? '🌱 Kişisel programlar' : g === 'diger' ? 'Diğer' : `${DISIPLIN_IKON[g] ?? '🤝'} ${danismanlikBaslik(g)}`);
+  const kisisel = alan === 'kisisel';
+  const sekler: [AlanSek, string][] = kisisel ? [['sablon', 'Şablonlar']] : [['malzeme', 'Malzeme'], ['sablon', 'Şablonlar'], ['ayar', 'Ayarlar']];
+  const [sek, setSekS] = useState<AlanSek>(durum.alanSek);
+  const setSek = (s: AlanSek) => { durum.alanSek = s; setSekS(s); };
+  const etkin: AlanSek = sekler.some(([k]) => k === sek) ? sek : sekler[0][0];
+  const aktifSay = useCanli(async () => (await db.iliski.toArray()).filter((i) => i.koc === dn.uid && i.durum === 'aktif' && i.disiplin === alan).length, [dn.uid, alan], 0);
+  const [kapat, setKapat] = useState(false);
+  const ic = kisisel ? '🌱' : DISIPLIN_IKON[alan] ?? '🤝';
+  const ad = kisisel ? 'Kişisel programlarım' : danismanlikBaslik(alan);
   return (
-    <div className="rt-atolye-kut">
-      <div className="rt-gorunum rt-kut-bolum" role="tablist" aria-label="Kütüphane bölümü">
-        <button type="button" role="tab" aria-selected={etkin === 'kart'} className={etkin === 'kart' ? 'on' : ''} onClick={() => setBolum('kart')}>Kartlar</button>
-        <button type="button" role="tab" aria-selected={etkin === 'sablon'} className={etkin === 'sablon' ? 'on' : ''} onClick={() => setBolum('sablon')}>Hafta şablonları</button>
-        {sinav && <button type="button" role="tab" aria-selected={etkin === 'paket'} className={etkin === 'paket' ? 'on' : ''} onClick={() => setBolum('paket')}>Sınav paketi</button>}
-      </div>
-      {etkin === 'kart' && <Kutuphane />}
-      {etkin === 'sablon' && (
-        <div className="rt-sablon-bolum">
-          {gruplar.length === 0 && <p className="rt-muted">Henüz şablon yok. Bir planın haftasını kurunca Plan&apos;daki &quot;💾 Haftayı şablon kaydet&quot; ile sakla; sonra &quot;📋 Şablon uygula&quot; ile başka haftalara ya da kişilere uygula.</p>}
-          {gruplar.sort((a, b) => grupAdi(a).localeCompare(grupAdi(b), 'tr')).map((g) => (
-            <div key={g} className="rt-arac"><h4>{grupAdi(g)}</h4><HaftaSablonlari disiplin={g} tam /></div>
-          ))}
+    <div className="rt-alan-dosyasi">
+      <div className="rt-tek"><span className="ic">{ic}</span><span className="tx"><b>{ad}</b><small>alan dosyası</small></span></div>
+      {sekler.length > 1 && (
+        <div className="rt-dosya-seg" role="tablist" aria-label="Alan dosyası">
+          {sekler.map(([k, a]) => <button key={k} type="button" role="tab" aria-selected={etkin === k} className={etkin === k ? 'on' : ''} onClick={() => setSek(k)}>{a}</button>)}
         </div>
       )}
-      {etkin === 'paket' && <div className={genis ? 'rt-paket genis' : 'rt-paket'}><SinavTool /></div>}
+      {etkin === 'malzeme' && (alan === 'sinav'
+        ? <div className="rt-paket"><SinavTool /></div>
+        : (
+          <div className="rt-arac">
+            <h4>Malzeme</h4>
+            <p className="rt-muted">{alan === 'beslenme'
+              ? 'Yakında: seçenekli öğün seti, basit değişim listesi ve takip edilen ölçüler. Kalori ve klinik hesap diyetisyen uygulamasında kalır.'
+              : 'Bu alanın malzemesi henüz yok.'}</p>
+          </div>
+        ))}
+      {etkin === 'sablon' && (
+        <div className="rt-arac">
+          <h4>Hafta şablonları</h4>
+          <HaftaSablonlari disiplin={alan} tam />
+          {kisisel && <HaftaSablonlari disiplin="diger" tam />}
+          <p className="rt-muted">Bir planın haftasını &quot;💾 Haftayı şablon kaydet&quot; ile buraya alırsın; &quot;📋 Şablon uygula&quot; bu alanın şablonlarını gösterir.</p>
+        </div>
+      )}
+      {etkin === 'ayar' && (
+        <div className="rt-arac">
+          <h4>Alan</h4>
+          <p className="rt-metin">{aktifSay ? `${aktifSay} aktif kişi` : 'Bu alanda aktif kişi yok.'}</p>
+          {aktifSay === 0 && (kapat
+            ? <OnayKutusu metin="Bu danışmanlık alanı kapansın mı? Şablonlar silinmez." evet="Kapat" onVazgec={() => setKapat(false)} onEvet={async () => { await kocOl((dn.profil?.disiplinler ?? []).filter((x) => x !== alan)); setKapat(false); }} />
+            : <button type="button" className="rt-btn tehlike" onClick={() => setKapat(true)}>Bu alanı kapat</button>)}
+          {aktifSay > 0 && <p className="rt-muted">Alan, içinde aktif kişi yokken kapatılabilir.</p>}
+        </div>
+      )}
     </div>
   );
 }
@@ -591,11 +637,12 @@ function GeriBildirim({ h, haftaBas, kartlar, programId, hicGonderilmedi }: { h:
 
 const kucuk = (x: string) => x.toLocaleLowerCase('tr');
 
-function HedefSecici({ hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, onAday, onYeniProgram, alanlar, bekleyen, sonlananlar, onDavet, onDavetIptal, onAlanEkle }: {
+function HedefSecici({ hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, onAday, onYeniProgram, alanlar, bekleyen, sonlananlar, onDavet, onDavetIptal, onAlanEkle, acikAlan, kutAcik, onAlan, onKutuphane }: {
   hedefler: Hedef[]; adaylar: Aday[]; seciliId: string | null; kompakt: boolean; kuruluyor: string | null;
   onSec: (h: Hedef) => void; onAday: (a: Aday) => void; onYeniProgram: () => void;
   alanlar: string[]; bekleyen: DavetSatir[]; sonlananlar: IliskiRow[];
   onDavet: (disiplin: string) => void; onDavetIptal: (kod: string) => void; onAlanEkle: () => void;
+  acikAlan: string | null; kutAcik: boolean; onAlan: (alan: string) => void; onKutuphane: () => void;
 }) {
   const [ara, setAra] = useState('');
   const [acik, setAcik] = useState<Record<string, boolean>>({});
@@ -608,14 +655,14 @@ function HedefSecici({ hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, o
     ...adaylar.map((a) => ({ id: a.id, ad: a.ad, ic: '👪', grup: 'Ailem', aday: a })),
   ];
   // Gruplar: önce danışmanlık alanları (boş olsa da — davet buradan), sonra Ailem, sonra Kişisel programlarım.
-  type Grup = { ad: string; ic: string; alan?: string };
+  type Grup = { ad: string; ic: string; alan?: string; dosya?: string };
   const alanGruplari: Grup[] = Array.from(new Set([...alanlar, ...hedefler.filter((x) => x.h.tur === 'danisan' && x.grup !== 'Ailem').map((x) => (x.h as { il: IliskiRow }).il.disiplin)]))
-    .map((d) => ({ ad: danismanlikBaslik(d), ic: DISIPLIN_IKON[d] ?? '🤝', alan: d }))
+    .map((d) => ({ ad: danismanlikBaslik(d), ic: DISIPLIN_IKON[d] ?? '🤝', alan: d, dosya: d }))
     .sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
   const gruplar: Grup[] = [
     ...alanGruplari,
     ...(ogeler.some((o) => o.grup === 'Ailem') ? [{ ad: 'Ailem', ic: '👪' }] : []),
-    { ad: 'Kişisel programlarım', ic: '🌱' },
+    { ad: 'Kişisel programlarım', ic: '🌱', dosya: 'kisisel' },
   ];
   const toplam = ogeler.length;
   const q = kucuk(ara.trim());
@@ -630,7 +677,7 @@ function HedefSecici({ hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, o
   );
   return (
     <div className={`rt-hedef-secici${kompakt ? ' kompakt' : ''}`}>
-      {!kompakt && <p className="rt-secici-baslik">Hangi planı açalım?</p>}
+      {!kompakt && <p className="rt-ekran-bas">PLANLAR</p>}
       {toplam > 8 && <input className="rt-inp rt-secici-ara" type="search" placeholder={kompakt ? 'Ara…' : `Ara (${toplam} kişi / program)`} value={ara} onChange={(e) => setAra(e.target.value)} />}
       {son.length > 1 && (
         <div className="rt-secici-son">
@@ -648,9 +695,12 @@ function HedefSecici({ hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, o
         const sonlanan = g.alan ? sonlananlar.filter((x) => x.disiplin === g.alan) : [];
         return (
           <div key={g.ad} className="rt-secici-grup">
-            <button type="button" className="rt-grup-ad" aria-expanded={ac} onClick={() => setAcik({ ...acik, [g.ad]: !ac })}>
-              <span>{g.ic} {g.ad}</span><span className="say">{tum.length} {ac ? '▾' : '▸'}</span>
-            </button>
+            <div className="rt-grup-bas">
+              <button type="button" className="rt-grup-ad" aria-expanded={ac} onClick={() => setAcik({ ...acik, [g.ad]: !ac })}>
+                <span>{g.ic} {g.ad}</span><span className="say">{tum.length} {ac ? '▾' : '▸'}</span>
+              </button>
+              {g.dosya && <button type="button" className={`rt-alan-ac${acikAlan === g.dosya ? ' on' : ''}`} aria-label={`${g.ad} alan dosyası`} onClick={() => onAlan(g.dosya!)}>Alan ›</button>}
+            </div>
             {ac && grupOgeleri.map(satir)}
             {ac && !q && g.alan && (
               <>
@@ -684,6 +734,11 @@ function HedefSecici({ hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, o
       })}
       {q && gorunen.length === 0 && <p className="rt-muted">“{ara}” bulunamadı.</p>}
       {!q && <button type="button" className="rt-linkbtn rt-yeni-program" onClick={onAlanEkle}>＋ Danışmanlık alanı aç</button>}
+      {!q && (
+        <button type="button" className={`rt-kut-sat${kutAcik ? ' on' : ''}`} onClick={onKutuphane}>
+          <span className="ic">📚</span><span className="tx"><b>Kütüphane</b><small>genel kartların ve klasörlerin</small></span>{!kompakt && <span className="chev">›</span>}
+        </button>
+      )}
     </div>
   );
 }

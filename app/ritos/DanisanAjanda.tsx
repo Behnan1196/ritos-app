@@ -177,7 +177,7 @@ function KocKartDetay({ h, k, onKapat }: { h: PlanHedef; k: KocKarti; onKapat: (
 type KartTur = 'ogun' | 'kart' | 'olcum' | 'sinav';
 const TEKRAR_SURE: [string, string][] = [['7', '1 hafta'], ['14', '2 hafta'], ['28', '4 hafta'], ['', 'Süresiz']];
 
-function KocKartFormu({ h, tarih, k, onKapat }: { h: PlanHedef; tarih: string; k?: KocKarti; onKapat: () => void }) {
+export function KocKartFormu({ h, tarih, k, onKapat }: { h: PlanHedef; tarih: string; k?: KocKarti; onKapat: () => void }) {
   // Kişisel programda kişinin kendi tek kart editörü (video, süre kaydı, zamanlayıcı…) kullanılır.
   // Aile içi görevler de (3 ekim) aynı tek kart editörüyle — öğün/ölçüm paleti koçluğa özgü.
   if (h.tur === 'program' || h.il.disiplin === 'aile') return <ProgramKartFormu h={h} tarih={tarih} k={k} onKapat={onKapat} />;
