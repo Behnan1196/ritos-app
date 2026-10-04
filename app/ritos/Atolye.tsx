@@ -25,7 +25,7 @@ import Kutuphane from './Kutuphane';
 
 type Alt = 'planlar' | 'kutuphane';
 // Oturum boyunca korunan durum (sekme değişince bileşen kapanır; modül değişkeni kalır).
-// seciciAcik (4 ekim): telefonda Atölye'ye ilk girişte önce "kimi planlıyorum" seçimi açılır.
+// seciciAcik (4 ekim): telefonda Atölye'ye ilk girişte önce plan seçimi açılır.
 const durum: { alt: Alt; tarih: string | null; hafta: boolean; seciciAcik: boolean } = { alt: 'planlar', tarih: null, hafta: true, seciciAcik: true };
 // Başka ekrandan "Atölye'de planla" (hedef önceden seçili): seçici atlanır. Atölye henüz açık değilken de yakalanır.
 if (typeof window !== 'undefined') window.addEventListener('ritos-atolyeye-git', () => { durum.alt = 'planlar'; durum.seciciAcik = false; });
@@ -59,7 +59,7 @@ function useHedefler(): Hedef[] {
     liste.push({ id: i.id, grup: 'Ailem', grupIc: '👪', ic: '👪', ad: i.danisan_ad, alt: 'verdiğin görevler', h: { tur: 'danisan', il: i } });
   }
   for (const p of programlar.sort((a, b) => a.ad.localeCompare(b.ad, 'tr'))) {
-    liste.push({ id: `p:${p.id}`, grup: 'Programlarım', grupIc: '🌱', ic: '🌱', ad: p.ad, alt: 'kişisel program', h: { tur: 'program', programId: p.id } });
+    liste.push({ id: `p:${p.id}`, grup: 'Kişisel programlarım', grupIc: '🌱', ic: '🌱', ad: p.ad, alt: 'kişisel program', h: { tur: 'program', programId: p.id } });
   }
   return liste;
 }
@@ -152,7 +152,7 @@ function Planlar({ genis }: { genis: boolean }) {
 
   return (
     <div className="rt-atolye-plan">
-      {genis && <aside className="rt-atolye-sol" aria-label="Kimi planlıyorum">{secici}</aside>}
+      {genis && <aside className="rt-atolye-sol" aria-label="Plan seçimi">{secici}</aside>}
       <section className="rt-atolye-orta">
         {kuruluyor && <p className="rt-muted">Hazırlanıyor…</p>}
         {kurHata && <p className="rt-hata">⚠ {kurHata}</p>}
@@ -162,7 +162,7 @@ function Planlar({ genis }: { genis: boolean }) {
             {genis
               ? <div className="rt-hedef-bas"><b>{h.ic} {h.ad}</b>{h.alt && <span className="rt-muted"> · {h.alt}</span>}</div>
               : (
-                <button type="button" className="rt-hedef-satir" onClick={() => setSeciciAcik(true)} aria-label="Kimi planladığını değiştir">
+                <button type="button" className="rt-hedef-satir" onClick={() => setSeciciAcik(true)} aria-label="Başka plan seç">
                   <span className="ic">{h.ic}</span>
                   <span className="tx"><b>{h.ad}</b><small>{h.grup}</small></span>
                   <span className="degis">Değiştir ▾</span>
@@ -372,7 +372,7 @@ function GeriBildirim({ h, haftaBas, kartlar, programId, hicGonderilmedi }: { h:
 }
 
 // ———————————————— Hedef seçici (4 ekim) ————————————————
-// Gruplar: her danışmanlık alanı ayrı (Beslenme, Sınav…), Ailem, Programlarım. Kalabalıkta (30 öğrenci,
+// Gruplar: her danışmanlık alanı ayrı (Beslenme, Sınav…), Ailem, Kişisel programlarım. Kalabalıkta (30 öğrenci,
 // 10 aile üyesi) arama kutusu ve "son seçilenler" çıkar; büyük gruplar kapalı başlar.
 
 const kucuk = (x: string) => x.toLocaleLowerCase('tr');
@@ -393,7 +393,7 @@ function HedefSecici({ hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, o
   const toplam = ogeler.length;
   const q = kucuk(ara.trim());
   const gorunen = q ? ogeler.filter((o) => kucuk(o.ad).includes(q)) : ogeler;
-  const sira = (g: string) => (g === 'Programlarım' ? 2 : g === 'Ailem' ? 1 : 0);
+  const sira = (g: string) => (g === 'Kişisel programlarım' ? 2 : g === 'Ailem' ? 1 : 0);
   const gruplar = Array.from(new Set(ogeler.map((o) => o.grup))).sort((a, b) => sira(a) - sira(b) || a.localeCompare(b, 'tr'));
   const tikla = (o: Oge) => (o.hedef ? onSec(o.hedef) : o.aday && onAday(o.aday));
   const son = !q && !kompakt && toplam > 6 ? sonlar.map((id) => ogeler.find((o) => o.id === id)).filter((o): o is Oge => !!o).slice(0, 4) : [];
@@ -405,7 +405,7 @@ function HedefSecici({ hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, o
   );
   return (
     <div className={`rt-hedef-secici${kompakt ? ' kompakt' : ''}`}>
-      {!kompakt && <p className="rt-secici-baslik">Kimi planlıyorsun?</p>}
+      {!kompakt && <p className="rt-secici-baslik">Hangi planı açalım?</p>}
       {toplam > 8 && <input className="rt-inp rt-secici-ara" type="search" placeholder={kompakt ? 'Ara…' : `Ara (${toplam} kişi / program)`} value={ara} onChange={(e) => setAra(e.target.value)} />}
       {son.length > 1 && (
         <div className="rt-secici-son">
