@@ -22,6 +22,9 @@ import { DanisanAjandasi } from './DanisanAjanda';
 import { AyTakvimi, haftaBasi, haftaEtiket } from './AjandaPane';
 import { DISIPLIN_IKON, danismanlikBaslik } from './DanismanlikEkrani';
 import Kutuphane from './Kutuphane';
+import { Modal } from './ortak';
+import { IKON_SECENEKLERI, VARSAYILAN_IKON, ikonOner } from '@/lib/programIkon';
+import { programGuncelle, programOlustur } from '@/lib/program';
 
 type Alt = 'planlar' | 'kutuphane';
 // Oturum boyunca korunan durum (sekme değişince bileşen kapanır; modül değişkeni kalır).
@@ -59,7 +62,7 @@ function useHedefler(): Hedef[] {
     liste.push({ id: i.id, grup: 'Ailem', grupIc: '👪', ic: '👪', ad: i.danisan_ad, alt: 'verdiğin görevler', h: { tur: 'danisan', il: i } });
   }
   for (const p of programlar.sort((a, b) => a.ad.localeCompare(b.ad, 'tr'))) {
-    liste.push({ id: `p:${p.id}`, grup: 'Kişisel programlarım', grupIc: '🌱', ic: '🌱', ad: p.ad, alt: 'kişisel program', h: { tur: 'program', programId: p.id } });
+    liste.push({ id: `p:${p.id}`, grup: 'Kişisel programlarım', grupIc: '🌱', ic: p.ikon ?? VARSAYILAN_IKON, ad: p.ad, alt: 'kişisel program', h: { tur: 'program', programId: p.id } });
   }
   return liste;
 }
@@ -96,6 +99,8 @@ function Planlar({ genis }: { genis: boolean }) {
   const setHafta = (h: boolean) => { durum.hafta = h; setHaftaS(h); };
   const adaylar = useAdaylar(hedefler);
   const [kuruluyor, setKuruluyor] = useState<string | null>(null);
+  const [progForm, setProgForm] = useState<null | { id?: string }>(null);
+  const [yeniBekle, setYeniBekle] = useState<string | null>(null); // yeni program listeye düşene kadar seçim ekranı açılmasın
   const [kurHata, setKurHata] = useState<string | null>(null);
   const h = hedefler.find((x) => x.id === secili) ?? null;
 
@@ -105,9 +110,10 @@ function Planlar({ genis }: { genis: boolean }) {
 
   // Geniş ekranda liste hep görünür: seçim yoksa ilk hedef seçilir. Telefonda seçim ekranı açılır.
   useEffect(() => {
-    if (h || kuruluyor || !hedefler.length) return;
+    if (h) { if (yeniBekle) setYeniBekle(null); return; }
+    if (kuruluyor || yeniBekle || !hedefler.length) return;
     if (genis) setSecili(hedefler[0].id); else setSeciciAcik(true);
-  }, [h, hedefler.length, kuruluyor, genis]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [h, hedefler.length, kuruluyor, genis, yeniBekle]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Aile üyesi ilk kez seçilince görev ilişkisi kurulur (ayrı bir "Görev ver" adımı yok).
   const adaySec = async (a: Aday) => {
@@ -117,9 +123,13 @@ function Planlar({ genis }: { genis: boolean }) {
     finally { setKuruluyor(null); }
   };
 
+  const formu = progForm && <ProgramFormu id={progForm.id} onKapat={() => setProgForm(null)} onOlustu={(id) => { setProgForm(null); setYeniBekle(`p:${id}`); sec(`p:${id}`); }} />;
+
   if (!hedefler.length && !adaylar.length) {
     return (
       <div className="rt-atolye-bos">
+        <button type="button" className="rt-btn primary" onClick={() => setProgForm({})}>＋ Yeni kişisel program</button>
+        {formu}
         <p className="rt-metin"><b>Henüz planlayacağın bir şey yok.</b></p>
         <ul className="rt-maddeler rt-muted">
           <li>Aile grubu kur (Ayarlar › Aile); ailendekiler burada listelenir, görev verirsin.</li>
@@ -136,16 +146,17 @@ function Planlar({ genis }: { genis: boolean }) {
 
   const secici = (
     <HedefSecici hedefler={hedefler} adaylar={adaylar} seciliId={h?.id ?? null} kompakt={genis}
-      kuruluyor={kuruluyor} onSec={(x) => sec(x.id)} onAday={adaySec} />
+      kuruluyor={kuruluyor} onSec={(x) => sec(x.id)} onAday={adaySec} onYeniProgram={() => setProgForm({})} />
   );
 
   // Telefon: seçim açıkken yalnız seçici (ajanda görünmez); seçilince tek satıra iner.
-  if (!genis && (seciciAcik || !h) && !kuruluyor) {
+  if (!genis && (seciciAcik || !h) && !kuruluyor && !yeniBekle) {
     return (
       <div className="rt-atolye-plan">
         {kurHata && <p className="rt-hata">⚠ {kurHata}</p>}
         {h && <button type="button" className="rt-linkbtn" onClick={() => setSeciciAcik(false)}>‹ {h.ad} planına dön</button>}
         {secici}
+        {formu}
       </div>
     );
   }
@@ -160,7 +171,8 @@ function Planlar({ genis }: { genis: boolean }) {
         {h && !kuruluyor && (
           <>
             {genis
-              ? <div className="rt-hedef-bas"><b>{h.ic} {h.ad}</b>{h.alt && <span className="rt-muted"> · {h.alt}</span>}</div>
+              ? <div className="rt-hedef-bas"><b>{h.ic} {h.ad}</b>{h.alt && <span className="rt-muted"> · {h.alt}</span>}
+                {h.h.tur === 'program' && <button type="button" className="rt-ikon rt-duzenle" aria-label="Programı düzenle" onClick={() => setProgForm({ id: (h.h as { programId: string }).programId })}>✎</button>}</div>
               : (
                 <button type="button" className="rt-hedef-satir" onClick={() => setSeciciAcik(true)} aria-label="Başka plan seç">
                   <span className="ic">{h.ic}</span>
@@ -168,6 +180,7 @@ function Planlar({ genis }: { genis: boolean }) {
                   <span className="degis">Değiştir ▾</span>
                 </button>
               )}
+            {!genis && h.h.tur === 'program' && <button type="button" className="rt-linkbtn rt-prog-duzenle" onClick={() => setProgForm({ id: (h.h as { programId: string }).programId })}>✎ Adı ve simgeyi düzenle</button>}
             <div className="rt-daterow">
               <button className="arrow" onClick={() => setTarih(tarihEkle(tarih, -adim))} aria-label={hafta ? 'Önceki hafta' : 'Önceki gün'}>‹</button>
               <button className="rt-dlabel" onClick={() => setAyAcik(true)}>
@@ -199,6 +212,7 @@ function Planlar({ genis }: { genis: boolean }) {
           <KutuphaneSurukle h={h} />
         </aside>
       )}
+      {formu}
       {ayAcik && <AyTakvimi secili={tarih} onSec={(t) => { setTarih(t); setAyAcik(false); }} onKapat={() => setAyAcik(false)} />}
     </div>
   );
@@ -377,9 +391,9 @@ function GeriBildirim({ h, haftaBas, kartlar, programId, hicGonderilmedi }: { h:
 
 const kucuk = (x: string) => x.toLocaleLowerCase('tr');
 
-function HedefSecici({ hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, onAday }: {
+function HedefSecici({ hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, onAday, onYeniProgram }: {
   hedefler: Hedef[]; adaylar: Aday[]; seciliId: string | null; kompakt: boolean; kuruluyor: string | null;
-  onSec: (h: Hedef) => void; onAday: (a: Aday) => void;
+  onSec: (h: Hedef) => void; onAday: (a: Aday) => void; onYeniProgram: () => void;
 }) {
   const [ara, setAra] = useState('');
   const [acik, setAcik] = useState<Record<string, boolean>>({});
@@ -428,6 +442,51 @@ function HedefSecici({ hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, o
         );
       })}
       {q && gorunen.length === 0 && <p className="rt-muted">“{ara}” bulunamadı.</p>}
+      <button type="button" className="rt-linkbtn rt-yeni-program" onClick={onYeniProgram}>＋ Yeni kişisel program</button>
     </div>
+  );
+}
+
+// ———————————————— Kişisel program: oluştur / düzenle (4 ekim) ————————————————
+
+function ProgramFormu({ id, onKapat, onOlustu }: { id?: string; onKapat: () => void; onOlustu: (id: string) => void }) {
+  const p = useCanli(async () => (id ? (await db.program.get(id)) ?? null : null), [id], null as ProgramRow | null);
+  const [ad, setAd] = useState('');
+  const [amac, setAmac] = useState('');
+  const [ikon, setIkon] = useState<string | null>(null); // null = ada göre öneri
+  const [hazir, setHazir] = useState(!id);
+  useEffect(() => { if (p && !hazir) { setAd(p.ad); setAmac(p.amac); setIkon(p.ikon ?? null); setHazir(true); } }, [p, hazir]);
+  const oneri = ikonOner(ad);
+  const secili = ikon ?? oneri ?? VARSAYILAN_IKON;
+  const kaydet = async () => {
+    if (!ad.trim()) return;
+    if (id) { await programGuncelle(id, { ad: ad.trim(), amac: amac.trim(), ikon: secili }); onKapat(); return; }
+    const yeni = await programOlustur(ad.trim(), amac.trim());
+    await programGuncelle(yeni, { ikon: secili, kimden: 'Kendim' });
+    onOlustu(yeni);
+  };
+  return (
+    <Modal baslik={id ? 'Programı düzenle' : 'Yeni kişisel program'} onKapat={onKapat}>
+      {!hazir ? <p className="rt-muted">…</p> : (
+        <>
+          <div className="rt-prog-ad">
+            <span className="rt-prog-ikon" aria-hidden="true">{secili}</span>
+            <input className="rt-inp" placeholder="Ad (ör. Gitar çalışması, Sabah koşusu)" value={ad} onChange={(e) => setAd(e.target.value)} autoFocus />
+          </div>
+          <div className="rt-ikon-izgara" role="radiogroup" aria-label="Simge">
+            {Array.from(new Set([...(oneri ? [oneri] : []), ...IKON_SECENEKLERI])).map((x) => (
+              <button key={x} type="button" role="radio" aria-checked={secili === x} className={`${secili === x ? 'on' : ''}${x === oneri && ikon === null ? ' oneri' : ''}`} onClick={() => setIkon(x)}>{x}</button>
+            ))}
+          </div>
+          <p className="rt-muted">{ikon === null && oneri ? 'Simge addan önerildi; istersen başka birini seç.' : 'Simge, programın kartlarında ve listelerde görünür.'}</p>
+          <textarea className="rt-inp" rows={2} placeholder="Amaç (isteğe bağlı)" value={amac} onChange={(e) => setAmac(e.target.value)} />
+          <div className="rt-satir" style={{ marginTop: 10, justifyContent: 'flex-end' }}>
+            <button type="button" className="rt-btn" onClick={onKapat}>Vazgeç</button>
+            <button type="button" className="rt-btn primary" disabled={!ad.trim()} onClick={kaydet}>{id ? 'Kaydet' : 'Oluştur'}</button>
+          </div>
+          {!id && <p className="rt-muted">Oluşunca haftasını açarız; kartlarını günlere eklersin, Ajandam&apos;a da düşer.</p>}
+        </>
+      )}
+    </Modal>
   );
 }

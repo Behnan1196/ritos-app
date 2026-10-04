@@ -911,3 +911,18 @@ textarea.rt-inp{resize:vertical;font-family:ui-monospace,monospace;font-size:12p
 .rt-hedef-secici button.rt-grup-ad span:first-child{flex:1;min-width:0;}
 .rt-hedef-secici .say{white-space:nowrap;}
 .rt-secici-son .rt-chip.on{background:var(--green2);border-color:var(--green);color:var(--ink);font-weight:700;}
+
+/* ---------- 4 ekim: kişisel program formu ---------- */
+.rt-prog-ad{display:flex;align-items:center;gap:10px;}
+.rt-prog-ad .rt-inp{flex:1;}
+.rt-prog-ikon{font-size:30px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:var(--green2);border-radius:12px;flex:0 0 auto;}
+.rt-ikon-izgara{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:6px;margin:10px 0 4px;}
+.rt-ikon-izgara button{height:40px;border:1px solid var(--line);background:#fff;border-radius:10px;font-size:20px;cursor:pointer;}
+.rt-ikon-izgara button.on{border-color:var(--green);background:var(--green2);box-shadow:0 0 0 1px var(--green) inset;}
+.rt-ikon-izgara button.oneri{position:relative;}
+.rt-yeni-program{margin:6px 0 0;align-self:flex-start;}
+.rt-hedef-bas{display:flex;align-items:center;gap:4px;}
+.rt-hedef-bas .rt-duzenle{margin-left:4px;font-size:13px;}
+.rt-prog-duzenle{display:block;margin:-4px 0 8px;font-size:12.5px;}
+textarea.rt-inp{font-family:inherit;}
+.rt-atolye-bos > .rt-btn{margin:0 0 12px;}

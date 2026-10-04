@@ -307,8 +307,10 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
   useTik(bekliyor, 15000);
   const adetB = kart.tip === 'yap' ? kart.bloklar.find((b): b is Extract<Blok, { tur: 'sayi' }> => b.tur === 'sayi' && b.bicim === 'adet') : undefined;
   const adetV = adetB ? Number((kayit?.degerler ?? {})[adetB.anahtar]) || 0 : 0;
-  const aileKarti = useCanli(async () => (kart.geri_bildirim === 'uzak' ? (await db.program.get((kart.kaynak_ref ?? '').split('/')[0]))?.uzak?.disiplin === 'aile' : false), [kart.kaynak_ref], false);
-  const meta = [yapildi && kayit?.zaman ? `✓ ${saatMetni(kayit.zaman)}` : '', kart.saatler.join(' · ') + (kart.hatirlatma ? ' 🔔' : ''), bagli && kart.kaynak_etiket ? `${kart.kaynak_modul === 'dis' ? '🔗' : aileKarti || kart.kaynak_modul === 'ortak' ? '👪' : uzak ? '🤝' : '🌱'} ${kart.kaynak_etiket}` : ''].filter(Boolean).join(' · ');
+  // Kaynak program: aile görevi mi, kişisel programın simgesi (4 ekim).
+  const kaynakP = useCanli(async () => (uzak || kart.kaynak_modul === 'program' ? (await db.program.get((kart.kaynak_ref ?? '').split('/')[0])) ?? null : null), [kart.kaynak_ref], null as ProgramRow | null);
+  const aileKarti = uzak && kaynakP?.uzak?.disiplin === 'aile';
+  const meta = [yapildi && kayit?.zaman ? `✓ ${saatMetni(kayit.zaman)}` : '', kart.saatler.join(' · ') + (kart.hatirlatma ? ' 🔔' : ''), bagli && kart.kaynak_etiket ? `${kart.kaynak_modul === 'dis' ? '🔗' : aileKarti || kart.kaynak_modul === 'ortak' ? '👪' : uzak ? '🤝' : kaynakP?.ikon ?? '🌱'} ${kart.kaynak_etiket}` : ''].filter(Boolean).join(' · ');
   const yeniGuncel = !!kart.isaret && Date.now() - kart.isaret < 3 * 86400000;
   // A9 — değer düzeltme süresi (koçun izni): süre geçtiyse yapılmış kart değiştirilemez.
   const kilitli = !!kayit?.yapildi && kart.izinler.duzeltme_gun !== null && gunFarki(tarih, bugun()) > kart.izinler.duzeltme_gun;

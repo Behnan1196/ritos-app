@@ -82,7 +82,7 @@ export default function Kutuphane() {
         })}
         {ps.map((p) => (
           <div key={p.id} className={`rt-kut-satir${kesilen?.id === p.id ? ' kesik' : ''}`} style={{ paddingLeft: 6 + derin * 16 + 18 }}>
-            <button type="button" className="ad" onClick={() => setProgram(p.id)}><span className="iko">🌱</span><span className="nm">{p.ad}</span><span className="rt-muted"> program</span></button>
+            <button type="button" className="ad" onClick={() => setProgram(p.id)}><span className="iko">{p.ikon ?? '🌱'}</span><span className="nm">{p.ad}</span><span className="rt-muted"> program</span></button>
             <button type="button" className="rt-ikon" onClick={() => setProgramMenu(p)} aria-label={`${p.ad} programı seçenekleri`}>⋯</button>
           </div>
         ))}
@@ -157,7 +157,7 @@ export default function Kutuphane() {
 function ProgramMenu({ p, onKapat, onAc, onKes }: { p: ProgramRow; onKapat: () => void; onAc: () => void; onKes: () => void }) {
   const [sil, setSil] = useState(false);
   return (
-    <Modal baslik={`🌱 ${p.ad}`} onKapat={onKapat}>
+    <Modal baslik={`${p.ikon ?? '🌱'} ${p.ad}`} onKapat={onKapat}>
       <div className="rt-kut-menu">
         <button type="button" className="rt-btn primary" onClick={onAc}>Aç</button>
         <button type="button" className="rt-btn" onClick={onKes}>✂️ Kes (taşı)</button>
