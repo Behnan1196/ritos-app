@@ -34,7 +34,7 @@ const NARROW_BREAKPOINT = 760;
 const TEST = process.env.NEXT_PUBLIC_RITOS_TEST === '1';
 
 type Sekme = 'home' | 'gunum' | 'atolye' | 'ayarlar' | 'gelenler';
-type Sag = 'home' | 'ayarlar' | 'gelenler'; // geniş ekranda Ajandam'ın yanındaki bölme
+type Sag = 'home' | 'atolye' | 'ayarlar' | 'gelenler'; // geniş ekranda Ajandam'ın yanındaki bölme
 
 export default function RitosLab() {
   const o = useOturum();
@@ -63,7 +63,7 @@ function RitosUygulama() {
   useEffect(() => {
     const f = () => setSekme('gunum');
     // Atölye'ye git (ör. Ayarlar › Aile › Görev ver, Danışmanlık › Atölye'de planla): hedef önceden seçilir.
-    const a = () => setSekme('atolye');
+    const a = () => { setSekme('atolye'); setSag('atolye'); };
     window.addEventListener('ritos-ajandaya-git', f);
     window.addEventListener('ritos-atolyeye-git', a);
     return () => { window.removeEventListener('ritos-ajandaya-git', f); window.removeEventListener('ritos-atolyeye-git', a); };
@@ -91,17 +91,16 @@ function RitosUygulama() {
   const sagSekme = (s: Sekme) => (
     s === 'gelenler' ? <GelenlerEkrani onGeri={homeyaDon} />
       : s === 'ayarlar' ? <AyarlarPane />
+      : s === 'atolye' ? <Atolye genis={false} />
       : home
   );
-  // Geniş ekran sekmeleri (4 ekim, B): Home · Atölye · Ayarlar sağ altta. Atölye seçilince ekranı kaplar.
-  const genisSekme: Sag | 'atolye' = sekme === 'atolye' ? 'atolye' : sag === 'gelenler' ? 'home' : sag;
+  // Geniş ekran (4 ekim): solda Ajandam, sağ bölmede Home · Atölye · Ayarlar. Atölye de telefondaki
+  // düzeniyle (alt alta günler, geri tuşlu ekranlar) sağ bölmede çalışır; tam ekran kipi kaldırıldı.
+  const genisSekme: Sag = sag === 'gelenler' ? 'home' : sag;
   const sekmeler = (
     <div className="side-tabs">
-      {([['home', '🏠', 'Home'], ['atolye', '🗂', 'Atölye'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sag | 'atolye', string, string][]).map(([k, ic, ad]) => (
-        <button key={k} className={genisSekme === k ? 'on' : ''} onClick={() => {
-          if (k === 'atolye') { setSekme('atolye'); return; }
-          setSekme('gunum'); setSag(k);
-        }}><span>{ic}{k !== 'atolye' && rozet(k)}</span>{ad}</button>
+      {([['home', '🏠', 'Home'], ['atolye', '🗂', 'Atölye'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sag, string, string][]).map(([k, ic, ad]) => (
+        <button key={k} className={genisSekme === k ? 'on' : ''} onClick={() => { setSag(k); setSekme(k === 'atolye' ? 'atolye' : 'gunum'); }}><span>{ic}{rozet(k)}</span>{ad}</button>
       ))}
     </div>
   );
@@ -122,14 +121,7 @@ function RitosUygulama() {
       ) : (
         <>
           <div className="topbar"><b>Ritos</b><SenkronIsareti /></div>
-          {sekme === 'atolye' ? (
-            <>
-              {/* Atölye geniş ekranda tüm alanı kaplar; sekmeler aynı yerde (sağ altta) kalır. */}
-              <div className="rt-atolye-tam"><Atolye genis /></div>
-              <div className="rt-tam-sekmeler"><span style={{ width: ratio + '%' }} />{sekmeler}</div>
-            </>
-          ) : (
-            <SplitPane
+          <SplitPane
               ratio={ratio}
               setRatio={setRatio}
               left={<AjandaPane />}
@@ -140,7 +132,6 @@ function RitosUygulama() {
                 </>
               )}
             />
-          )}
         </>
       )}
     </div>

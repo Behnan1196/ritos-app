@@ -990,3 +990,9 @@ textarea.rt-inp{font-family:inherit;}
 .rt-atolye.genis .rt-atolye-plan{grid-template-columns:220px minmax(0,1fr) 250px;}
 .rt-hedef-secici.kompakt .rt-alan-ac{padding:2px 7px;font-size:11px;}
 .rt-hedef-secici.kompakt button.rt-grup-ad{align-items:flex-start;}
+/* 4 ekim: Atölye telefonda ve geniş ekranın sağ bölmesinde aynı düzende — hafta günleri alt alta. */
+.rt-atolye:not(.genis) .rt-hafta{grid-template-columns:1fr;}
+.side-content .rt-atolye{padding-bottom:8px;}
+.rt-atolye:not(.genis) .rt-hafta-bos{display:none;}
+.rt-atolye:not(.genis) .rt-hafta-gun .rt-hafta-hd{padding-bottom:2px;}
+.rt-atolye:not(.genis) .rt-hafta{gap:6px;}
