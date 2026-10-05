@@ -1235,3 +1235,19 @@ textarea.rt-inp{font-family:inherit;}
 .rt-aysonu-sat .ust{display:flex;align-items:center;gap:8px;}
 .rt-aysonu-sat .ust small{margin-left:auto;color:var(--muted);font-size:11.5px;}
 .rt-aysonu-sat .rt-linkbtn{align-self:flex-start;font-size:12.5px;}
+
+/* Rutin yaşam döngüsü (5 ekim, 4. adım) */
+.rt-lejant i.taban{background:#cfe2c4;}
+.rt-alan-karo .nok i.t{background:#a9cc98;}
+.rt-durum-tag{display:inline-block;font-size:11px;font-weight:800;border-radius:8px;padding:1px 7px;background:#fbf1dc;color:#9a6b1f;margin-right:4px;}
+.rt-durum-tag.oturdu{background:var(--green2);color:var(--green);}
+.rt-hedef-sat .rt-durum-tag{margin-left:auto;margin-right:0;}
+.rt-hedef-sat.oturdu{background:var(--green2);}
+.rt-hedef-sat.soluk .ic{filter:grayscale(1);opacity:.6;}
+.rt-hedef-sat.soluk .ad{color:var(--muted);}
+.rt-aliskanlik{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--green2);border-radius:12px;padding:10px 12px;font-size:12.5px;line-height:1.4;}
+.rt-aliskanlik .ic{font-size:20px;}
+.rt-aliskanlik .tx{flex:1 1 200px;}
+.rt-aliskanlik .ey{display:flex;gap:6px;margin-left:auto;}
+.rt-tik-sat{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px;}
+.rt-tik-sat input{width:18px;height:18px;accent-color:var(--green);}

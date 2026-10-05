@@ -32,7 +32,8 @@ import { AKTIVITE, HIZLAR, beklenenKilo, beslenmeHesap, kiloDurumu, vkiEtiket, t
 import { HAZIR_OLCULER, OLC_ONEK, olcuBlok } from '@/lib/olcum';
 import { ALAN_IKONLARI, EN_FAZLA_GORUNEN, alanEkle as yAlanEkle, alanGuncelle, alanOner, alanSil, alanSirala, alanlar as yAlanlar, alanlariGaranti } from '@/lib/yasamAlani';
 import type { YasamAlaniRow } from '@/lib/db';
-import { AlanKarolari, AlanSayfasi, AySonu, DengeKarti } from './Rutinler';
+import { AlanKarolari, AlanSayfasi, AliskanlikOnerisi, AySonu, DengeKarti } from './Rutinler';
+import { arsivle, kuruluyoraDon, oturduIsaretle, rutinDurumu } from '@/lib/rutinDongu';
 import { hazirKartlar, hazirSablonlariYenile, hazirSablonuAl, useHazirSablonlar, type HazirSablon } from '@/lib/hazirSablon';
 
 // 4 ekim (v6): üstte Planlar/Kütüphane düğmeleri yok. Telefonda ekranlar yığın gibi: liste → (kişi | alan | kütüphane),
@@ -75,7 +76,9 @@ function useAdaylar(hedefler: Hedef[], gruplar: AileRow[]): Aday[] {
 /** Gruptaki biri (görev verdiğim kişi) mi? — disiplini 'aile' olan görev ilişkisi. */
 const grupKisisi = (h: Hedef | null | undefined) => !!h && h.h.tur === 'danisan' && h.h.il.disiplin === 'aile';
 const GRUP_ETIKET = 'Gruplarım';
-const RUTIN_BOLUM = 'Rutinler';
+const RUTIN_BOLUM = 'Kuruluyor';
+const OTURDU_BOLUM = 'Oturdu';
+const ARSIV_BOLUM = 'Arşiv';
 
 /** Aktif gruplarım (ada göre). */
 function useGruplarim(): AileRow[] | null {
@@ -93,7 +96,9 @@ function useHedeflerHazir(gruplar: AileRow[] | null, kapsam: Kapsam): Hedef[] | 
   const liste: Hedef[] = [];
   if (kapsam === 'kendim') {
     for (const p of programlar.sort((a, b) => a.ad.localeCompare(b.ad, 'tr'))) {
-      liste.push({ id: `p:${p.id}`, grup: RUTIN_BOLUM, grupIc: '🌱', ic: p.ikon ?? VARSAYILAN_IKON, ad: p.ad, alt: 'rutin', etiket: p.alanlar ?? [], h: { tur: 'program', programId: p.id } });
+      const d = rutinDurumu(p);
+      liste.push({ id: `p:${p.id}`, grup: d === 'oturdu' ? OTURDU_BOLUM : d === 'arsiv' ? ARSIV_BOLUM : RUTIN_BOLUM, grupIc: '🌱', ic: p.ikon ?? VARSAYILAN_IKON, ad: p.ad,
+        alt: d === 'oturdu' ? 'oturmuş alışkanlık' : d === 'arsiv' ? 'arşiv' : 'rutin', etiket: p.alanlar ?? [], h: { tur: 'program', programId: p.id } });
     }
     return liste;
   }
@@ -440,8 +445,9 @@ function ProgramBilgileri({ programId, onDuzenle }: { programId: string; onDuzen
       <div className="rt-arac">
         <h4>Program</h4>
         <div className="rt-prog-ozet"><span className="rt-prog-ikon">{p.ikon ?? VARSAYILAN_IKON}</span><span><b>{p.ad}</b>{p.amac && <span className="rt-muted"><br />{p.amac}</span>}</span></div>
-        <button type="button" className="rt-linkbtn" onClick={onDuzenle}>✎ Ad, simge ve amacı düzenle</button>
+        <button type="button" className="rt-linkbtn" onClick={onDuzenle}>✎ Ad, simge, alanlar ve amacı düzenle</button>
       </div>
+      {!p.uzak && <RutinDurumu p={p} />}
       <div className="rt-arac">
         <h4>Notlar</h4>
         <textarea className="rt-inp" rows={4} value={not} placeholder="Bu programla ilgili notların" onChange={(e) => { setNot(e.target.value); setTamam(false); }} />
@@ -450,6 +456,33 @@ function ProgramBilgileri({ programId, onDuzenle }: { programId: string; onDuzen
           <button type="button" className="rt-btn primary" disabled={not.trim() === (p.notlar ?? '')} onClick={async () => { await programGuncelle(p.id, { notlar: not.trim() }); setTamam(true); }}>Kaydet</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// 5 ekim — rutin yaşam döngüsü: kuruluyor / oturdu / arşiv.
+function RutinDurumu({ p }: { p: ProgramRow }) {
+  const d = rutinDurumu(p);
+  const [onay, setOnay] = useState<null | 'oturdu' | 'arsiv' | 'don'>(null);
+  const [bekle, setBekle] = useState(false);
+  const yap = async (f: () => Promise<void>) => { setBekle(true); try { await f(); } finally { setBekle(false); setOnay(null); } };
+  const tarih = p.durum_tarih ? tarihEtiket(p.durum_tarih) : '';
+  return (
+    <div className="rt-arac">
+      <h4>Durum</h4>
+      <p className="rt-metin">
+        {d === 'kuruluyor' && <><span className="rt-durum-tag">● Kuruluyor</span> Ajandam&apos;da; işaretledikçe dengene emek olarak yansır.</>}
+        {d === 'oturdu' && <><span className="rt-durum-tag oturdu">✓ Oturdu</span> {tarih && `${tarih}'den beri `}alışkanlık; Ajandam&apos;da görünmez, dengede taban olarak durur.</>}
+        {d === 'arsiv' && <><span className="rt-durum-tag">🗄 Arşiv</span> {tarih && `${tarih}'de `}bırakıldı.</>}
+      </p>
+      <div className="rt-satir">
+        {d === 'kuruluyor' && <button type="button" className="rt-btn" disabled={bekle} onClick={() => setOnay('oturdu')}>✓ Oturdu olarak işaretle</button>}
+        {d !== 'kuruluyor' && <button type="button" className="rt-btn" disabled={bekle} onClick={() => setOnay('don')}>{d === 'arsiv' ? '↺ Yeniden başlat' : '↺ Kuruluyor’a döndür'}</button>}
+        {d !== 'arsiv' && <button type="button" className="rt-btn" disabled={bekle} onClick={() => setOnay('arsiv')}>🗄 Arşivle</button>}
+      </div>
+      {onay === 'oturdu' && <OnayKutusu metin="Alışkanlık oldu mu? Kartları yarından Ajandam'dan kalkar; dengede bu rutinin alanları taban olarak dolu görünür. İstediğinde geri döndürebilirsin." evet="Oturdu" onVazgec={() => setOnay(null)} onEvet={() => yap(() => oturduIsaretle(p.id))} />}
+      {onay === 'arsiv' && <OnayKutusu metin="Rutin arşivlenir; kartları yarından Ajandam'dan kalkar. Geçmişi saklanır, istediğinde yeniden başlatırsın." evet="Arşivle" onVazgec={() => setOnay(null)} onEvet={() => yap(() => arsivle(p.id))} />}
+      {onay === 'don' && <OnayKutusu metin={`Kartları yarından Ajandam'a geri gelir (${(p.kaliplar ?? []).length} kart).`} evet={d === 'arsiv' ? 'Yeniden başlat' : 'Döndür'} onVazgec={() => setOnay(null)} onEvet={() => yap(() => kuruluyoraDon(p.id))} />}
     </div>
   );
 }
@@ -745,7 +778,11 @@ function HedefSecici({ kapsam, hedefler, adaylar, seciliId, kompakt, kuruluyor, 
   const bolumler: Grup[] = [
     ...alanGruplari,
     ...gruplar.map((g) => ({ ad: g.ad, ic: grupIkon(g), anahtar: `g:${g.id}`, aile: g })),
-    ...(kapsam === 'kendim' ? [{ ad: RUTIN_BOLUM, ic: '🌱', anahtar: RUTIN_BOLUM, dosya: 'kisisel' }] : []),
+    ...(kapsam === 'kendim' ? [
+      { ad: RUTIN_BOLUM, ic: '🌱', anahtar: RUTIN_BOLUM, dosya: 'kisisel' },
+      ...(ogeler.some((o) => o.grup === OTURDU_BOLUM) ? [{ ad: OTURDU_BOLUM, ic: '✓', anahtar: OTURDU_BOLUM }] : []),
+      ...(ogeler.some((o) => o.grup === ARSIV_BOLUM) ? [{ ad: ARSIV_BOLUM, ic: '🗄', anahtar: ARSIV_BOLUM }] : []),
+    ] : []),
   ];
   const toplam = ogeler.length;
   const q = kucuk(ara.trim());
@@ -753,7 +790,7 @@ function HedefSecici({ kapsam, hedefler, adaylar, seciliId, kompakt, kuruluyor, 
   const tikla = (o: Oge) => (o.hedef ? onSec(o.hedef) : o.aday && onAday(o.aday));
   const son = !q && !kompakt && toplam > 6 ? sonlar.map((id) => ogeler.find((o) => o.id === id)).filter((o): o is Oge => !!o).slice(0, 4) : [];
   const satir = (o: Oge) => (
-    <button key={o.anahtar} type="button" className={`rt-hedef-sat${o.id === seciliId || o.id === kuruluyor ? ' on' : ''}`} disabled={!!kuruluyor} onClick={() => tikla(o)}>
+    <button key={o.anahtar} type="button" className={`rt-hedef-sat${o.id === seciliId || o.id === kuruluyor ? ' on' : ''}${o.grup === OTURDU_BOLUM ? ' oturdu' : o.grup === ARSIV_BOLUM ? ' soluk' : ''}`} disabled={!!kuruluyor} onClick={() => tikla(o)}>
       <span className="ic">{o.ic}</span><span className="ad">{o.ad}</span>
       {kapsam === 'kendim' && !!o.etiket?.length && <span className="rt-etiket-ikon" aria-label={o.etiket.map((k) => yalanlar.find((a) => a.id === k)?.ad).filter(Boolean).join(', ')}>{o.etiket.map((k) => yalanlar.find((a) => a.id === k)?.ikon ?? '').join('')}</span>}
       {!kompakt && <span className="chev">›</span>}
@@ -766,6 +803,7 @@ function HedefSecici({ kapsam, hedefler, adaylar, seciliId, kompakt, kuruluyor, 
         <div className="rt-alan-blok">
           <DengeKarti onDegerlendir={onDegerlendir} />
           <AlanKarolari onAlan={onYasamAlani} kompakt={kompakt} />
+          <AliskanlikOnerisi />
           <div className="rt-alan-alt">
             <span className="rt-muted">Alana dokun: değerlendirmesi ve rutinleri.</span>
             <button type="button" className="rt-linkbtn" onClick={() => setAlanDuzen(true)}>Alanları düzenle</button>
@@ -788,7 +826,7 @@ function HedefSecici({ kapsam, hedefler, adaylar, seciliId, kompakt, kuruluyor, 
         const bolumOgeleri = gorunen.filter((o) => o.grup === g.anahtar);
         if (q && !bolumOgeleri.length) return null;
         const suzBos = kapsam === 'kendim' && !!suz && bolumOgeleri.length === 0;
-        const varsayilan = tum.length <= 6 || tum.some((o) => o.id === seciliId);
+        const varsayilan = g.anahtar === ARSIV_BOLUM ? tum.some((o) => o.id === seciliId) : tum.length <= 6 || tum.some((o) => o.id === seciliId);
         const ac = q ? true : acik[g.anahtar] ?? varsayilan;
         const yonetici = g.aile && benimAileRolum(g.aile)?.rol === 'yonetici';
         const davetliler = g.aile ? g.aile.uyeler.filter((u) => u.durum === 'davet') : [];

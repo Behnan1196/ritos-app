@@ -113,6 +113,12 @@ export interface ProgramRow {
   notlar?: string;               // 4 ekim — Atölye › Bilgiler: kişisel program notları
   ikon?: string;                 // 4 ekim — programın simgesi (emoji, ör. 🎸); yoksa 🌱
   alanlar?: string[];            // 5 ekim — dokunduğu yaşam alanları (yasam_alani id'leri); boş = alansız
+  // 5 ekim — rutin yaşam döngüsü (Rutinlerim): yok = kuruluyor. Oturdu: ajandadan kalkar, dengede taban;
+  // arşiv: bırakıldı. Kalkan kartların kalıbı 'kaliplar'da saklanır — geri dönüşte yarından yeniden kurulur.
+  durum?: 'kuruluyor' | 'oturdu' | 'arsiv';
+  durum_tarih?: string;          // durum ne zaman değişti (YYYY-MM-DD)
+  kaliplar?: Omit<AjandaKartRow, 'id' | 'guncellendi'>[];
+  oneri_ret?: string;            // "alışkanlık oldu mu?" önerisine "henüz değil" denen gün
   plan?: boolean;                // 28 eylül — kişisel program Ajanda'dan planlanır: tarihler mutlak, kendiliğinden bitmez
   hafta_notlari?: Record<string, { metin: string; zaman: number }>; // 3 ekim — koçun haftalık değerlendirmesi (anahtar: haftanın pazartesisi)
   uzak?: UzakProgram | null;     // D5/D6 — danışana atanmış (koç tarafı) ya da koçtan gelen (danışan tarafı)

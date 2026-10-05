@@ -11,6 +11,8 @@ import type { AlanDegerlendirmeRow, ProgramRow, YasamAlaniRow } from '@/lib/db';
 import { alanGuncelle, alanlar as yAlanlar, ONERILEN_KRITER } from '@/lib/yasamAlani';
 import { alanRutinleri, ayAdi, ayKodu, degerlendir, degerlendirmeler, degerlendirmeZamani, emekHesapla, oncekiAy, type AlanEmek } from '@/lib/denge';
 import { Modal } from './ortak';
+import { db } from '@/lib/db';
+import { kuruluyoraDon, oneriAdaylari, oneriReddet, oturduIsaretle } from '@/lib/rutinDongu';
 
 export function useDenge() {
   const liste = useCanli(yAlanlar, [], [] as YasamAlaniRow[]);
@@ -33,9 +35,10 @@ function Radar({ alanlar, emek, deg, boyut = 156 }: { alanlar: YasamAlaniRow[]; 
   return (
     <svg className="rt-radar" viewBox={`0 0 ${boyut} ${boyut}`} role="img" aria-label="Denge grafiği">
       {[1, 2, 3, 4].map((k) => <polygon key={k} points={poly(() => k)} fill="none" stroke="var(--line)" strokeWidth="1" />)}
-      <polygon points={poly((a) => emek[a.id]?.emek ?? 0)} fill="var(--green2)" stroke="var(--green)" strokeWidth="1.5" />
+      <polygon points={poly((a) => emek[a.id]?.toplam ?? 0)} fill="var(--green2)" stroke="var(--green)" strokeWidth="1.5" />
+      {alanlar.some((a) => (emek[a.id]?.taban ?? 0) > 0) && <polygon points={poly((a) => emek[a.id]?.taban ?? 0)} fill="#cfe2c4" stroke="none" />}
       {hisVar && <polygon points={poly((a) => (sonPuan(deg[a.id]) ?? 1) - 1)} fill="none" stroke="#4f7fa8" strokeWidth="2" strokeDasharray="4 3" />}
-      {alanlar.map((a, i) => { const [x, y] = nokta(i, 4.95); const bos = (emek[a.id]?.emek ?? 0) === 0; return <text key={a.id} x={x} y={y} fontSize="12" textAnchor="middle" dominantBaseline="central" opacity={bos ? 0.45 : 1}>{a.ikon}</text>; })}
+      {alanlar.map((a, i) => { const [x, y] = nokta(i, 4.95); const bos = (emek[a.id]?.toplam ?? 0) === 0; return <text key={a.id} x={x} y={y} fontSize="12" textAnchor="middle" dominantBaseline="central" opacity={bos ? 0.45 : 1}>{a.ikon}</text>; })}
     </svg>
   );
 }
@@ -44,7 +47,8 @@ function Radar({ alanlar, emek, deg, boyut = 156 }: { alanlar: YasamAlaniRow[]; 
 export function DengeKarti({ onDegerlendir }: { onDegerlendir: () => void }) {
   const { alanlar, emek, deg } = useDenge();
   if (!alanlar.length) return null;
-  const bos = alanlar.filter((a) => (emek[a.id]?.emek ?? 0) === 0);
+  const bos = alanlar.filter((a) => (emek[a.id]?.toplam ?? 0) === 0);
+  const tabanVar = alanlar.some((a) => (emek[a.id]?.taban ?? 0) > 0);
   const zaman = degerlendirmeZamani(deg);
   return (
     <>
@@ -58,6 +62,7 @@ export function DengeKarti({ onDegerlendir }: { onDegerlendir: () => void }) {
         <Radar alanlar={alanlar} emek={emek} deg={deg} />
         <div className="rt-denge-sag">
           <b>Denge</b>
+          {tabanVar && <span className="rt-lejant"><i className="taban" />Oturmuş alışkanlıklar</span>}
           <span className="rt-lejant"><i className="emek" />Emeğin · son 4 hafta</span>
           <span className="rt-lejant"><i className="his" />Hissin · ay sonu</span>
           {bos.length > 0 && bos.length < alanlar.length && <span className="rt-denge-not"><b>{bos.slice(0, 3).map((a) => `${a.ikon} ${a.ad}`).join(', ')}</b>{bos.length > 3 ? ` +${bos.length - 3}` : ''} son 4 haftada boş.</span>}
@@ -75,11 +80,11 @@ export function AlanKarolari({ onAlan, kompakt }: { onAlan: (id: string) => void
   return (
     <div className={`rt-alan-karolar${kompakt ? ' kompakt' : ''}`}>
       {alanlar.map((a) => {
-        const e = emek[a.id]?.emek ?? 0;
+        const x = emek[a.id]; const tb = x?.taban ?? 0, top = x?.toplam ?? 0;
         return (
-          <button key={a.id} type="button" className={`rt-alan-karo${e === 0 ? ' bos' : ''}`} title={a.aciklama} onClick={() => onAlan(a.id)}>
+          <button key={a.id} type="button" className={`rt-alan-karo${top === 0 ? ' bos' : ''}`} title={a.aciklama} onClick={() => onAlan(a.id)}>
             <span className="ic">{a.ikon}</span><span className="ad">{a.ad}</span>
-            <span className="nok" aria-label={`son 4 haftanın ${e} haftasında`}>{[0, 1, 2, 3].map((i) => <i key={i} className={i < e ? 'd' : ''} />)}</span>
+            <span className="nok" aria-label={`son 4 haftanın ${x?.emek ?? 0} haftasında${tb ? ', oturmuş alışkanlık var' : ''}`}>{[0, 1, 2, 3].map((i) => <i key={i} className={i < tb ? 't' : i < top ? 'd' : ''} />)}</span>
           </button>
         );
       })}
@@ -99,7 +104,7 @@ export function AlanSayfasi({ alanId, onRutin, onYeniRutin, onDegerlendir }: {
   if (!a) return null;
   const gecmis = (deg[alanId] ?? []).slice(0, 6).reverse();
   const buAy = (deg[alanId] ?? []).find((d) => d.ay === ayKodu());
-  const e = emek[alanId] ?? { hafta: [0, 0, 0, 0], emek: 0 };
+  const e = emek[alanId] ?? { hafta: [0, 0, 0, 0], emek: 0, taban: 0, toplam: 0, oturan: [] };
   return (
     <div className="rt-yalan">
       <div className="rt-tek"><span className="ic">{a.ikon}</span><span className="tx"><b>{a.ad}</b><small>{a.aciklama || 'yaşam alanı'}</small></span></div>
@@ -121,12 +126,13 @@ export function AlanSayfasi({ alanId, onRutin, onYeniRutin, onDegerlendir }: {
       <div className="rt-arac">
         <h4>Son 4 hafta</h4>
         <div className="rt-yalan-hafta">{e.hafta.map((n, i) => <div key={i}><b>{n}</b>{i === 3 ? 'bu hafta' : `${3 - i} hf önce`}</div>)}</div>
-        <p className="rt-muted">Bu alana etiketli rutinlerden yapılan kart sayısı.</p>
+        <p className="rt-muted">Bu alana etiketli rutinlerden yapılan kart sayısı.{e.oturan.length ? <> Oturmuş: <b>{e.oturan.join(', ')}</b> — ajandada izlenmese de dengede yerini korur.</> : null}</p>
       </div>
       <div className="rt-arac">
         <h4>Bu alana dokunan rutinler</h4>
         {rutinler.map((p) => (
-          <button key={p.id} type="button" className="rt-hedef-sat" onClick={() => onRutin(p.id)}><span className="ic">{p.ikon ?? '🌱'}</span><span className="ad">{p.ad}</span><span className="chev">›</span></button>
+          <button key={p.id} type="button" className={`rt-hedef-sat${p.durum === 'arsiv' ? ' soluk' : ''}`} onClick={() => onRutin(p.id)}><span className="ic">{p.ikon ?? '🌱'}</span><span className="ad">{p.ad}</span>
+            {p.durum === 'oturdu' && <span className="rt-durum-tag oturdu">✓ oturdu</span>}{p.durum === 'arsiv' && <span className="rt-durum-tag">arşiv</span>}<span className="chev">›</span></button>
         ))}
         {!rutinler.length && <p className="rt-muted">Henüz yok. Küçük bir başlangıç yeter: haftada bir kez bile olsa.</p>}
         <button type="button" className="rt-hedef-sat yeni" onClick={onYeniRutin}><span className="ic">＋</span><span className="ad">Bu alana rutin</span></button>
@@ -207,6 +213,7 @@ export function AySonu({ onBitti }: { onBitti: () => void }) {
     if (dolu.length === yeni.length) setTaslak({ ...taslak, [a.id]: Math.round((dolu.reduce((s, x) => s + x, 0) / dolu.length) * 10) / 10 });
   };
   const kaydet = async () => {
+    for (const p of oturanlar) if (birakilan[p.id]) await kuruluyoraDon(p.id);
     for (const a of alanlar) {
       const v = taslak[a.id];
       if (v === undefined) continue;
@@ -216,10 +223,24 @@ export function AySonu({ onBitti }: { onBitti: () => void }) {
     onBitti();
   };
   const dolu = alanlar.filter((a) => deger(a.id) !== null).length;
+  const oturanlar = useCanli(async () => (await db.program.toArray()).filter((p) => !p.uzak && !p.sablon && p.durum === 'oturdu'), [], [] as ProgramRow[]);
+  const [birakilan, setBirakilan] = useState<Record<string, boolean>>({});
   return (
     <div className="rt-aysonu">
       <div className="rt-tek"><span className="ic">🗓</span><span className="tx"><b>{ayAdi(ay)} değerlendirmesi</b><small>{dolu}/{alanlar.length} alan</small></span></div>
       <p className="rt-muted">Her alan için içinden gelen sayıyı seç; doğru cevap yok. Geçen ayki değer yanında görünür.{soru > 20 ? ' Değerlendirme uzuyor; bazı alanları tek soruya döndürmeyi düşünebilirsin.' : ''}</p>
+      {oturanlar.length > 0 && (
+        <div className="rt-arac">
+          <h4>Oturmuş rutinlerin sürüyor mu?</h4>
+          {oturanlar.map((p) => (
+            <label key={p.id} className="rt-tik-sat">
+              <input type="checkbox" checked={!birakilan[p.id]} onChange={(e) => setBirakilan({ ...birakilan, [p.id]: !e.target.checked })} />
+              <span>{p.ikon ?? '🌱'} {p.ad}</span>
+            </label>
+          ))}
+          <p className="rt-muted">İşaretini kaldırdığın rutin &quot;kuruluyor&quot;a döner; kartları yarından Ajandam&apos;a geri gelir.</p>
+        </div>
+      )}
       <div className="rt-arac">
         {alanlar.map((a) => {
           const o = onceki(a.id);
@@ -241,8 +262,27 @@ export function AySonu({ onBitti }: { onBitti: () => void }) {
           );
         })}
       </div>
-      <button type="button" className="rt-btn primary rt-genis" disabled={!Object.keys(taslak).length} onClick={kaydet}>Kaydet</button>
+      <button type="button" className="rt-btn primary rt-genis" disabled={!Object.keys(taslak).length && !Object.values(birakilan).some(Boolean)} onClick={kaydet}>Kaydet</button>
       <p className="rt-muted">Bir önceki ay: {ayAdi(oncekiAy(ay))}. Değerlendirmeler hesabınla eşitlenir; yalnız sen görürsün.</p>
+    </div>
+  );
+}
+
+// ———————————————— "alışkanlık oldu mu?" önerisi ————————————————
+
+export function AliskanlikOnerisi() {
+  const adaylar = useCanli(oneriAdaylari, [], [] as Awaited<ReturnType<typeof oneriAdaylari>>);
+  const [bekle, setBekle] = useState(false);
+  const a = adaylar[0];
+  if (!a) return null;
+  return (
+    <div className="rt-aliskanlik">
+      <span className="ic">🌱</span>
+      <span className="tx"><b>{a.p.ikon ?? ''} {a.p.ad}</b> {a.hafta} haftadır neredeyse hiç aksamadı (%{Math.round(a.oran * 100)}). Alışkanlık oldu mu? Olduysa Ajandam&apos;dan kaldırırım; dengede yerini korur.</span>
+      <span className="ey">
+        <button type="button" className="rt-btn" disabled={bekle} onClick={() => oneriReddet(a.p.id)}>Henüz değil</button>
+        <button type="button" className="rt-btn primary" disabled={bekle} onClick={async () => { setBekle(true); await oturduIsaretle(a.p.id); setBekle(false); }}>Oturdu</button>
+      </span>
     </div>
   );
 }

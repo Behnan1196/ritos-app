@@ -5,7 +5,8 @@
 //  • Emeğin: son 4 haftanın kaçında, o alana etiketli rutinlerin kartlarından en az biri yapıldı (0–4).
 //    Kendiliğinden hesaplanır; puan değil.
 //  • Hissin: ay sonu öz değerlendirmesi (1–5). Kriterli alanda kriterlerin ortalaması.
-// (Oturmuş alışkanlıkların tabanı 4. adımda.)
+//  • Taban: alanına dokunan en az bir OTURMUŞ rutin varsa sabit 2 (ajandada izlenmese de alan boş görünmez).
+//    Grafikte toplam = min(4, taban + emek).
 // ————————————————————————————————————————————————————————————————
 
 import { db, type AlanDegerlendirmeRow, type ProgramRow, type YasamAlaniRow } from './db';
@@ -17,14 +18,18 @@ export const oncekiAy = (ay: string) => { const [y, m] = ay.split('-').map(Numbe
 const AY_AD = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 export const ayAdi = (ay: string, kisa = false) => { const a = AY_AD[Number(ay.slice(5, 7)) - 1] ?? ay; return kisa ? a.slice(0, 3) : a; };
 
-export interface AlanEmek { hafta: number[]; emek: number }   // hafta: son 4 hafta (eskiden yeniye) yapılan kart sayısı
+export interface AlanEmek { hafta: number[]; emek: number; taban: number; toplam: number; oturan: string[] } // hafta: son 4 hafta (eskiden yeniye) yapılan kart sayısı
 
 /** Her alan için son 4 haftanın yapılan sayıları ve emek (yapılan haftaların sayısı). */
 export async function emekHesapla(alanlar: YasamAlaniRow[]): Promise<Record<string, AlanEmek>> {
-  const programlar = (await db.program.toArray()).filter((p) => !p.uzak && !p.sablon && p.alanlar?.length);
+  const tum = (await db.program.toArray()).filter((p) => !p.uzak && !p.sablon && p.alanlar?.length);
+  const programlar = tum; // arşiv ve oturdu dahil: geçmiş işaretler emeğe sayılır
   const bas = tarihEkle(haftaBasi(bugun()), -21);
   const sonuc: Record<string, AlanEmek> = {};
-  for (const a of alanlar) sonuc[a.id] = { hafta: [0, 0, 0, 0], emek: 0 };
+  for (const a of alanlar) {
+    const oturan = tum.filter((p) => p.durum === 'oturdu' && p.alanlar!.includes(a.id)).map((p) => p.ad);
+    sonuc[a.id] = { hafta: [0, 0, 0, 0], emek: 0, taban: oturan.length ? 2 : 0, toplam: 0, oturan };
+  }
   if (!programlar.length) return sonuc;
   const progAlan = new Map<string, string[]>(programlar.map((p) => [p.id, p.alanlar!]));
   const kartlar = (await db.ajanda_kart.where('kaynak_modul').equals('program').toArray())
@@ -35,7 +40,10 @@ export async function emekHesapla(alanlar: YasamAlaniRow[]): Promise<Record<stri
     const hi = Math.min(3, Math.floor((tarihParse(r.tarih).getTime() - tarihParse(bas).getTime()) / (7 * 86400000)));
     for (const al of kartAlan.get(r.kart_id)!) if (sonuc[al]) sonuc[al].hafta[hi]++;
   }
-  for (const al of Object.keys(sonuc)) sonuc[al].emek = sonuc[al].hafta.filter((n) => n > 0).length;
+  for (const al of Object.keys(sonuc)) {
+    sonuc[al].emek = sonuc[al].hafta.filter((n) => n > 0).length;
+    sonuc[al].toplam = Math.min(4, sonuc[al].emek + sonuc[al].taban);
+  }
   return sonuc;
 }
 
