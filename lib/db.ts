@@ -183,8 +183,10 @@ export interface YasamAlaniRow {
 export interface AlanDegerlendirmeRow {
   id: string;
   alan_id: string;
-  deger: number;                 // 0..4 (Berbat..Çok iyi)
+  deger: number;                 // eski klasör alanlarında 0..4; 5 ekim yaşam alanlarında 1..5
   zaman: number;
+  ay?: string;                   // 5 ekim — 'YYYY-MM' (ay sonu değerlendirmesi; id = '<alan>|<ay>')
+  kriter?: number[];             // 5 ekim — kriterli alanda her kriterin puanı (1..5), deger = ortalaması
 }
 
 // ———————————————————————————————— v3 — 25 eylül: Gelenler + kişiler ————————————————————————————————

@@ -32,11 +32,12 @@ import { AKTIVITE, HIZLAR, beklenenKilo, beslenmeHesap, kiloDurumu, vkiEtiket, t
 import { HAZIR_OLCULER, OLC_ONEK, olcuBlok } from '@/lib/olcum';
 import { ALAN_IKONLARI, EN_FAZLA_GORUNEN, alanEkle as yAlanEkle, alanGuncelle, alanOner, alanSil, alanSirala, alanlar as yAlanlar, alanlariGaranti } from '@/lib/yasamAlani';
 import type { YasamAlaniRow } from '@/lib/db';
+import { AlanKarolari, AlanSayfasi, AySonu, DengeKarti } from './Rutinler';
 import { hazirKartlar, hazirSablonlariYenile, hazirSablonuAl, useHazirSablonlar, type HazirSablon } from '@/lib/hazirSablon';
 
 // 4 ekim (v6): üstte Planlar/Kütüphane düğmeleri yok. Telefonda ekranlar yığın gibi: liste → (kişi | alan | kütüphane),
 // her alt ekranın ilk satırı "‹ Geri  PLANLAR".
-type Ekran = 'liste' | 'hedef' | 'alan' | 'kut' | 'grup'; // grup (5 ekim): alan = grup id
+type Ekran = 'liste' | 'hedef' | 'alan' | 'kut' | 'grup' | 'yalan' | 'deg'; // grup: alan = grup id · yalan: yaşam alanı sayfası (alan = id) · deg: ay sonu değerlendirmesi
 type Dosya = 'plan' | 'gelisim' | 'bilgi';   // telefonda kişi dosyasının sekmesi
 type Sag = 'gelisim' | 'bilgi' | 'kut';       // geniş ekranda sağ bölme
 type AlanSek = 'malzeme' | 'sablon' | 'ayar';
@@ -137,7 +138,7 @@ function Planlar({ genis, kapsam }: { genis: boolean; kapsam: Kapsam }) {
   const [grupKur, setGrupKur] = useState(false);
   const [uyeDavet, setUyeDavet] = useState<string | null>(null); // hangi gruba
   const [kuruluyor, setKuruluyor] = useState<string | null>(null);
-  const [progForm, setProgForm] = useState<null | { id?: string }>(null);
+  const [progForm, setProgForm] = useState<null | { id?: string; etiket?: string[] }>(null);
   const [yeniBekle, setYeniBekle] = useState<string | null>(null); // yeni program listeye düşene kadar liste açılmasın
   const [kurHata, setKurHata] = useState<string | null>(null);
   const [davet, setDavet] = useState<string | null>(null);      // hangi alana davet
@@ -180,7 +181,7 @@ function Planlar({ genis, kapsam }: { genis: boolean; kapsam: Kapsam }) {
 
   const modallar = (
     <>
-      {progForm && <ProgramFormu id={progForm.id} onKapat={() => setProgForm(null)} onOlustu={(id) => { setProgForm(null); setYeniBekle(`p:${id}`); sec(`p:${id}`); }} />}
+      {progForm && <ProgramFormu id={progForm.id} etiket0={progForm.etiket} onKapat={() => setProgForm(null)} onOlustu={(id) => { setProgForm(null); setYeniBekle(`p:${id}`); sec(`p:${id}`); }} />}
       {davet && <DavetModal sabitDisiplin={davet} onKapat={() => { setDavet(null); setDavetYenile((n) => n + 1); }} />}
       {alanEkle && <AlanEkleModal onKapat={() => setAlanEkle(false)} onEklendi={() => setAlanEkle(false)} />}
       {grupKur && <GrupKurModal onKapat={() => setGrupKur(false)} onKuruldu={(id) => { setGrupKur(false); git('grup', id); }} />}
@@ -198,8 +199,12 @@ function Planlar({ genis, kapsam }: { genis: boolean; kapsam: Kapsam }) {
       onDavet={setDavet} onDavetIptal={async (kod) => { await davetSil(kod); setDavetYenile((n) => n + 1); }} onAlanEkle={() => setAlanEkle(true)}
       acikAlan={ekran === 'alan' || ekran === 'grup' ? alan : null} kutAcik={ekran === 'kut'}
       onAlan={(a) => git('alan', a)} onKutuphane={() => git('kut')}
-      gruplar={gruplar} onGrup={(id) => git('grup', id)} onGrupKur={() => setGrupKur(true)} onUyeDavet={setUyeDavet} />
+      gruplar={gruplar} onGrup={(id) => git('grup', id)} onGrupKur={() => setGrupKur(true)} onUyeDavet={setUyeDavet}
+      onYasamAlani={(id) => git('yalan', id)} onDegerlendir={() => git('deg')} />
   );
+  const yasamEkrani = ekran === 'yalan' && alan
+    ? <AlanSayfasi alanId={alan} onRutin={(pid) => sec(`p:${pid}`)} onYeniRutin={() => setProgForm({ etiket: [alan] })} onDegerlendir={() => git('deg')} />
+    : ekran === 'deg' ? <AySonu onBitti={() => git('liste')} /> : null;
   const grupDosyasi = ekran === 'grup' && alan && (
     <GrupDosyasi id={alan} hedefler={hedefler} adaylar={adaylar} onSec={(x) => sec(x.id)} onAday={adaySec} onUyeDavet={() => setUyeDavet(alan)} onBitti={() => git('liste')} />
   );
@@ -212,6 +217,7 @@ function Planlar({ genis, kapsam }: { genis: boolean; kapsam: Kapsam }) {
     if (ekran === 'kut') return <div className="rt-atolye-plan">{geri}<Kutuphane />{modallar}</div>;
     if (ekran === 'alan' && alan) return <div className="rt-atolye-plan">{geri}<AlanDosyasi alan={alan} />{modallar}</div>;
     if (grupDosyasi) return <div className="rt-atolye-plan">{geri}{grupDosyasi}{modallar}</div>;
+    if (yasamEkrani) return <div className="rt-atolye-plan">{geri}{yasamEkrani}{modallar}</div>;
     if (ekran === 'liste' || (!h && !kuruluyor && !yeniBekle)) {
       return (
         <div className="rt-atolye-plan">
@@ -287,7 +293,7 @@ function Planlar({ genis, kapsam }: { genis: boolean; kapsam: Kapsam }) {
   }
 
   // ———— Geniş ekran: solda liste, ortada plan / alan dosyası / kütüphane, sağda dosya bölmesi ————
-  const ortaPlan = ekran !== 'alan' && ekran !== 'kut' && ekran !== 'grup';
+  const ortaPlan = ekran !== 'alan' && ekran !== 'kut' && ekran !== 'grup' && !yasamEkrani;
   return (
     <div className="rt-atolye-plan">
       <aside className="rt-atolye-sol" aria-label="Plan seçimi">{secici}</aside>
@@ -295,6 +301,7 @@ function Planlar({ genis, kapsam }: { genis: boolean; kapsam: Kapsam }) {
         {ekran === 'kut' ? <div className="rt-orta-dar"><Kutuphane /></div>
           : ekran === 'alan' && alan ? <div className="rt-orta-dar"><AlanDosyasi alan={alan} /></div>
           : grupDosyasi ? <div className="rt-orta-dar">{grupDosyasi}</div>
+          : yasamEkrani ? <div className="rt-orta-dar">{yasamEkrani}</div>
           : (
             <>
               {kuruluyor && <p className="rt-muted">Hazırlanıyor…</p>}
@@ -698,13 +705,14 @@ function GeriBildirim({ h, haftaBas, kartlar, programId, hicGonderilmedi }: { h:
 
 const kucuk = (x: string) => x.toLocaleLowerCase('tr');
 
-function HedefSecici({ kapsam, hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, onAday, onYeniProgram, alanlar, bekleyen, sonlananlar, onDavet, onDavetIptal, onAlanEkle, acikAlan, kutAcik, onAlan, onKutuphane, gruplar, onGrup, onGrupKur, onUyeDavet }: {
+function HedefSecici({ kapsam, hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, onAday, onYeniProgram, alanlar, bekleyen, sonlananlar, onDavet, onDavetIptal, onAlanEkle, acikAlan, kutAcik, onAlan, onKutuphane, gruplar, onGrup, onGrupKur, onUyeDavet, onYasamAlani, onDegerlendir }: {
   kapsam: Kapsam; hedefler: Hedef[]; adaylar: Aday[]; seciliId: string | null; kompakt: boolean; kuruluyor: string | null;
   onSec: (h: Hedef) => void; onAday: (a: Aday) => void; onYeniProgram: () => void;
   alanlar: string[]; bekleyen: DavetSatir[]; sonlananlar: IliskiRow[];
   onDavet: (disiplin: string) => void; onDavetIptal: (kod: string) => void; onAlanEkle: () => void;
   acikAlan: string | null; kutAcik: boolean; onAlan: (alan: string) => void; onKutuphane: () => void;
   gruplar: AileRow[]; onGrup: (id: string) => void; onGrupKur: () => void; onUyeDavet: (grup: string) => void;
+  onYasamAlani: (id: string) => void; onDegerlendir: () => void;
 }) {
   const dn = useDanismanlik();
   const [ara, setAra] = useState('');
@@ -712,7 +720,7 @@ function HedefSecici({ kapsam, hedefler, adaylar, seciliId, kompakt, kuruluyor, 
   useEffect(() => { if (kapsam === 'kendim') alanlariGaranti().catch(() => {}); }, [kapsam]);
   const yalanlar = useCanli(yAlanlar, [], [] as YasamAlaniRow[]);
   const gorunurAlan = yalanlar.filter((a) => !a.gizli);
-  const [suz, setSuz] = useState<string | null>(null);
+  const suz = null as string | null; // 3. adım: karo artık alan sayfasını açar (süzme alan sayfasında)
   const [alanDuzen, setAlanDuzen] = useState(false);
   const [acik, setAcik] = useState<Record<string, boolean>>({});
   const [sonAcik, setSonAcik] = useState<Record<string, boolean>>({});
@@ -756,18 +764,10 @@ function HedefSecici({ kapsam, hedefler, adaylar, seciliId, kompakt, kuruluyor, 
       {!kompakt && <p className="rt-ekran-bas">{KAPSAM_AD[kapsam]}</p>}
       {kapsam === 'kendim' && gorunurAlan.length > 0 && (
         <div className="rt-alan-blok">
-          <div className="rt-alan-karolar">
-            {gorunurAlan.map((a) => {
-              const say = hedefler.filter((x) => x.etiket?.includes(a.id)).length;
-              return (
-                <button key={a.id} type="button" className={`rt-alan-karo${suz === a.id ? ' on' : ''}${say === 0 ? ' bos' : ''}`} aria-pressed={suz === a.id} title={a.aciklama} onClick={() => setSuz(suz === a.id ? null : a.id)}>
-                  <span className="ic">{a.ikon}</span><span className="ad">{a.ad}</span><span className="say">{say || '·'}</span>
-                </button>
-              );
-            })}
-          </div>
+          <DengeKarti onDegerlendir={onDegerlendir} />
+          <AlanKarolari onAlan={onYasamAlani} kompakt={kompakt} />
           <div className="rt-alan-alt">
-            {suz ? <span className="rt-muted">{yalanlar.find((a) => a.id === suz)?.ad} alanına dokunan rutinler · <button type="button" className="rt-linkbtn" onClick={() => setSuz(null)}>tümü</button></span> : <span className="rt-muted">Alana dokun: o alana dokunan rutinler süzülür.</span>}
+            <span className="rt-muted">Alana dokun: değerlendirmesi ve rutinleri.</span>
             <button type="button" className="rt-linkbtn" onClick={() => setAlanDuzen(true)}>Alanları düzenle</button>
           </div>
         </div>
@@ -1042,12 +1042,12 @@ function AlanlariDuzenle({ onKapat }: { onKapat: () => void }) {
 
 // ———————————————— Kişisel program: oluştur / düzenle (4 ekim) ————————————————
 
-function ProgramFormu({ id, onKapat, onOlustu }: { id?: string; onKapat: () => void; onOlustu: (id: string) => void }) {
+function ProgramFormu({ id, etiket0, onKapat, onOlustu }: { id?: string; etiket0?: string[]; onKapat: () => void; onOlustu: (id: string) => void }) {
   const p = useCanli(async () => (id ? (await db.program.get(id)) ?? null : null), [id], null as ProgramRow | null);
   const [ad, setAd] = useState('');
   const [amac, setAmac] = useState('');
   const [ikon, setIkon] = useState<string | null>(null); // null = ada göre öneri
-  const [etiket, setEtiket] = useState<string[]>([]);
+  const [etiket, setEtiket] = useState<string[]>(etiket0 ?? []);
   const [hazir, setHazir] = useState(!id);
   useEffect(() => { if (p && !hazir) { setAd(p.ad); setAmac(p.amac); setIkon(p.ikon ?? null); setEtiket(p.alanlar ?? []); setHazir(true); } }, [p, hazir]);
   useEffect(() => { alanlariGaranti().catch(() => {}); }, []);

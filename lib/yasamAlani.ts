@@ -92,3 +92,15 @@ export function alanOner(ad: string): string[] {
   const a = ` ${ad.toLocaleLowerCase('tr')} `;
   return Array.from(new Set(ONERI.filter(([k]) => a.includes(k)).flatMap(([, v]) => v))).map(hazirId);
 }
+
+// Hazır alanlar için önerilen kriterler (kriterli değerlendirme açılınca gelir; kullanıcı değiştirir).
+export const ONERILEN_KRITER: Record<string, string[]> = {
+  hareket: ['Haftada yeterince hareket ediyorum', 'Gün içinde uzun süre oturmuyorum', 'Bedenim güçlü ve esnek hissediyor'],
+  beslenme: ['Düzenli ve dengeli yiyorum', 'Yeterince su içiyorum', 'Ne yediğimin farkındayım'],
+  uyku: ['Dinlenmiş uyanıyorum', 'Uyku saatim düzenli', 'Kolay uykuya dalıyorum'],
+  zihin: ['Stresle baş edebiliyorum', 'Kendime sakin anlar ayırıyorum', 'Duygularımı fark ediyorum'],
+  sosyal: ['Yakınlarımla yeterince vakit geçiriyorum', 'Derdimi anlatabileceğim biri var', 'Yalnız hissetmiyorum'],
+  ogrenme: ['Yeni bir şey öğreniyorum', 'Merakımı besliyorum'],
+  keyif: ['Kendime keyif veren şeylere vakit ayırıyorum', 'Gülüyor, eğleniyorum'],
+  anlam: ['Yaptıklarım bana önemli geliyor', 'Kendimden büyük bir şeye katkı veriyorum'],
+};

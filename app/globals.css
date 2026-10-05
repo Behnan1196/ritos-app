@@ -1198,3 +1198,40 @@ textarea.rt-inp{font-family:inherit;}
 .rt-alan-duzen-sat .tx small{color:var(--muted);font-size:11.5px;}
 .rt-alan-duzen-sat.gizli .ic,.rt-alan-duzen-sat.gizli .tx{opacity:.45;}
 .rt-alan-duzen-sat .rt-ikon:disabled{opacity:.3;cursor:default;}
+
+/* Rutinlerim — denge, alan sayfası, ay sonu (5 ekim, 3. adım) */
+.rt-alan-karo .nok{display:flex;gap:2px;margin-top:1px;}
+.rt-alan-karo .nok i{width:6px;height:6px;border-radius:50%;background:var(--line);}
+.rt-alan-karo .nok i.d{background:var(--green);}
+.rt-alan-karolar.kompakt{grid-template-columns:repeat(2,1fr);}
+.rt-denge{display:grid;grid-template-columns:156px 1fr;gap:10px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px;}
+.rt-radar{width:156px;height:156px;display:block;}
+.rt-denge-sag{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:12px;}
+.rt-denge-sag > b{font-size:14px;}
+.rt-lejant{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:11.5px;}
+.rt-lejant i{display:inline-block;width:11px;height:11px;border-radius:3px;}
+.rt-lejant i.emek{background:var(--green2);border:1.5px solid var(--green);}
+.rt-lejant i.his{border:2px dashed #4f7fa8;}
+.rt-denge-not{font-size:12px;line-height:1.4;}
+.rt-denge-sag .rt-linkbtn{align-self:flex-start;font-size:12.5px;}
+.rt-deg-uyari{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#fbf1dc;border-radius:12px;padding:8px 10px;font-size:13px;}
+.rt-deg-uyari span{flex:1 1 180px;}
+.rt-deg-uyari b{color:#9a6b1f;}
+@media (max-width:360px){.rt-denge{grid-template-columns:1fr;justify-items:center;}}
+.rt-puan{display:flex;gap:6px;}
+.rt-puan button{flex:1;border:1px solid var(--line);background:#fff;border-radius:10px;padding:7px 0;font:inherit;font-weight:800;font-size:15px;cursor:pointer;color:inherit;}
+.rt-puan button.on{background:var(--green);border-color:var(--green);color:#fff;}
+.rt-puan.kucuk button{padding:4px 0;font-size:13px;border-radius:8px;}
+.rt-yalan,.rt-aysonu{display:flex;flex-direction:column;gap:10px;}
+.rt-yalan-gecmis{display:flex;align-items:flex-end;gap:8px;height:60px;margin:8px 0 4px;}
+.rt-yalan-gecmis div{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;color:var(--muted);max-width:56px;}
+.rt-yalan-gecmis i{width:100%;max-width:28px;border-radius:5px 5px 2px 2px;background:#4f7fa8;}
+.rt-yalan-hafta{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;font-size:11px;color:var(--muted);}
+.rt-yalan-hafta b{display:block;font-size:17px;color:var(--ink,#2c2a24);font-variant-numeric:tabular-nums;}
+.rt-kriterler{display:flex;flex-direction:column;gap:8px;}
+.rt-kriter{display:flex;flex-direction:column;gap:4px;font-size:13px;padding-left:4px;}
+.rt-aysonu-sat{display:flex;flex-direction:column;gap:6px;padding:8px 0;border-bottom:1px solid var(--line);}
+.rt-aysonu-sat:last-child{border-bottom:0;}
+.rt-aysonu-sat .ust{display:flex;align-items:center;gap:8px;}
+.rt-aysonu-sat .ust small{margin-left:auto;color:var(--muted);font-size:11.5px;}
+.rt-aysonu-sat .rt-linkbtn{align-self:flex-start;font-size:12.5px;}
