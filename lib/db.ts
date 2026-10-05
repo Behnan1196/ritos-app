@@ -119,6 +119,7 @@ export interface ProgramRow {
   durum_tarih?: string;          // durum ne zaman değişti (YYYY-MM-DD)
   kaliplar?: Omit<AjandaKartRow, 'id' | 'guncellendi'>[];
   oneri_ret?: string;            // "alışkanlık oldu mu?" önerisine "henüz değil" denen gün
+  malzeme?: string | null;       // 5 ekim — bağlı Kütüphane koleksiyonu (klasor id): Kütüphaneden eklerken önce gelir
   plan?: boolean;                // 28 eylül — kişisel program Ajanda'dan planlanır: tarihler mutlak, kendiliğinden bitmez
   hafta_notlari?: Record<string, { metin: string; zaman: number }>; // 3 ekim — koçun haftalık değerlendirmesi (anahtar: haftanın pazartesisi)
   uzak?: UzakProgram | null;     // D5/D6 — danışana atanmış (koç tarafı) ya da koçtan gelen (danışan tarafı)
@@ -168,6 +169,9 @@ export interface KlasorRow {
   kriterler?: string[];          // yalnız alanda
   aciklama?: string;
   guncellendi?: number;
+  // 5 ekim — Kütüphane koleksiyonu (tek seviye, kök klasör): simge ve alan etiketleri (kartlar devralır).
+  ikon?: string;
+  alanlar?: string[];
 }
 
 // Alan öz değerlendirmesi — tarihiyle saklanır (denge zamanla izlenebilsin), şimdilik sonuncusu gösterilir.
@@ -353,6 +357,7 @@ export interface KutuphaneKartRow {
   sira: number;
   olusturuldu: number;
   guncellendi: number;
+  konular?: string[];            // 5 ekim — koleksiyon içi konu etiketleri (bir kart birden çok konuda)
 }
 
 // Notlar (30 eylül) — stilli hızlı notlar (Tiptap belgesi, JSON). Uçtan uca şifreli senkronlanır.

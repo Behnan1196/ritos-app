@@ -1251,3 +1251,25 @@ textarea.rt-inp{font-family:inherit;}
 .rt-aliskanlik .ey{display:flex;gap:6px;margin-left:auto;}
 .rt-tik-sat{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px;}
 .rt-tik-sat input{width:18px;height:18px;accent-color:var(--green);}
+
+/* Kütüphane yenilemesi (5 ekim, 5. adım) */
+.rt-kut-suz{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0;align-items:center;}
+.rt-kut-suz::-webkit-scrollbar{display:none;}
+.rt-kut-suz .rt-chip{flex:0 0 auto;}
+.rt-kut-suz .rt-chip small{opacity:.75;font-weight:500;}
+.rt-kut-suz .ayrac{flex:0 0 1px;height:18px;background:var(--line);margin:0 2px;}
+.rt-kut-bolum{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:10px 0 2px;}
+.rt-kut-koller{display:flex;flex-direction:column;gap:6px;}
+.rt-kut-kol,.rt-kut-kart{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:9px 12px;text-align:left;width:100%;cursor:pointer;font:inherit;color:inherit;}
+.rt-kut-kart{border:0;border-bottom:1px solid var(--line);border-radius:0;padding:8px 2px;background:none;}
+.rt-kut-kart:last-of-type{border-bottom:0;}
+.rt-kut-kol.bos{background:transparent;border-style:dashed;}
+.rt-kut-kol .ic,.rt-kut-kart .ic{font-size:20px;flex:0 0 auto;}
+.rt-kut-kol .tx,.rt-kut-kart .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.rt-kut-kol small,.rt-kut-kart small{color:var(--muted);font-size:12px;}
+.rt-kut-kol .say{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;}
+.rt-konu{display:inline-block;font-size:10.5px;font-weight:700;color:#4f7fa8;background:#e6eef6;border-radius:7px;padding:0 6px;margin-right:4px;}
+.rt-kol{display:flex;flex-direction:column;gap:8px;}
+.rt-kut-konular{display:flex;flex-direction:column;gap:6px;margin:8px 0;}
+.rt-konu-inp{width:120px;flex:0 0 auto;padding:4px 8px;font-size:13px;}
+.rt-aliskanlik.ajanda{background:var(--soft,#efe8da);}

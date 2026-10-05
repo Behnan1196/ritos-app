@@ -1,227 +1,267 @@
 'use client';
 
-// Kütüphane (30 eylül) — klasör ağacı + tarihsiz kartlar. Taşıma kes/yapıştır ile.
-// Motor: lib/kutuphane.ts.
+// ————————————————————————————————————————————————————————————————
+// Kütüphane (5 ekim yenilemesi) — malzeme deposu: topla, sakla, tekrar kullan.
+//  • Koleksiyonlar tek seviye ("hangi konunun malzemesi?"); içinde kartlar konu etiketiyle süzülür.
+//  • Koleksiyona alan etiketi verilir, kartları devralır; bir rutin koleksiyonu "malzeme" olarak bağlar.
+//  • Arama + tür + alan süzgeci önde. Hafta şablonları da burada.
+//  • Rutinler Rutinlerim'de, notlar Home'da — burada değil.
+// Motor: lib/kutuphane.ts. Eski alt klasörler ilk açılışta konu etiketine dönüşür (kutuphaneGoc).
+// ————————————————————————————————————————————————————————————————
 
 import React, { useEffect, useState } from 'react';
 import { useCanli } from '@/lib/canli';
-import { db, type AjandaKartRow, type KlasorRow, type KutuphaneKartRow, type ProgramRow } from '@/lib/db';
+import { db, type AjandaKartRow, type KlasorRow, type KutuphaneKartRow, type ProgramRow, type YasamAlaniRow } from '@/lib/db';
 import {
-  ajandayaAl, klasorAdDegistir, klasorOlustur, klasorSilIcerikUste, klasorTasi, kutKartEkle, kutKartGuncelle, kutKartSil, kutKartTasi,
-  kutKullanimlari, type KutKullanim,
+  ajandayaAl, koleksiyonGuncelle, koleksiyonlar, koleksiyonOlustur, koleksiyonSil, kutKartEkle, kutKartGuncelle, kutKartKonular, kutKartSil, kutKartTasi,
+  kutKullanimlari, kutuphaneGoc, type KutKullanim,
 } from '@/lib/kutuphane';
-import { EN_FAZLA_SEVIYE, seviye } from '@/lib/alan';
+import { alanlar as yAlanlar, alanlariGaranti, ALAN_IKONLARI } from '@/lib/yasamAlani';
 import { GUN_KISA, bugun, tarihParse } from '@/lib/paket';
 import { BlokGoster, Modal, OnayKutusu } from './ortak';
 import { KartEditor } from './KartEditor';
-import { ProgramEkrani } from './KisiselGelisim';
-import { programiSil } from '@/lib/danismanlik';
-
-type Kesilen = { tur: 'kart' | 'klasor' | 'program'; id: string; ad: string } | null;
-const ACIK_ANAH = 'ritos-kut-acik';
+import { HaftaSablonlari } from './DanisanAjanda';
 
 const kisaTarih = (t: string) => tarihParse(t).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
 const kartIkon = (k: KutuphaneKartRow) => (k.bloklar.some((b) => b.tur === 'video') ? '🎬' : k.bloklar.some((b) => b.tur === 'sayi') ? '📏' : '📄');
+const kucuk = (x: string) => x.toLocaleLowerCase('tr');
+const KOLEKSIYON_IKON = ['📁', '🎸', '📐', '🧘', '🍳', '🤝', '🏃', '📖', '🎨', '🌿', '💼', '🎵', '🧠', '🏡', '✈️', '🐾'];
+type Tur = 'hepsi' | 'kart' | 'sablon';
 
 export default function Kutuphane() {
-  const klasorler = useCanli(() => db.klasor.toArray(), [], [] as KlasorRow[]);
+  useEffect(() => { kutuphaneGoc().catch(() => {}); alanlariGaranti().catch(() => {}); }, []);
+  const kols = useCanli(koleksiyonlar, [], [] as KlasorRow[]);
   const kartlar = useCanli(() => db.kutuphane_kart.toArray(), [], [] as KutuphaneKartRow[]);
-  const programlar = useCanli(() => db.program.filter((p) => !p.uzak && !p.sablon).toArray(), [], [] as ProgramRow[]);
-  const kullanim = useCanli(kutKullanimlari, [], {} as Record<string, KutKullanim>);
-  const [acik, setAcik] = useState<Set<string>>(new Set());
-  useEffect(() => { try { setAcik(new Set(JSON.parse(localStorage.getItem(ACIK_ANAH) ?? '[]'))); } catch { /* yok say */ } }, []);
-  const ac = (id: string) => setAcik((s) => {
-    const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id);
-    try { localStorage.setItem(ACIK_ANAH, JSON.stringify(Array.from(n))); } catch { /* yok say */ }
-    return n;
-  });
-  const [kesilen, setKesilen] = useState<Kesilen>(null);
-  const [hata, setHata] = useState<string | null>(null);
-  const [yeniKlasor, setYeniKlasor] = useState<{ ust: string | null } | null>(null);
-  const [yeniKart, setYeniKart] = useState<{ klasor: string | null } | null>(null);
+  const rutinler = useCanli(() => db.program.filter((p) => !p.uzak && !p.sablon && !!p.malzeme).toArray(), [], [] as ProgramRow[]);
+  const alanlar = useCanli(yAlanlar, [], [] as YasamAlaniRow[]).filter((a) => !a.gizli);
+  const [kol, setKol] = useState<string | null>(null);           // açık koleksiyon (null = liste; '-' = koleksiyonsuz)
+  const [ara, setAra] = useState('');
+  const [tur, setTur] = useState<Tur>('hepsi');
+  const [alan, setAlan] = useState<string | null>(null);
+  const [yeniKol, setYeniKol] = useState(false);
+  const [yeniKart, setYeniKart] = useState(false);
   const [kartAc, setKartAc] = useState<KutuphaneKartRow | null>(null);
-  const [klasorMenu, setKlasorMenu] = useState<KlasorRow | null>(null);
-  const [program, setProgram] = useState<string | null>(null);
-  const [programMenu, setProgramMenu] = useState<ProgramRow | null>(null);
 
-  async function yapistir(hedef: string | null) {
-    if (!kesilen) return;
-    setHata(null);
-    try {
-      if (kesilen.tur === 'kart') await kutKartTasi(kesilen.id, hedef);
-      else if (kesilen.tur === 'klasor') await klasorTasi(kesilen.id, hedef);
-      else await db.program.update(kesilen.id, { klasor_id: hedef, guncellendi: Date.now() });
-      if (hedef) setAcik((s) => new Set(s).add(hedef));
-      setKesilen(null);
-    } catch (e) { setHata((e as Error).message); }
+  const kolAd = (id: string | null) => (id ? kols.find((k) => k.id === id) : undefined);
+  const kartAlanlari = (k: KutuphaneKartRow) => kolAd(k.klasor_id)?.alanlar ?? [];
+  const q = kucuk(ara.trim());
+  const suzuluyor = !!q || !!alan;
+  const eslesen = kartlar.filter((k) => (!q || kucuk(k.ad).includes(q) || (k.konular ?? []).some((x) => kucuk(x).includes(q)) || kucuk(kolAd(k.klasor_id)?.ad ?? '').includes(q))
+    && (!alan || kartAlanlari(k).includes(alan))).sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
+
+  if (kol) {
+    return (
+      <div className="side-content rt-kut" style={{ height: '100%', overflowY: 'auto' }}>
+        <Koleksiyon kolIdler={new Set(kols.map((c) => c.id))} kartlar={kartlar} kol={kol === '-' ? null : kolAd(kol) ?? null} alanlar={alanlar}
+          rutinler={rutinler.filter((r) => r.malzeme === kol)} onGeri={() => setKol(null)} onKart={setKartAc} />
+        {kartAc && <KutKartDetay k={kartAc} kols={kols} onKapat={() => setKartAc(null)} />}
+      </div>
+    );
   }
 
-  if (program) return <div className="side-content" style={{ height: '100%', overflowY: 'auto' }}><ProgramEkrani programId={program} onGeri={() => setProgram(null)} /></div>;
-
-  const icerik = (ust: string | null, derin: number): React.ReactNode => {
-    const altlar = klasorler.filter((k) => k.ust_id === ust).sort((a, b) => (a.sira ?? 0) - (b.sira ?? 0) || a.ad.localeCompare(b.ad, 'tr'));
-    const ks = kartlar.filter((k) => k.klasor_id === ust).sort((a, b) => a.sira - b.sira);
-    const ps = programlar.filter((p) => (p.klasor_id ?? null) === ust);
-    return (
-      <>
-        {altlar.map((k) => {
-          const a = acik.has(k.id);
-          const say = kartlar.filter((x) => x.klasor_id === k.id).length + klasorler.filter((x) => x.ust_id === k.id).length;
-          return (
-            <div key={k.id} className="rt-kut-dugum">
-              <div className={`rt-kut-satir klasor${kesilen?.id === k.id ? ' kesik' : ''}`} style={{ paddingLeft: 6 + derin * 16 }}>
-                <button type="button" className="ad" onClick={() => ac(k.id)}>
-                  <span className="ok">{a ? '▾' : '▸'}</span><span className="iko">📁</span><span className="nm">{k.ad}</span>{say > 0 && <span className="say">{say}</span>}
-                </button>
-                {kesilen && kesilen.id !== k.id && <button type="button" className="rt-kut-yap" onClick={() => yapistir(k.id)}>📋 Buraya</button>}
-                <button type="button" className="rt-ikon" onClick={() => setKlasorMenu(k)} aria-label={`${k.ad} klasörü seçenekleri`}>⋯</button>
-              </div>
-              {a && icerik(k.id, derin + 1)}
-            </div>
-          );
-        })}
-        {ps.map((p) => (
-          <div key={p.id} className={`rt-kut-satir${kesilen?.id === p.id ? ' kesik' : ''}`} style={{ paddingLeft: 6 + derin * 16 + 18 }}>
-            <button type="button" className="ad" onClick={() => setProgram(p.id)}><span className="iko">{p.ikon ?? '🌱'}</span><span className="nm">{p.ad}</span><span className="rt-muted"> program</span></button>
-            <button type="button" className="rt-ikon" onClick={() => setProgramMenu(p)} aria-label={`${p.ad} programı seçenekleri`}>⋯</button>
-          </div>
-        ))}
-        {ks.map((k) => {
-          const u = kullanim[k.id];
-          return (
-            <div key={k.id} className={`rt-kut-satir${kesilen?.id === k.id ? ' kesik' : ''}`} style={{ paddingLeft: 6 + derin * 16 + 18 }}>
-              <button type="button" className="ad" onClick={() => setKartAc(k)}>
-                <span className="iko">{kartIkon(k)}</span><span className="nm">{k.ad}</span>
-                {u && (u.yapildi > 0 || u.siradaki) && <span className="rt-kut-meta">{u.yapildi ? `${u.yapildi}×` : ''}{u.siradaki ? ` 📅 ${u.siradaki === bugun() ? 'bugün' : kisaTarih(u.siradaki)}` : ''}</span>}
-              </button>
-            </div>
-          );
-        })}
-        {derin > 0 && !altlar.length && !ks.length && !ps.length && <p className="rt-muted rt-kut-bos" style={{ paddingLeft: 6 + derin * 16 + 18 }}>Boş</p>}
-      </>
-    );
-  };
-
-  const bos = !klasorler.length && !kartlar.length && !programlar.length;
+  const bos = !kols.length && !kartlar.length;
   return (
     <div className="side-content rt-kut" style={{ height: '100%', overflowY: 'auto' }}>
       <div className="rt-kut-bas">
         <h4>📚 Kütüphane</h4>
-        <button type="button" className="rt-btn" onClick={() => setYeniKlasor({ ust: null })}>＋ Klasör</button>
-        <button type="button" className="rt-btn primary" onClick={() => setYeniKart({ klasor: null })}>＋ Kart</button>
+        <button type="button" className="rt-btn" onClick={() => setYeniKol(true)}>＋ Koleksiyon</button>
+        <button type="button" className="rt-btn primary" onClick={() => setYeniKart(true)}>＋ Kart</button>
       </div>
-      {kesilen && (
-        <div className="rt-kut-kes">
-          <span>✂️ <b>{kesilen.ad}</b> taşınıyor — hedef klasörde &quot;📋 Buraya&quot;ya bas.</span>
-          <button type="button" className="rt-btn" onClick={() => yapistir(null)}>En üste</button>
-          <button type="button" className="rt-btn" onClick={() => setKesilen(null)}>Vazgeç</button>
-        </div>
-      )}
-      {hata && <p className="rt-hata" onClick={() => setHata(null)}>⚠ {hata}</p>}
       {bos && (
         <p className="rt-muted rt-kut-giris">
-          Beğendiğin videoları, anlatımları, egzersizleri kart olarak topla; klasörlerde tasnif et (örn. Müzik › Gitar, TYT › Matematik).
-          Bir kartı istediğin gün &quot;Ajandaya al&quot; ile uygula. Ajanda&apos;daki bir kartı da detayından &quot;Kütüphaneye kaydet&quot; ile buraya alabilirsin.
+          Beğendiğin videoları, anlatımları, egzersizleri kart olarak topla; koleksiyonlarda sakla (örn. Gitar, LGS Matematik), içinde konu etiketiyle ayır.
+          Bir kartı rutinine ya da istediğin güne ekle. Ajandam&apos;daki bir kartı da detayından &quot;Kütüphaneye kaydet&quot; ile buraya alabilirsin.
         </p>
       )}
-      <div className="rt-kut-agac">{icerik(null, 0)}</div>
+      {!bos && <input className="rt-inp" type="search" placeholder="Kütüphanede ara (kart, konu, koleksiyon)" value={ara} onChange={(e) => setAra(e.target.value)} />}
+      {!bos && (
+        <div className="rt-kut-suz">
+          {([['hepsi', 'Hepsi'], ['kart', 'Kartlar'], ['sablon', 'Hafta şablonları']] as [Tur, string][]).map(([k, a]) => (
+            <button key={k} type="button" className={`rt-chip${tur === k ? ' on' : ''}`} onClick={() => setTur(k)}>{a}</button>
+          ))}
+          {tur !== 'sablon' && alanlar.length > 0 && <span className="ayrac" />}
+          {tur !== 'sablon' && alanlar.map((a) => (
+            <button key={a.id} type="button" className={`rt-chip${alan === a.id ? ' on' : ''}`} aria-pressed={alan === a.id} title={a.ad} onClick={() => setAlan(alan === a.id ? null : a.id)}>{a.ikon}</button>
+          ))}
+        </div>
+      )}
 
-      {yeniKlasor && <KlasorAdModal baslik="Yeni klasör" onKapat={() => setYeniKlasor(null)} onKaydet={async (ad) => { const id = await klasorOlustur(ad, yeniKlasor.ust); if (yeniKlasor.ust) setAcik((s) => new Set(s).add(yeniKlasor.ust!)); return id; }} />}
-      {yeniKart && (
-        <KartEditor tarih={bugun()} tarihsiz baslik="Kütüphaneye kart" onKapat={() => setYeniKart(null)}
-          onPlan={async (t) => { await kutKartEkle(yeniKart.klasor, t); if (yeniKart.klasor) setAcik((s) => new Set(s).add(yeniKart.klasor!)); }} />
+      {tur !== 'sablon' && suzuluyor && (
+        <div className="rt-arac">
+          <h4>{eslesen.length} kart{alan ? ` · ${alanlar.find((a) => a.id === alan)?.ad}` : ''}</h4>
+          {eslesen.map((k) => <KartSatiri key={k.id} k={k} kol={kolAd(k.klasor_id)?.ad} onAc={() => setKartAc(k)} />)}
+          {!eslesen.length && <p className="rt-muted">Eşleşen kart yok.{alan ? ' Alan süzgeci koleksiyonun alanlarına bakar; koleksiyona alan vermeyi dene.' : ''}</p>}
+        </div>
       )}
-      {kartAc && <KutKartDetay k={kartAc} onKapat={() => setKartAc(null)} onKes={() => { setKesilen({ tur: 'kart', id: kartAc.id, ad: kartAc.ad }); setKartAc(null); }} />}
-      {programMenu && (
-        <ProgramMenu
-          p={programMenu}
-          onKapat={() => setProgramMenu(null)}
-          onAc={() => { setProgram(programMenu.id); setProgramMenu(null); }}
-          onKes={() => { setKesilen({ tur: 'program', id: programMenu.id, ad: programMenu.ad }); setProgramMenu(null); }}
-        />
+
+      {tur !== 'sablon' && !suzuluyor && !bos && (
+        <>
+          <div className="rt-kut-bolum"><span>Koleksiyonlar</span></div>
+          <div className="rt-kut-koller">
+            {kols.map((c) => {
+              const n = kartlar.filter((k) => k.klasor_id === c.id).length;
+              const bagli = rutinler.filter((r) => r.malzeme === c.id);
+              return (
+                <button key={c.id} type="button" className="rt-kut-kol" onClick={() => setKol(c.id)}>
+                  <span className="ic">{c.ikon ?? '📁'}</span>
+                  <span className="tx"><b>{c.ad}</b><small>{(c.alanlar ?? []).map((a) => alanlar.find((x) => x.id === a)?.ikon ?? '').join(' ')}{bagli.length ? ` · 🔗 ${bagli.map((r) => r.ad).join(', ')}` : ''}</small></span>
+                  <span className="say">{n}</span><span className="chev">›</span>
+                </button>
+              );
+            })}
+            {kartlar.some((k) => !k.klasor_id || !kolAd(k.klasor_id)) && (
+              <button type="button" className="rt-kut-kol bos" onClick={() => setKol('-')}>
+                <span className="ic">🗂</span><span className="tx"><b>Koleksiyonsuz kartlar</b><small>Gelenler&apos;den ve Ajandam&apos;dan kaydedilenler</small></span>
+                <span className="say">{kartlar.filter((k) => !k.klasor_id || !kolAd(k.klasor_id)).length}</span><span className="chev">›</span>
+              </button>
+            )}
+          </div>
+        </>
       )}
-      {klasorMenu && (
-        <KlasorMenu
-          k={klasorMenu}
-          altKlasorOlur={seviye(klasorMenu, klasorler) < EN_FAZLA_SEVIYE}
-          onKapat={() => setKlasorMenu(null)}
-          onKartEkle={() => { setYeniKart({ klasor: klasorMenu.id }); setKlasorMenu(null); }}
-          onAltKlasor={() => { setYeniKlasor({ ust: klasorMenu.id }); setKlasorMenu(null); }}
-          onKes={() => { setKesilen({ tur: 'klasor', id: klasorMenu.id, ad: klasorMenu.ad }); setKlasorMenu(null); }}
-        />
+
+      {tur !== 'kart' && !suzuluyor && (
+        <>
+          <div className="rt-kut-bolum"><span>Hafta şablonları</span></div>
+          <HaftaSablonlari disiplin="kisisel" tam />
+          <p className="rt-muted">Bir rutinin haftasını kurunca Plan&apos;daki &quot;💾 Haftayı şablon kaydet&quot; ile buraya gelir; &quot;📋 Şablon uygula&quot; ile başka haftalara uygularsın.</p>
+        </>
+      )}
+
+      {yeniKol && <KoleksiyonFormu alanlar={alanlar} onKapat={() => setYeniKol(false)} onKaydet={async (v) => { const id = await koleksiyonOlustur(v.ad, v.ikon, v.alanlar); setKol(id); }} />}
+      {yeniKart && <KartEditor tarih={bugun()} tarihsiz baslik="Kütüphaneye kart" onKapat={() => setYeniKart(false)} onPlan={async (t) => { await kutKartEkle(null, t); }} />}
+      {kartAc && <KutKartDetay k={kartAc} kols={kols} onKapat={() => setKartAc(null)} />}
+    </div>
+  );
+}
+
+function KartSatiri({ k, kol, onAc }: { k: KutuphaneKartRow; kol?: string; onAc: () => void }) {
+  const u = useCanli(kutKullanimlari, [], {} as Record<string, KutKullanim>)[k.id];
+  return (
+    <button type="button" className="rt-kut-kart" onClick={onAc}>
+      <span className="ic">{kartIkon(k)}</span>
+      <span className="tx"><b>{k.ad}</b>
+        <small>{(k.konular ?? []).map((x) => <span key={x} className="rt-konu">{x}</span>)}{kol ? `${kol}` : ''}{u && (u.yapildi > 0 || u.siradaki) ? ` · ${u.yapildi ? `${u.yapildi}×` : ''}${u.siradaki ? ` 📅 ${u.siradaki === bugun() ? 'bugün' : kisaTarih(u.siradaki)}` : ''}` : ''}</small>
+      </span>
+      <span className="chev">›</span>
+    </button>
+  );
+}
+
+function Koleksiyon({ kol, kolIdler, kartlar, alanlar, rutinler, onGeri, onKart }: {
+  kol: KlasorRow | null; kolIdler: Set<string>; kartlar: KutuphaneKartRow[]; alanlar: YasamAlaniRow[]; rutinler: ProgramRow[]; onGeri: () => void; onKart: (k: KutuphaneKartRow) => void;
+}) {
+  const [konu, setKonu] = useState<string | null>(null);
+  const [duzen, setDuzen] = useState(false);
+  const [sil, setSil] = useState(false);
+  const [yeniKart, setYeniKart] = useState(false);
+  const tum = kol ? kartlar.filter((k) => k.klasor_id === kol.id) : kartlar.filter((k) => !k.klasor_id || !kolIdler.has(k.klasor_id));
+  const liste = tum.filter((k) => !konu || (konu === '∅' ? !(k.konular ?? []).length : (k.konular ?? []).includes(konu)))
+    .sort((a, b) => a.sira - b.sira || a.ad.localeCompare(b.ad, 'tr'));
+  const konular = Array.from(new Set(tum.flatMap((k) => k.konular ?? []))).sort((a, b) => a.localeCompare(b, 'tr'));
+  const konusuz = tum.filter((k) => !(k.konular ?? []).length).length;
+  return (
+    <div className="rt-kol">
+      <div className="rt-geri-bar"><button type="button" className="rt-geri-dugme" onClick={onGeri}>‹ Kütüphane</button></div>
+      <div className="rt-tek">
+        <span className="ic">{kol?.ikon ?? '🗂'}</span>
+        <span className="tx"><b>{kol?.ad ?? 'Koleksiyonsuz kartlar'}</b>
+          <small>{kol ? `${(kol.alanlar ?? []).map((a) => { const x = alanlar.find((y) => y.id === a); return x ? `${x.ikon} ${x.ad}` : ''; }).filter(Boolean).join(' · ') || 'alan yok'} · ${tum.length} kart` : `${tum.length} kart`}{rutinler.length ? ` · 🔗 ${rutinler.map((r) => r.ad).join(', ')}` : ''}</small>
+        </span>
+        {kol && <button type="button" className="rt-ikon" aria-label="Koleksiyonu düzenle" onClick={() => setDuzen(true)}>⋯</button>}
+      </div>
+      {(konular.length > 0) && (
+        <div className="rt-kut-suz">
+          <button type="button" className={`rt-chip${!konu ? ' on' : ''}`} onClick={() => setKonu(null)}>Tümü <small>{tum.length}</small></button>
+          {konular.map((k) => <button key={k} type="button" className={`rt-chip${konu === k ? ' on' : ''}`} onClick={() => setKonu(konu === k ? null : k)}>{k} <small>{tum.filter((x) => (x.konular ?? []).includes(k)).length}</small></button>)}
+          {konusuz > 0 && <button type="button" className={`rt-chip${konu === '∅' ? ' on' : ''}`} onClick={() => setKonu(konu === '∅' ? null : '∅')}>konusuz <small>{konusuz}</small></button>}
+        </div>
+      )}
+      <div className="rt-arac">
+        {liste.map((k) => <KartSatiri key={k.id} k={k} onAc={() => onKart(k)} />)}
+        {!liste.length && <p className="rt-muted">Henüz kart yok.</p>}
+        {kol && <button type="button" className="rt-hedef-sat yeni" onClick={() => setYeniKart(true)}><span className="ic">＋</span><span className="ad">Kart ekle{konu && konu !== '∅' ? ` · ${konu}` : ''}</span></button>}
+      </div>
+      <p className="rt-muted">Konu, kartın etiketi: bir kart birden çok konuda görünebilir. Kartı açıp &quot;Konular&quot;dan eklersin.</p>
+      {yeniKart && kol && <KartEditor tarih={bugun()} tarihsiz baslik={`${kol.ikon ?? '📁'} ${kol.ad} › kart`} onKapat={() => setYeniKart(false)} onPlan={async (t) => { await kutKartEkle(kol.id, t, konu && konu !== '∅' ? [konu] : []); }} />}
+      {duzen && kol && !sil && (
+        <KoleksiyonFormu ilk={kol} alanlar={alanlar} onKapat={() => setDuzen(false)} onSil={() => setSil(true)}
+          onKaydet={async (v) => { await koleksiyonGuncelle(kol.id, v); }} />
+      )}
+      {sil && kol && (
+        <Modal baslik={`${kol.ikon ?? '📁'} ${kol.ad}`} onKapat={() => { setSil(false); setDuzen(false); }}>
+          <OnayKutusu metin="Koleksiyon silinsin mi? Kartları silinmez, koleksiyonsuz kalır; bağlı rutinin malzeme bağı kalkar." evet="Sil"
+            onVazgec={() => { setSil(false); setDuzen(false); }} onEvet={async () => { await koleksiyonSil(kol.id); onGeri(); }} />
+        </Modal>
       )}
     </div>
   );
 }
 
-function ProgramMenu({ p, onKapat, onAc, onKes }: { p: ProgramRow; onKapat: () => void; onAc: () => void; onKes: () => void }) {
-  const [sil, setSil] = useState(false);
+function KoleksiyonFormu({ ilk, alanlar, onKapat, onKaydet, onSil }: {
+  ilk?: KlasorRow; alanlar: YasamAlaniRow[]; onKapat: () => void; onKaydet: (v: { ad: string; ikon: string; alanlar: string[] }) => Promise<void>; onSil?: () => void;
+}) {
+  const [ad, setAd] = useState(ilk?.ad ?? '');
+  const [ikon, setIkon] = useState(ilk?.ikon ?? '📁');
+  const [etiket, setEtiket] = useState<string[]>(ilk?.alanlar ?? []);
+  const ikonlar = Array.from(new Set([...KOLEKSIYON_IKON, ...ALAN_IKONLARI]));
   return (
-    <Modal baslik={`${p.ikon ?? '🌱'} ${p.ad}`} onKapat={onKapat}>
-      <div className="rt-kut-menu">
-        <button type="button" className="rt-btn primary" onClick={onAc}>Aç</button>
-        <button type="button" className="rt-btn" onClick={onKes}>✂️ Kes (taşı)</button>
-        {!sil && <button type="button" className="rt-btn tehlike" onClick={() => setSil(true)}>Sil</button>}
+    <Modal baslik={ilk ? 'Koleksiyon' : '＋ Koleksiyon'} onKapat={onKapat}>
+      <div className="rt-prog-ad">
+        <span className="rt-prog-ikon" aria-hidden="true">{ikon}</span>
+        <input className="rt-inp" placeholder="Ad (ör. Gitar, LGS Matematik, Kahvaltı tarifleri)" value={ad} onChange={(e) => setAd(e.target.value)} autoFocus={!ilk} />
       </div>
-      {sil && <OnayKutusu metin="Program silinsin mi? Ajanda'daki yarından sonraki kartları kalkar; geçmiş kayıtlar kalır." evet="Sil" onVazgec={() => setSil(false)} onEvet={async () => { await programiSil(p.id); onKapat(); }} />}
-    </Modal>
-  );
-}
-
-function KlasorAdModal({ baslik, ilk = '', onKapat, onKaydet }: { baslik: string; ilk?: string; onKapat: () => void; onKaydet: (ad: string) => Promise<unknown> }) {
-  const [ad, setAd] = useState(ilk);
-  const [hata, setHata] = useState<string | null>(null);
-  const kaydet = async () => { try { await onKaydet(ad); onKapat(); } catch (e) { setHata((e as Error).message); } };
-  return (
-    <Modal baslik={baslik} onKapat={onKapat}>
-      <input className="rt-inp" placeholder="Klasör adı (örn. Gitar)" value={ad} onChange={(e) => setAd(e.target.value)} autoFocus onKeyDown={(e) => { if (e.key === 'Enter' && ad.trim()) kaydet(); }} />
-      {hata && <p className="rt-hata">⚠ {hata}</p>}
-      <button type="button" className="rt-btn primary" disabled={!ad.trim()} onClick={kaydet}>Kaydet</button>
-    </Modal>
-  );
-}
-
-function KlasorMenu({ k, altKlasorOlur, onKapat, onKartEkle, onAltKlasor, onKes }: { k: KlasorRow; altKlasorOlur: boolean; onKapat: () => void; onKartEkle: () => void; onAltKlasor: () => void; onKes: () => void }) {
-  const [adDegis, setAdDegis] = useState(false);
-  const [sil, setSil] = useState(false);
-  if (adDegis) return <KlasorAdModal baslik="Klasörün adı" ilk={k.ad} onKapat={onKapat} onKaydet={(ad) => klasorAdDegistir(k.id, ad)} />;
-  return (
-    <Modal baslik={`📁 ${k.ad}`} onKapat={onKapat}>
-      <div className="rt-kut-menu">
-        <button type="button" className="rt-btn primary" onClick={onKartEkle}>＋ Kart ekle</button>
-        {altKlasorOlur && <button type="button" className="rt-btn" onClick={onAltKlasor}>＋ Alt klasör</button>}
-        <button type="button" className="rt-btn" onClick={() => setAdDegis(true)}>✎ Adını değiştir</button>
-        <button type="button" className="rt-btn" onClick={onKes}>✂️ Kes (taşı)</button>
-        {!sil && <button type="button" className="rt-btn tehlike" onClick={() => setSil(true)}>Sil</button>}
+      <div className="rt-ikon-izgara" role="radiogroup" aria-label="Simge">
+        {ikonlar.map((x) => <button key={x} type="button" role="radio" aria-checked={ikon === x} className={ikon === x ? 'on' : ''} onClick={() => setIkon(x)}>{x}</button>)}
       </div>
-      {sil && <OnayKutusu metin="Klasör silinsin mi? İçindekiler bir üst klasöre çıkar, hiçbiri silinmez." evet="Sil" onVazgec={() => setSil(false)} onEvet={async () => { await klasorSilIcerikUste(k.id); onKapat(); }} />}
+      <span className="rt-alan-lbl">Alanlar (kartlar devralır)</span>
+      <div className="rt-alan-sec">
+        {alanlar.map((a) => { const sec = etiket.includes(a.id); return <button key={a.id} type="button" aria-pressed={sec} className={`rt-chip${sec ? ' on' : ''}`} onClick={() => setEtiket(sec ? etiket.filter((x) => x !== a.id) : [...etiket, a.id])}>{a.ikon} {a.ad}</button>; })}
+      </div>
+      <div className="rt-satir" style={{ justifyContent: 'space-between' }}>
+        {onSil ? <button type="button" className="rt-btn tehlike" onClick={onSil}>Sil</button> : <span />}
+        <button type="button" className="rt-btn primary" disabled={!ad.trim()} onClick={async () => { await onKaydet({ ad, ikon, alanlar: etiket }); onKapat(); }}>{ilk ? 'Kaydet' : 'Oluştur'}</button>
+      </div>
     </Modal>
   );
 }
 
-function KutKartDetay({ k, onKapat, onKes }: { k: KutuphaneKartRow; onKapat: () => void; onKes: () => void }) {
+function KutKartDetay({ k, kols, onKapat }: { k: KutuphaneKartRow; kols: KlasorRow[]; onKapat: () => void }) {
+  const kart = useCanli(async () => (await db.kutuphane_kart.get(k.id)) ?? null, [k.id], k as KutuphaneKartRow | null) ?? k;
   const [duzenle, setDuzenle] = useState(false);
   const [al, setAl] = useState(false);
   const [sil, setSil] = useState(false);
+  const [tasi, setTasi] = useState(false);
+  const [konuYeni, setKonuYeni] = useState('');
   const kullanim = useCanli(kutKullanimlari, [], {} as Record<string, KutKullanim>)[k.id];
   if (duzenle) {
-    const sahte = { id: k.id, tip: k.tip, ad: k.ad, bloklar: k.bloklar, baslangic: bugun(), bitis: bugun(), gunler: null, saatler: [] } as unknown as AjandaKartRow;
-    return <KartEditor tarih={bugun()} kart={sahte} tarihsiz baslik="Kartı düzenle" onKapat={onKapat} onPlan={async (t) => { await kutKartGuncelle(k.id, t); }} />;
+    const sahte = { id: kart.id, tip: kart.tip, ad: kart.ad, bloklar: kart.bloklar, baslangic: bugun(), bitis: bugun(), gunler: null, saatler: [] } as unknown as AjandaKartRow;
+    return <KartEditor tarih={bugun()} kart={sahte} tarihsiz baslik="Kartı düzenle" onKapat={onKapat} onPlan={async (t) => { await kutKartGuncelle(kart.id, t); }} />;
   }
-  if (al) return <AjandayaAlModal k={k} onKapat={onKapat} />;
+  if (al) return <AjandayaAlModal k={kart} onKapat={onKapat} />;
+  if (tasi) return <KlasorSecModal baslik="Koleksiyona taşı" onKapat={onKapat} onSec={async (kl) => { await kutKartTasi(kart.id, kl); }} />;
+  const konular = kart.konular ?? [];
+  const ekle = async () => { if (!konuYeni.trim()) return; await kutKartKonular(kart.id, [...konular, konuYeni]); setKonuYeni(''); };
+  const kol = kols.find((c) => c.id === kart.klasor_id);
   return (
-    <Modal baslik={k.ad} onKapat={onKapat}>
-      <BlokGoster bloklar={k.bloklar} />
+    <Modal baslik={kart.ad} onKapat={onKapat}>
+      <BlokGoster bloklar={kart.bloklar} />
       {kullanim && <p className="rt-muted">{kullanim.yapildi ? `${kullanim.yapildi} kez uygulandı${kullanim.son ? ` · son: ${kisaTarih(kullanim.son)}` : ''}` : 'Henüz uygulanmadı'}{kullanim.siradaki ? ` · Ajanda'da: ${kullanim.siradaki === bugun() ? 'bugün' : kisaTarih(kullanim.siradaki)}` : ''}</p>}
+      <div className="rt-kut-konular">
+        <span className="rt-alan-lbl">{kol ? `${kol.ikon ?? '📁'} ${kol.ad} · konular` : 'Konular'}</span>
+        <div className="rt-alan-sec">
+          {konular.map((x) => <button key={x} type="button" className="rt-chip on" aria-label={`${x} konusunu kaldır`} onClick={() => kutKartKonular(kart.id, konular.filter((y) => y !== x))}>{x} ×</button>)}
+          <input className="rt-inp rt-konu-inp" placeholder="＋ konu" value={konuYeni} onInput={(e) => e.stopPropagation() /* konu hemen kaydedilir: pencere "kaydedilmemiş" saymasın */} onChange={(e) => setKonuYeni(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') ekle(); }} onBlur={ekle} />
+        </div>
+      </div>
       {!sil && (
         <div className="rt-satir">
           <button type="button" className="rt-btn primary" onClick={() => setAl(true)}>📅 Ajandaya al</button>
           <button type="button" className="rt-btn" onClick={() => setDuzenle(true)}>Düzenle</button>
-          <button type="button" className="rt-btn" onClick={onKes}>✂️ Kes</button>
+          <button type="button" className="rt-btn" onClick={() => setTasi(true)}>Koleksiyona taşı</button>
           <button type="button" className="rt-btn tehlike" onClick={() => setSil(true)}>Sil</button>
         </div>
       )}
-      {sil && <OnayKutusu metin="Kart kütüphaneden silinsin mi? Ajanda'ya alınmış kopyaları kalır." evet="Sil" onVazgec={() => setSil(false)} onEvet={async () => { await kutKartSil(k.id); onKapat(); }} />}
+      {sil && <OnayKutusu metin="Kart kütüphaneden silinsin mi? Ajanda'ya alınmış kopyaları kalır." evet="Sil" onVazgec={() => setSil(false)} onEvet={async () => { await kutKartSil(kart.id); onKapat(); }} />}
     </Modal>
   );
 }
@@ -263,29 +303,28 @@ function AjandayaAlModal({ k, onKapat }: { k: KutuphaneKartRow; onKapat: () => v
   );
 }
 
-/** Ajanda kartının detayında: "Kütüphaneye kaydet" — klasör seçimi. */
+
+/** Ajanda kartının detayında "Kütüphaneye kaydet" ve kart taşıma — koleksiyon seçimi. */
 export function KlasorSecModal({ baslik, onKapat, onSec }: { baslik: string; onKapat: () => void; onSec: (klasorId: string | null) => Promise<void> }) {
-  const klasorler = useCanli(() => db.klasor.toArray(), [], [] as KlasorRow[]);
+  const kols = useCanli(koleksiyonlar, [], [] as KlasorRow[]);
   const [tamam, setTamam] = useState<string | null>(null);
-  const satir = (ust: string | null, derin: number): React.ReactNode =>
-    klasorler.filter((k) => k.ust_id === ust).sort((a, b) => a.ad.localeCompare(b.ad, 'tr')).map((k) => (
-      <React.Fragment key={k.id}>
-        <button type="button" className="rt-kut-sec" style={{ paddingLeft: 8 + derin * 16 }} onClick={async () => { await onSec(k.id); setTamam(k.ad); }}>📁 {k.ad}</button>
-        {satir(k.id, derin + 1)}
-      </React.Fragment>
-    ));
+  const [yeni, setYeni] = useState('');
   if (tamam) return (
     <Modal baslik={baslik} onKapat={onKapat}>
-      <p className="rt-tamam">Kütüphanede &quot;{tamam}&quot; klasörüne kaydedildi.</p>
+      <p className="rt-tamam">Kütüphanede &quot;{tamam}&quot; içine kaydedildi.</p>
       <button type="button" className="rt-btn" onClick={onKapat}>Tamam</button>
     </Modal>
   );
   return (
     <Modal baslik={baslik} onKapat={onKapat}>
-      <p className="rt-muted">Hangi klasöre?</p>
+      <p className="rt-muted">Hangi koleksiyona?</p>
       <div className="rt-kut-secler">
-        <button type="button" className="rt-kut-sec" onClick={async () => { await onSec(null); setTamam('En üst'); }}>📚 En üst (klasörsüz)</button>
-        {satir(null, 0)}
+        {kols.map((c) => <button key={c.id} type="button" className="rt-kut-sec" onClick={async () => { await onSec(c.id); setTamam(c.ad); }}>{c.ikon ?? '📁'} {c.ad}</button>)}
+        <button type="button" className="rt-kut-sec" onClick={async () => { await onSec(null); setTamam('Koleksiyonsuz'); }}>🗂 Koleksiyonsuz</button>
+      </div>
+      <div className="rt-satir" style={{ flexWrap: 'nowrap' }}>
+        <input className="rt-inp" placeholder="Yeni koleksiyon adı" value={yeni} onChange={(e) => setYeni(e.target.value)} />
+        <button type="button" className="rt-btn" disabled={!yeni.trim()} onClick={async () => { const id = await koleksiyonOlustur(yeni); await onSec(id); setTamam(yeni.trim()); }}>＋ Oluştur</button>
       </div>
     </Modal>
   );

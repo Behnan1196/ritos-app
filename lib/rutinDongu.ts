@@ -92,3 +92,31 @@ export async function oneriAdaylari(): Promise<{ p: ProgramRow; hafta: number; o
   }
   return sonuc;
 }
+
+// ———————————————— Ajandam'dan doğan rutin: "önce uygula, sonra kaydet" ————————————————
+// Kendi eklediğin, en az 3 haftadır tekrar eden ve son 4 haftanın en az 3'ünde yapılan kart → öneri.
+// Kaydedince: aynı ad/alan önerisiyle rutin kurulur, kart yarından rutinin kartı olarak sürer (eski kart bugün biter).
+
+const RUTIN_ONERI_RET = 'rutin_oneri_ret';
+
+export async function ajandadanRutinAdaylari(): Promise<{ kart: AjandaKartRow; hafta: number }[]> {
+  const t = bugun();
+  const ret = new Set(((await db.ayar.get(RUTIN_ONERI_RET))?.deger as string[] | undefined) ?? []);
+  const bas = tarihEkle(haftaBasi(t), -21);
+  const kartlar = (await db.ajanda_kart.where('kaynak_modul').equals('ajanda').toArray()).filter((k) =>
+    !ret.has(k.id) && k.tip !== 'oku' && k.baslangic <= tarihEkle(t, -14) && (k.bitis === null || k.bitis > t)
+    && (k.gunler !== null || k.bitis === null));
+  if (!kartlar.length) return [];
+  const kayit = (await db.ajanda_kayit.where('tarih').aboveOrEqual(bas).toArray()).filter((r) => r.yapildi);
+  const sonuc: { kart: AjandaKartRow; hafta: number }[] = [];
+  for (const k of kartlar) {
+    const haftalar = new Set(kayit.filter((r) => r.kart_id === k.id).map((r) => haftaBasi(r.tarih)));
+    if (haftalar.size >= 3) sonuc.push({ kart: k, hafta: haftalar.size });
+  }
+  return sonuc;
+}
+
+export async function rutinOnerisiReddet(kartId: string) {
+  const ret = ((await db.ayar.get(RUTIN_ONERI_RET))?.deger as string[] | undefined) ?? [];
+  await db.ayar.put({ anahtar: RUTIN_ONERI_RET, deger: [...ret, kartId] });
+}

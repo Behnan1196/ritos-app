@@ -10,7 +10,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useCanli } from '@/lib/canli';
-import { db, type AileRow, type IliskiAyarRow, type IliskiRow, type KutuphaneKartRow, type ProgramRow } from '@/lib/db';
+import { db, type AileRow, type IliskiAyarRow, type IliskiRow, type KlasorRow, type KutuphaneKartRow, type ProgramRow } from '@/lib/db';
 import { bugun, degerBloklari, iyelik, tarihEkle, tarihEtiket, tarihParse } from '@/lib/paket';
 import { aileAktifMi, aileAyril, aileDavet, aileGorevIliski, aileKur, benimAileRolum, kocOl, davetler, davetSil, haftaNotuGonder, iliskiBilgiYaz, type DavetSatir } from '@/lib/danismanlik';
 import { GRUP_SINIR, GRUP_TUR, grupIkon, grupTuru, type GrupTur } from '@/lib/grup';
@@ -30,9 +30,10 @@ import { IKON_SECENEKLERI, VARSAYILAN_IKON, ikonOner } from '@/lib/programIkon';
 import { programGuncelle, programOlustur } from '@/lib/program';
 import { AKTIVITE, HIZLAR, beklenenKilo, beslenmeHesap, kiloDurumu, vkiEtiket, type HedefTur } from '@/lib/beslenme';
 import { HAZIR_OLCULER, OLC_ONEK, olcuBlok } from '@/lib/olcum';
+import { koleksiyonlar } from '@/lib/kutuphane';
 import { ALAN_IKONLARI, EN_FAZLA_GORUNEN, alanEkle as yAlanEkle, alanGuncelle, alanOner, alanSil, alanSirala, alanlar as yAlanlar, alanlariGaranti } from '@/lib/yasamAlani';
 import type { YasamAlaniRow } from '@/lib/db';
-import { AlanKarolari, AlanSayfasi, AliskanlikOnerisi, AySonu, DengeKarti } from './Rutinler';
+import { AjandadanRutinOnerisi, AlanKarolari, AlanSayfasi, AliskanlikOnerisi, AySonu, DengeKarti } from './Rutinler';
 import { arsivle, kuruluyoraDon, oturduIsaretle, rutinDurumu } from '@/lib/rutinDongu';
 import { hazirKartlar, hazirSablonlariYenile, hazirSablonuAl, useHazirSablonlar, type HazirSablon } from '@/lib/hazirSablon';
 
@@ -447,6 +448,7 @@ function ProgramBilgileri({ programId, onDuzenle }: { programId: string; onDuzen
         <div className="rt-prog-ozet"><span className="rt-prog-ikon">{p.ikon ?? VARSAYILAN_IKON}</span><span><b>{p.ad}</b>{p.amac && <span className="rt-muted"><br />{p.amac}</span>}</span></div>
         <button type="button" className="rt-linkbtn" onClick={onDuzenle}>✎ Ad, simge, alanlar ve amacı düzenle</button>
       </div>
+      {!p.uzak && <RutinMalzemesi p={p} />}
       {!p.uzak && <RutinDurumu p={p} />}
       <div className="rt-arac">
         <h4>Notlar</h4>
@@ -456,6 +458,22 @@ function ProgramBilgileri({ programId, onDuzenle }: { programId: string; onDuzen
           <button type="button" className="rt-btn primary" disabled={not.trim() === (p.notlar ?? '')} onClick={async () => { await programGuncelle(p.id, { notlar: not.trim() }); setTamam(true); }}>Kaydet</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// 5 ekim — rutinin malzemesi: bağlı Kütüphane koleksiyonu (Kart ekle › Kütüphaneden'de önce gelir).
+function RutinMalzemesi({ p }: { p: ProgramRow }) {
+  const kols = useCanli(koleksiyonlar, [], [] as KlasorRow[]);
+  const say = useCanli(async () => (p.malzeme ? db.kutuphane_kart.where('klasor_id').equals(p.malzeme).count() : 0), [p.malzeme], 0);
+  return (
+    <div className="rt-arac">
+      <h4>Malzeme</h4>
+      <select className="rt-inp" aria-label="Malzeme koleksiyonu" value={p.malzeme ?? ''} onChange={(e) => programGuncelle(p.id, { malzeme: e.target.value || null })}>
+        <option value="">— koleksiyon bağlı değil —</option>
+        {kols.map((c) => <option key={c.id} value={c.id}>{c.ikon ?? '📁'} {c.ad}</option>)}
+      </select>
+      <p className="rt-muted">{p.malzeme ? `${say} kart · "＋ Kart ekle › Kütüphaneden" önce bu koleksiyonu gösterir.` : 'Kütüphanedeki bir koleksiyonu bu rutinin malzemesi yap; kart eklerken önce o gelir.'}</p>
     </div>
   );
 }
@@ -490,7 +508,15 @@ function RutinDurumu({ p }: { p: ProgramRow }) {
 // ———————————————— Kütüphaneden ekle (telefon da) ————————————————
 
 function KutuphanedenEkle({ h, tarih, onKapat }: { h: Hedef; tarih: string; onKapat: () => void }) {
-  const kartlar = useCanli(() => db.kutuphane_kart.toArray(), [], [] as KutuphaneKartRow[]);
+  const tumKartlar = useCanli(() => db.kutuphane_kart.toArray(), [], [] as KutuphaneKartRow[]);
+  // 5 ekim — rutinin malzeme koleksiyonu varsa önce o (konu çipleriyle); "tümü" ile bütün kütüphane.
+  const malzeme = useCanli(async () => (h.h.tur === 'program' ? (await db.program.get(h.h.programId))?.malzeme ?? null : null), [h.id], null as string | null);
+  const kol = useCanli(async () => (malzeme ? (await db.klasor.get(malzeme)) ?? null : null), [malzeme], null as KlasorRow | null);
+  const [tumu, setTumu] = useState(false);
+  const [konu, setKonu] = useState<string | null>(null);
+  const kolKartlari = malzeme ? tumKartlar.filter((k) => k.klasor_id === malzeme) : [];
+  const konular = Array.from(new Set(kolKartlari.flatMap((k) => k.konular ?? []))).sort((a, b) => a.localeCompare(b, 'tr'));
+  const kartlar = malzeme && !tumu ? kolKartlari.filter((k) => !konu || (k.konular ?? []).includes(konu)) : tumKartlar;
   const [gun, setGun] = useState(tarih);
   const [ara, setAra] = useState('');
   const [eklenen, setEklenen] = useState<string[]>([]);
@@ -500,8 +526,15 @@ function KutuphanedenEkle({ h, tarih, onKapat }: { h: Hedef; tarih: string; onKa
   return (
     <Modal baslik="📚 Kütüphaneden ekle" onKapat={onKapat}>
       <label className="rt-alan">Hangi gün<input className="rt-inp" type="date" min={bugun()} value={gun} onChange={(e) => setGun(e.target.value)} /></label>
+      {malzeme && kol && (
+        <div className="rt-kut-suz">
+          <button type="button" className={`rt-chip${!tumu ? ' on' : ''}`} onClick={() => setTumu(false)}>{kol.ikon ?? '📁'} {kol.ad}</button>
+          <button type="button" className={`rt-chip${tumu ? ' on' : ''}`} onClick={() => setTumu(true)}>Tüm kütüphane</button>
+          {!tumu && konular.map((k) => <button key={k} type="button" className={`rt-chip${konu === k ? ' on' : ''}`} onClick={() => setKonu(konu === k ? null : k)}>{k}</button>)}
+        </div>
+      )}
       {kartlar.length > 6 && <input className="rt-inp" type="search" placeholder="Kartlarda ara…" value={ara} onChange={(e) => setAra(e.target.value)} />}
-      {kartlar.length === 0 && <p className="rt-muted">Kütüphanen boş. Rutinlerim › 📚 Kütüphane&apos;den kart ekleyebilir ya da Ajandam&apos;daki bir kartı &quot;Kütüphaneye kaydet&quot; ile saklayabilirsin.</p>}
+      {tumKartlar.length === 0 && <p className="rt-muted">Kütüphanen boş. Rutinlerim › 📚 Kütüphane&apos;den kart ekleyebilir ya da Ajandam&apos;daki bir kartı &quot;Kütüphaneye kaydet&quot; ile saklayabilirsin.</p>}
       <div className="rt-kut-liste">
         {liste.map((k) => (
           <div key={k.id} className="rt-kut-oge">
@@ -804,6 +837,7 @@ function HedefSecici({ kapsam, hedefler, adaylar, seciliId, kompakt, kuruluyor, 
           <DengeKarti onDegerlendir={onDegerlendir} />
           <AlanKarolari onAlan={onYasamAlani} kompakt={kompakt} />
           <AliskanlikOnerisi />
+          <AjandadanRutinOnerisi onOlustu={() => { /* yeni rutin Kuruluyor listesinde görünür */ }} />
           <div className="rt-alan-alt">
             <span className="rt-muted">Alana dokun: değerlendirmesi ve rutinleri.</span>
             <button type="button" className="rt-linkbtn" onClick={() => setAlanDuzen(true)}>Alanları düzenle</button>

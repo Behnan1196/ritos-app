@@ -12,7 +12,12 @@ import { alanGuncelle, alanlar as yAlanlar, ONERILEN_KRITER } from '@/lib/yasamA
 import { alanRutinleri, ayAdi, ayKodu, degerlendir, degerlendirmeler, degerlendirmeZamani, emekHesapla, oncekiAy, type AlanEmek } from '@/lib/denge';
 import { Modal } from './ortak';
 import { db } from '@/lib/db';
-import { kuruluyoraDon, oneriAdaylari, oneriReddet, oturduIsaretle } from '@/lib/rutinDongu';
+import { ajandadanRutinAdaylari, kuruluyoraDon, oneriAdaylari, oneriReddet, oturduIsaretle, rutinOnerisiReddet } from '@/lib/rutinDongu';
+import { programGuncelle, programOlustur } from '@/lib/program';
+import { ikonOner } from '@/lib/programIkon';
+import { alanOner } from '@/lib/yasamAlani';
+import { kocKartlariEkle } from '@/lib/danisanAjanda';
+import { bugun, gunFarki, tarihEkle } from '@/lib/paket';
 
 export function useDenge() {
   const liste = useCanli(yAlanlar, [], [] as YasamAlaniRow[]);
@@ -282,6 +287,37 @@ export function AliskanlikOnerisi() {
       <span className="ey">
         <button type="button" className="rt-btn" disabled={bekle} onClick={() => oneriReddet(a.p.id)}>Henüz değil</button>
         <button type="button" className="rt-btn primary" disabled={bekle} onClick={async () => { setBekle(true); await oturduIsaretle(a.p.id); setBekle(false); }}>Oturdu</button>
+      </span>
+    </div>
+  );
+}
+
+// ———————————————— Ajandam'dan rutin önerisi ————————————————
+
+export function AjandadanRutinOnerisi({ onOlustu }: { onOlustu: (programId: string) => void }) {
+  const adaylar = useCanli(ajandadanRutinAdaylari, [], [] as Awaited<ReturnType<typeof ajandadanRutinAdaylari>>);
+  const [bekle, setBekle] = useState(false);
+  const a = adaylar[0];
+  if (!a) return null;
+  const kaydet = async () => {
+    setBekle(true);
+    try {
+      const k = a.kart;
+      const pid = await programOlustur(k.ad, '');
+      await programGuncelle(pid, { ikon: ikonOner(k.ad) ?? undefined, kimden: 'Kendim', alanlar: alanOner(k.ad) });
+      const yarin = tarihEkle(bugun(), 1);
+      await kocKartlariEkle({ tur: 'program', programId: pid }, [{ tarih: yarin, kart: { tip: k.tip, ad: k.ad, bloklar: k.bloklar, ek: k.ek ?? null, saatler: k.saatler }, tekrar: { gun: k.bitis ? gunFarki(yarin, k.bitis) + 1 : null, gunler: k.gunler } }]);
+      await db.ajanda_kart.update(k.id, { bitis: bugun(), guncellendi: Date.now() });
+      onOlustu(pid);
+    } finally { setBekle(false); }
+  };
+  return (
+    <div className="rt-aliskanlik ajanda">
+      <span className="ic">✨</span>
+      <span className="tx"><b>{a.kart.ad}</b> {a.hafta} haftadır Ajandam&apos;da tekrar ediyor. Rutin olarak kaydedeyim mi? Alanlarını ve dengedeki yerini birlikte izleriz.</span>
+      <span className="ey">
+        <button type="button" className="rt-btn" disabled={bekle} onClick={() => rutinOnerisiReddet(a.kart.id)}>Hayır</button>
+        <button type="button" className="rt-btn primary" disabled={bekle} onClick={kaydet}>Kaydet</button>
       </span>
     </div>
   );
