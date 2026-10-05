@@ -296,49 +296,81 @@ function zamanFarki(ms: number) {
   return `${Math.round(sa / 24)} gün önce`;
 }
 
-export function AyarlarPane() {
+// ———————————————— 5 ekim: avatar menüsü + hesap ekranları ————————————————
+// Ayarlar alt menüden kalktı; üst köşedeki avatardan açılan menüde: Profil ve hesap · Bildirimler · Ayarlar · Çıkış.
+// Her biri "‹ Geri" ile dönülen bir ekran (telefonda ana alanda, geniş ekranda sağ bölmede).
+
+export type HesapEkran = 'profil' | 'bildirim' | 'ayarlar';
+export const HESAP_EKRAN_AD: Record<HesapEkran, string> = { profil: '👤 Profil ve hesap', bildirim: '🔔 Bildirimler', ayarlar: '⚙️ Ayarlar' };
+
+export function HesapEkrani({ ekran, onGeri }: { ekran: HesapEkran; onGeri: () => void }) {
+  return (
+    <div className="rt-hesap-ekran">
+      <div className="rt-geri-bar"><button type="button" className="rt-geri-dugme" onClick={onGeri}>‹ Geri</button><span className="rt-hw-tam-ad">{HESAP_EKRAN_AD[ekran]}</span></div>
+      {ekran === 'profil' ? <ProfilIcerik /> : ekran === 'bildirim' ? <BildirimAyarlari /> : <AyarlarIcerik />}
+    </div>
+  );
+}
+
+function ProfilIcerik() {
   const o = useOturum();
   const d = useSenkronDurum();
-  const dn = useDanismanlik();
-  const [modal, setModal] = useState<null | 'cikis' | 'sifre' | 'kurtarma'>(null);
+  const [modal, setModal] = useState<null | 'sifre' | 'kurtarma'>(null);
   const [adDuzenle, setAdDuzenle] = useState<string | null>(null);
-  const [veriModal, setVeriModal] = useState<null | 'sifirla' | 'sil'>(null);
   const uid = o.session?.user.id;
+  const u = o.session?.user;
   const sadeceGoogle = !!o.session && !epostaGirisiVar(o.session.user);
-
+  const google = !!u && ((u.app_metadata?.providers as string[] | undefined) ?? []).includes('google');
+  const ad = o.gorunenAd ?? '—';
+  const meta = (u?.user_metadata ?? {}) as Record<string, unknown>;
+  const resim = (typeof meta.avatar_url === 'string' && meta.avatar_url) || (typeof meta.picture === 'string' && meta.picture) || null;
   return (
-    <div className="side-content" style={{ height: '100%', overflowY: 'auto' }}>
-      <h4>⚙️ Ayarlar</h4>
-      <Kap baslik="Hesap">
-        <KurtarmaHatirlatma />
-        {o.session && (
-          <>
-            {adDuzenle === null ? (
-              <p className="rt-metin"><b>{o.gorunenAd ?? '—'}</b> <button type="button" className="rt-linkbtn" onClick={() => setAdDuzenle(o.gorunenAd ?? '')}>değiştir</button><br /><span className="rt-muted">{o.session.user.email}</span></p>
-            ) : (
-              <div className="rt-satir" style={{ flexWrap: 'nowrap' }}>
-                <input className="rt-inp" value={adDuzenle} onChange={(e) => setAdDuzenle(e.target.value)} />
-                <button type="button" className="rt-btn primary" disabled={!adDuzenle.trim()} onClick={async () => { await gorunenAdDegistir(uid!, adDuzenle); setAdDuzenle(null); location.reload(); }}>Kaydet</button>
-              </div>
-            )}
-            <p className="rt-muted">
-              {d.hata ? <span className="rt-hata">⚠ {d.hata}</span> : d.son ? `Son eşitleme: ${zamanFarki(d.son)}` : 'Henüz eşitlenmedi'}
-              {d.bekleyen > 0 && ` · ${d.bekleyen} değişiklik bekliyor`}
-            </p>
-          </>
-        )}
-        <div className="rt-satir">
-          {o.session && <button type="button" className="rt-btn" disabled={d.calisiyor} onClick={() => senkronla()}>{d.calisiyor ? 'Eşitleniyor…' : 'Şimdi eşitle'}</button>}
-          <button type="button" className="rt-btn" onClick={() => setModal('kurtarma')}>Kurtarma anahtarı</button>
-          <button type="button" className="rt-btn" onClick={() => setModal('sifre')}>{sadeceGoogle ? 'Veri şifresini değiştir' : 'Şifre değiştir'}</button>
-          <button type="button" className="rt-btn" onClick={() => setModal('cikis')}>Çıkış yap</button>
+    <>
+      <KurtarmaHatirlatma />
+      <Kap baslik="Profil">
+        <div className="rt-profil-bas">
+          <Avatar ad={ad} resim={resim} boyut={48} />
+          {adDuzenle === null ? (
+            <span className="tx"><span><b>{ad}</b> <button type="button" className="rt-linkbtn" onClick={() => setAdDuzenle(o.gorunenAd ?? '')}>değiştir</button></span><small>{u?.email}</small></span>
+          ) : (
+            <div className="rt-satir" style={{ flexWrap: 'nowrap', flex: 1 }}>
+              <input className="rt-inp" value={adDuzenle} onChange={(e) => setAdDuzenle(e.target.value)} autoFocus />
+              <button type="button" className="rt-btn primary" disabled={!adDuzenle.trim()} onClick={async () => { await gorunenAdDegistir(uid!, adDuzenle); setAdDuzenle(null); location.reload(); }}>Kaydet</button>
+            </div>
+          )}
         </div>
+        <p className="rt-muted">Görünen adın davetlerde, gruplarda ve koçunun listesinde görünür.</p>
       </Kap>
+      <Kap baslik="Giriş ve güvenlik">
+        <p className="rt-metin">Giriş: <b>{[google ? 'Google' : '', !sadeceGoogle ? 'e-posta + şifre' : ''].filter(Boolean).join(' · ') || '—'}</b></p>
+        <div className="rt-satir">
+          <button type="button" className="rt-btn" onClick={() => setModal('sifre')}>{sadeceGoogle ? 'Veri şifresini değiştir' : 'Şifre değiştir'}</button>
+          <button type="button" className="rt-btn" onClick={() => setModal('kurtarma')}>Kurtarma anahtarı</button>
+        </div>
+        <p className="rt-muted">Verin cihazında şifrelenir. Şifreni unutursan verini yalnız kurtarma anahtarın açar.</p>
+      </Kap>
+      <Kap baslik="Eşitleme">
+        <p className="rt-muted">
+          {d.hata ? <span className="rt-hata">⚠ {d.hata}</span> : d.son ? `Son eşitleme: ${zamanFarki(d.son)}` : 'Henüz eşitlenmedi'}
+          {d.bekleyen > 0 && ` · ${d.bekleyen} değişiklik bekliyor`}
+        </p>
+        {o.session && <div className="rt-satir"><button type="button" className="rt-btn" disabled={d.calisiyor} onClick={() => senkronla()}>{d.calisiyor ? 'Eşitleniyor…' : 'Şimdi eşitle'}</button></div>}
+      </Kap>
+      {modal === 'sifre' && <SifreModal onKapat={() => setModal(null)} veri={sadeceGoogle} />}
+      {modal === 'kurtarma' && <KurtarmaIste onKapat={() => setModal(null)} onKaydedildi={async () => { if (uid) await kurtarmaKaydet(uid); setModal(null); }} />}
+    </>
+  );
+}
 
+function AyarlarIcerik() {
+  const o = useOturum();
+  const dn = useDanismanlik();
+  const [veriModal, setVeriModal] = useState<null | 'sifirla' | 'sil'>(null);
+  return (
+    <>
       {dn.profil?.koc && <PaketlerKap />}
       <DanismanlikAyarlari />
       <AileAyarlari />
-      <BildirimAyarlari />
       {o.hesapli && (
         <Kap baslik="Veriler">
           <p className="rt-muted">Bu cihazı temizlemek için &quot;Çıkış yap&quot; yeter: çıkışta cihazdaki kopya silinir, veri hesapta kalır.</p>
@@ -350,12 +382,14 @@ export function AyarlarPane() {
       )}
       {veriModal === 'sifirla' && <SifirlaModal onKapat={() => setVeriModal(null)} />}
       {veriModal === 'sil' && <HesapSilModal onKapat={() => setVeriModal(null)} />}
-
-      {modal === 'cikis' && <CikisModal onKapat={() => setModal(null)} bekleyen={d.bekleyen} />}
-      {modal === 'sifre' && <SifreModal onKapat={() => setModal(null)} veri={sadeceGoogle} />}
-      {modal === 'kurtarma' && <KurtarmaIste onKapat={() => setModal(null)} onKaydedildi={async () => { if (uid) await kurtarmaKaydet(uid); setModal(null); }} />}
-    </div>
+    </>
   );
+}
+
+/** Çıkış onayı (avatar menüsünden). */
+export function CikisOnayi({ onKapat }: { onKapat: () => void }) {
+  const d = useSenkronDurum();
+  return <CikisModal onKapat={onKapat} bekleyen={d.bekleyen} />;
 }
 
 function CikisModal({ onKapat, bekleyen }: { onKapat: () => void; bekleyen: number }) {
@@ -491,21 +525,49 @@ export function Avatar({ ad, resim, boyut = 28 }: { ad: string; resim?: string |
   return <span className="rt-avatar" style={{ ...st, background: renkSec(ad) }} aria-hidden>{basHarfler(ad)}</span>;
 }
 
-export function KullaniciRozeti({ onAc, uyari }: { onAc: () => void; uyari?: boolean }) {
+export function KullaniciRozeti({ onSec, uyari }: { onSec: (e: HesapEkran | 'cikis') => void; uyari?: boolean }) {
   const o = useOturum();
+  const d = useSenkronDurum();
+  const [acik, setAcik] = useState(false);
+  const kok = React.useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!acik) return;
+    const dis = (e: PointerEvent) => { if (kok.current && !kok.current.contains(e.target as Node)) setAcik(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setAcik(false); };
+    document.addEventListener('pointerdown', dis);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('pointerdown', dis); document.removeEventListener('keydown', esc); };
+  }, [acik]);
   if (!o.hesapli) return null;
   const u = o.session?.user;
   const eposta = u?.email ?? '';
   const ad = o.gorunenAd ?? (eposta ? eposta.split('@')[0] : 'Ben');
   const meta = (u?.user_metadata ?? {}) as Record<string, unknown>;
   const resim = (typeof meta.avatar_url === 'string' && meta.avatar_url) || (typeof meta.picture === 'string' && meta.picture) || null;
+  const sec = (e: HesapEkran | 'cikis') => { setAcik(false); onSec(e); };
   return (
-    <button type="button" className="rt-kullanici" onClick={onAc} title={eposta ? `${ad} · ${eposta}` : ad} aria-label={`${ad} — Ayarlar`}>
-      <span className="rt-kullanici-ad">{ad}</span>
-      <span className="rt-kullanici-av">
-        <Avatar ad={ad} resim={resim} />
-        {uyari && <i className="rt-sekme-rozet nokta" aria-label="Hesabını güvenceye al" />}
-      </span>
-    </button>
+    <div className="rt-kullanici-kok" ref={kok}>
+      <button type="button" className="rt-kullanici" onClick={() => setAcik(!acik)} aria-haspopup="menu" aria-expanded={acik} aria-label={`${ad} — hesap menüsü`}>
+        <span className="rt-kullanici-ad">{ad}</span>
+        <span className="rt-kullanici-av">
+          <Avatar ad={ad} resim={resim} />
+          {uyari && <i className="rt-sekme-rozet nokta" aria-label="Hesabını güvenceye al" />}
+        </span>
+      </button>
+      {acik && (
+        <div className="rt-kmenu" role="menu">
+          <div className="rt-kmenu-bas">
+            <Avatar ad={ad} resim={resim} boyut={38} />
+            <span className="tx"><b>{ad}</b><small>{eposta}</small>
+              <small className={d.hata ? 'hata' : ''}>{d.hata ? '⚠ Eşitleme sorunu' : d.calisiyor ? 'Eşitleniyor…' : d.son ? `Eşitlendi · ${zamanFarki(d.son)}` : ''}</small>
+            </span>
+          </div>
+          <button type="button" role="menuitem" onClick={() => sec('profil')}>👤 Profil ve hesap{uyari && <i className="rt-kmenu-nokta" aria-label="Kurtarma anahtarını kaydet" />}</button>
+          <button type="button" role="menuitem" onClick={() => sec('bildirim')}>🔔 Bildirimler</button>
+          <button type="button" role="menuitem" onClick={() => sec('ayarlar')}>⚙️ Ayarlar</button>
+          <button type="button" role="menuitem" className="cikis" onClick={() => sec('cikis')}>Çıkış yap</button>
+        </div>
+      )}
+    </div>
   );
 }

@@ -21,15 +21,18 @@ import { DavetKarsilama } from './ritos/Danismanlik';
 import { SenkronIsareti, useGelenSenkron } from './ritos/Paylasim';
 import { GelenlerEkrani, useGelenlerOzeti } from './ritos/Sohbet';
 import { HomeEkrani } from './ritos/HomeEkrani';
-import { AyarlarPane, GirisEkrani, KullaniciRozeti, SifreSifirlaEkrani, VeriSifresiEkrani, useKurtarmaHatirlat } from './ritos/Hesap';
+import { CikisOnayi, GirisEkrani, HesapEkrani, KullaniciRozeti, type HesapEkran, SifreSifirlaEkrani, VeriSifresiEkrani, useKurtarmaHatirlat } from './ritos/Hesap';
 import { oauthBekliyor, useHesapBaslat, useOturum } from '@/lib/hesap';
 
 const NARROW_BREAKPOINT = 760;
 // Testte (NEXT_PUBLIC_RITOS_TEST=1 ile derlenmiş sürüm) giriş kapısı atlanır; gerçek sürümde yok.
 const TEST = process.env.NEXT_PUBLIC_RITOS_TEST === '1';
 
-type Sekme = 'home' | 'gunum' | 'atolye' | 'ayarlar' | 'gelenler';
-type Sag = 'home' | 'atolye' | 'ayarlar' | 'gelenler'; // geniş ekranda Ajandam'ın yanındaki bölme
+type Sekme = 'home' | 'gunum' | 'atolye' | 'gelenler';
+type Sag = 'home' | 'atolye' | 'gelenler'; // geniş ekranda Ajandam'ın yanındaki bölme
+// Alt menü (5 ekim): Ayarlar sekmesi kalktı, avatar menüsüne taşındı. Yeni sekme buraya eklenir.
+const MOBIL_SEKMELER: [Sekme, string, string][] = [['home', '🏠', 'Home'], ['gunum', '📅', 'Ajandam'], ['atolye', '🗂', 'Atölye']];
+const GENIS_SEKMELER: [Sag, string, string][] = [['home', '🏠', 'Home'], ['atolye', '🗂', 'Atölye']];
 
 export default function RitosLab() {
   const o = useOturum();
@@ -74,7 +77,11 @@ function RitosUygulama() {
   }, []);
 
   const homeyaDon = () => { if (isNarrow) setSekme('home'); else setSag('home'); };
-  const ayarlaraGit = () => { if (isNarrow) setSekme('ayarlar'); else { setSag('ayarlar'); setSekme('gunum'); } };
+  // Avatar menüsünden açılan hesap ekranları (Profil · Bildirimler · Ayarlar): telefonda ana alanda,
+  // geniş ekranda sağ bölmede; bir sekmeye dokununca kapanır.
+  const [hesap, setHesap] = useState<HesapEkran | null>(null);
+  const [cikis, setCikis] = useState(false);
+  const menuSec = (e: HesapEkran | 'cikis') => { if (e === 'cikis') setCikis(true); else setHesap(e); };
   // 4 ekim: Home'daki Danışmanlık ekranı kalktı — davet, sonlananlar, alan açma Atölye seçicisinde;
   // şablonlar ve sınav paketi Atölye › Kütüphane'de; sonlandırma kişinin Bilgiler sekmesinde.
   const home = <HomeEkrani />;
@@ -82,24 +89,23 @@ function RitosUygulama() {
   const kurtarma = useKurtarmaHatirlat();
   const rozet = (k: Sekme) => (
     k === 'home' && gelenler.toplam > 0 ? <i className="rt-sekme-rozet">{gelenler.toplam}</i>
-      : k === 'ayarlar' && kurtarma ? <i className="rt-sekme-rozet nokta" aria-label="Hesabını güvenceye al" />
       : null
   );
-  // Üst köşe (5 ekim): hangi hesapta olduğun her an görünür; dokununca Ayarlar.
-  const ustSag = <div className="rt-ust-sag"><SenkronIsareti /><KullaniciRozeti onAc={ayarlaraGit} uyari={kurtarma} /></div>;
+  // Üst köşe (5 ekim): hangi hesapta olduğun her an görünür; dokununca hesap menüsü.
+  const ustSag = <div className="rt-ust-sag"><SenkronIsareti /><KullaniciRozeti onSec={menuSec} uyari={kurtarma} /></div>;
+  const hesapEkrani = hesap && <HesapEkrani ekran={hesap} onGeri={() => setHesap(null)} />;
   const sagSekme = (s: Sekme) => (
     s === 'gelenler' ? <GelenlerEkrani onGeri={homeyaDon} />
-      : s === 'ayarlar' ? <AyarlarPane />
       : s === 'atolye' ? <Atolye genis={false} />
       : home
   );
-  // Geniş ekran (4 ekim): solda Ajandam, sağ bölmede Home · Atölye · Ayarlar. Atölye de telefondaki
+  // Geniş ekran (4 ekim): solda Ajandam, sağ bölmede Home · Atölye (5 ekim: Ayarlar avatar menüsünde). Atölye de telefondaki
   // düzeniyle (alt alta günler, geri tuşlu ekranlar) sağ bölmede çalışır; tam ekran kipi kaldırıldı.
   const genisSekme: Sag = sag === 'gelenler' ? 'home' : sag;
   const sekmeler = (
     <div className="side-tabs">
-      {([['home', '🏠', 'Home'], ['atolye', '🗂', 'Atölye'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sag, string, string][]).map(([k, ic, ad]) => (
-        <button key={k} className={genisSekme === k ? 'on' : ''} onClick={() => { setSag(k); setSekme(k === 'atolye' ? 'atolye' : 'gunum'); }}><span>{ic}{rozet(k)}</span>{ad}</button>
+      {GENIS_SEKMELER.map(([k, ic, ad]) => (
+        <button key={k} className={!hesap && genisSekme === k ? 'on' : ''} onClick={() => { setHesap(null); setSag(k); setSekme(k === 'atolye' ? 'atolye' : 'gunum'); }}><span>{ic}{rozet(k)}</span>{ad}</button>
       ))}
     </div>
   );
@@ -107,13 +113,14 @@ function RitosUygulama() {
   return (
     <div className="shell">
       <DavetKarsilama />
+      {cikis && <CikisOnayi onKapat={() => setCikis(false)} />}
       {isNarrow ? (
         <div className="mobile-app">
           <div className="mobile-hd"><b>Ritos</b>{ustSag}</div>
-          <div className="mobile-main">{sekme === 'gunum' ? <AjandaPane /> : sekme === 'atolye' ? <Atolye genis={false} /> : sagSekme(sekme)}</div>
+          <div className="mobile-main">{hesapEkrani || (sekme === 'gunum' ? <AjandaPane /> : sekme === 'atolye' ? <Atolye genis={false} /> : sagSekme(sekme))}</div>
           <div className="mobile-nav">
-            {([['home', '🏠', 'Home'], ['gunum', '📅', 'Ajandam'], ['atolye', '🗂', 'Atölye'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sekme, string, string][]).map(([k, ic, ad]) => (
-              <button key={k} className={(sekme === 'gelenler' ? 'home' : sekme) === k ? 'on' : ''} onClick={() => setSekme(k)}><span className="ic">{ic}{rozet(k)}</span>{ad}</button>
+            {MOBIL_SEKMELER.map(([k, ic, ad]) => (
+              <button key={k} className={!hesap && (sekme === 'gelenler' ? 'home' : sekme) === k ? 'on' : ''} onClick={() => { setHesap(null); setSekme(k); }}><span className="ic">{ic}{rozet(k)}</span>{ad}</button>
             ))}
           </div>
         </div>
@@ -126,7 +133,7 @@ function RitosUygulama() {
               left={<AjandaPane />}
               right={(
                 <>
-                  <div className="side-content">{sagSekme(sag)}</div>
+                  <div className="side-content">{hesapEkrani || sagSekme(sag)}</div>
                   {sekmeler}
                 </>
               )}
