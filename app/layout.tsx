@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   description: 'Günlük ritüeller, kişisel gelişim programları ve paylaşım.',
   applicationName: 'Ritos',
   appleWebApp: { capable: true, title: 'Ritos', statusBarStyle: 'black-translucent' },
+  other: { 'mobile-web-app-capable': 'yes' },
   formatDetection: { telephone: false },
 };
 

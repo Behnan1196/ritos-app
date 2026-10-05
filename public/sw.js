@@ -1,6 +1,8 @@
 // Ritos service worker — uygulama kabuğunu önbellekler ki çevrimdışı da açılsın.
 // Veri zaten cihazda (IndexedDB); Supabase gibi dış istekler önbelleğe alınmaz.
-const SURUM = 'ritos-v2';
+// v3 (5 ekim): yalnız başarılı yanıtlar önbelleğe girer. Önceden, yayın anında bir kez 404 dönen
+// derlenmiş dosya (CSS/JS) kalıcı olarak 404 diye saklanıyordu → stilsiz / boş ekran; sürüm artınca eski önbellek silinir.
+const SURUM = 'ritos-v3';
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(SURUM).then((c) => c.addAll(['/', '/manifest.webmanifest', '/ikon/192.png'])).then(() => self.skipWaiting()));
@@ -21,8 +23,8 @@ self.addEventListener('fetch', (e) => {
   // Sayfa: önce ağ (yeni sürüm gelsin), yoksa önbellek.
   if (req.mode === 'navigate') {
     e.respondWith(
-      fetch(req)
-        .then((r) => { const k = r.clone(); caches.open(SURUM).then((c) => c.put('/', k)); return r; })
+      fetch(req, { cache: 'no-cache' })
+        .then((r) => { if (r.ok) { const k = r.clone(); caches.open(SURUM).then((c) => c.put('/', k)); } return r; })
         .catch(() => caches.match('/')),
     );
     return;
@@ -31,7 +33,7 @@ self.addEventListener('fetch', (e) => {
   // Derlenmiş dosyalar adlarında hash taşır, değişmez: önce önbellek.
   if (url.pathname.startsWith('/_next/static/')) {
     e.respondWith(
-      caches.match(req).then((h) => h || fetch(req).then((r) => { const k = r.clone(); caches.open(SURUM).then((c) => c.put(req, k)); return r; })),
+      caches.match(req).then((h) => (h && h.ok ? h : fetch(req).then((r) => { if (r.ok) { const k = r.clone(); caches.open(SURUM).then((c) => c.put(req, k)); } return r; }))),
     );
     return;
   }

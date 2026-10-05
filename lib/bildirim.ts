@@ -42,7 +42,7 @@ export async function bildirimAc(): Promise<string | null> {
   if (!sb) return 'Bağlantı yok';
   const izin = await Notification.requestPermission();
   if (izin !== 'granted') return 'İzin verilmedi';
-  const reg = (await navigator.serviceWorker.getRegistration()) ?? (await navigator.serviceWorker.register('/sw.js'));
+  const reg = (await navigator.serviceWorker.getRegistration()) ?? (await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }));
   await navigator.serviceWorker.ready;
   let ab = await reg.pushManager.getSubscription();
   if (!ab) ab = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(VAPID_ACIK) });
