@@ -26,7 +26,7 @@ import { SenkronIsareti, useGelenSenkron } from './ritos/Paylasim';
 import { GelenlerEkrani, useGelenlerOzeti } from './ritos/Sohbet';
 import { OlcumlerSatiri } from './ritos/Olcum';
 import { NotlarWidget } from './ritos/Notlar';
-import { AyarlarPane, GirisEkrani, SifreSifirlaEkrani, useKurtarmaHatirlat } from './ritos/Hesap';
+import { AyarlarPane, GirisEkrani, KullaniciRozeti, SifreSifirlaEkrani, useKurtarmaHatirlat } from './ritos/Hesap';
 import { useHesapBaslat, useOturum } from '@/lib/hesap';
 
 const NARROW_BREAKPOINT = 760;
@@ -78,6 +78,7 @@ function RitosUygulama() {
 
   const gelenlereGit = () => { if (isNarrow) setSekme('gelenler'); else setSag('gelenler'); };
   const homeyaDon = () => { if (isNarrow) setSekme('home'); else setSag('home'); };
+  const ayarlaraGit = () => { if (isNarrow) setSekme('ayarlar'); else { setSag('ayarlar'); setSekme('gunum'); } };
   // 4 ekim: Home'daki Danışmanlık ekranı kalktı — davet, sonlananlar, alan açma Atölye seçicisinde;
   // şablonlar ve sınav paketi Atölye › Kütüphane'de; sonlandırma kişinin Bilgiler sekmesinde.
   const home = <HomeEkrani onGelenler={gelenlereGit} />;
@@ -88,6 +89,8 @@ function RitosUygulama() {
       : k === 'ayarlar' && kurtarma ? <i className="rt-sekme-rozet nokta" aria-label="Hesabını güvenceye al" />
       : null
   );
+  // Üst köşe (5 ekim): hangi hesapta olduğun her an görünür; dokununca Ayarlar.
+  const ustSag = <div className="rt-ust-sag"><SenkronIsareti /><KullaniciRozeti onAc={ayarlaraGit} uyari={kurtarma} /></div>;
   const sagSekme = (s: Sekme) => (
     s === 'gelenler' ? <GelenlerEkrani onGeri={homeyaDon} />
       : s === 'ayarlar' ? <AyarlarPane />
@@ -110,7 +113,7 @@ function RitosUygulama() {
       <DavetKarsilama />
       {isNarrow ? (
         <div className="mobile-app">
-          <div className="mobile-hd"><b>Ritos</b><SenkronIsareti /></div>
+          <div className="mobile-hd"><b>Ritos</b>{ustSag}</div>
           <div className="mobile-main">{sekme === 'gunum' ? <AjandaPane /> : sekme === 'atolye' ? <Atolye genis={false} /> : sagSekme(sekme)}</div>
           <div className="mobile-nav">
             {([['home', '🏠', 'Home'], ['gunum', '📅', 'Ajandam'], ['atolye', '🗂', 'Atölye'], ['ayarlar', '⚙️', 'Ayarlar']] as [Sekme, string, string][]).map(([k, ic, ad]) => (
@@ -120,7 +123,7 @@ function RitosUygulama() {
         </div>
       ) : (
         <>
-          <div className="topbar"><b>Ritos</b><SenkronIsareti /></div>
+          <div className="topbar"><b>Ritos</b>{ustSag}</div>
           <SplitPane
               ratio={ratio}
               setRatio={setRatio}

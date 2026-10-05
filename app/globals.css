@@ -1044,3 +1044,15 @@ textarea.rt-inp{font-family:inherit;}
 .rt-sifirla-sec input{margin-top:3px;width:18px;height:18px;flex:0 0 auto;}
 .rt-sifirla-sec span{display:flex;flex-direction:column;}
 .rt-sifirla-sec small{color:var(--muted);font-size:12px;}
+
+/* üst köşe: avatar + ad (5 ekim) */
+.rt-ust-sag{margin-left:auto;display:flex;align-items:center;gap:10px;min-width:0;}
+.rt-ust-sag .rt-senkron{margin-left:0;}
+.rt-kullanici{display:flex;align-items:center;gap:8px;background:none;border:0;color:inherit;cursor:pointer;padding:2px 2px 2px 8px;border-radius:20px;min-width:0;font:inherit;}
+.rt-kullanici:hover{background:rgba(255,255,255,.08);}
+.rt-kullanici-ad{font-size:13px;font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mobile-hd .rt-kullanici-ad{max-width:96px;font-size:12.5px;}
+.rt-kullanici-av{position:relative;display:flex;}
+.rt-kullanici-av .rt-sekme-rozet.nokta{right:-2px;top:-2px;margin:0;box-shadow:0 0 0 2px #2c2a24;}
+.rt-avatar{border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:700;letter-spacing:.02em;object-fit:cover;flex:0 0 auto;}
+.rt-ust-sag .rt-senkron{white-space:nowrap;}

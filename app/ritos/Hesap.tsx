@@ -370,3 +370,46 @@ function HesapSilModal({ onKapat }: { onKapat: () => void }) {
     </Modal>
   );
 }
+
+// ———————————— Üst köşe: avatar + ad (5 ekim) — dokununca Ayarlar ————————————
+// Resim: ileride Google girişinde user_metadata.avatar_url/picture gelir; yoksa baş harfler.
+const AVATAR_RENK = ['#5b8a72', '#7a6aa8', '#b0704a', '#4f7fa8', '#a8576a', '#8a8a3c', '#3c8a8a'];
+function basHarfler(ad: string): string {
+  const p = ad.trim().split(/\s+/).filter(Boolean);
+  const h = p.length > 1 ? p[0][0] + p[p.length - 1][0] : (p[0] ?? '?')[0];
+  return h.toLocaleUpperCase('tr-TR');
+}
+function renkSec(s: string): string {
+  let n = 0;
+  for (let i = 0; i < s.length; i++) n = (n * 31 + s.charCodeAt(i)) >>> 0;
+  return AVATAR_RENK[n % AVATAR_RENK.length];
+}
+
+export function Avatar({ ad, resim, boyut = 28 }: { ad: string; resim?: string | null; boyut?: number }) {
+  const [bozuk, setBozuk] = useState(false);
+  const st = { width: boyut, height: boyut, fontSize: Math.round(boyut * 0.4) };
+  if (resim && !bozuk) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img className="rt-avatar" style={st} src={resim} alt="" referrerPolicy="no-referrer" onError={() => setBozuk(true)} />;
+  }
+  return <span className="rt-avatar" style={{ ...st, background: renkSec(ad) }} aria-hidden>{basHarfler(ad)}</span>;
+}
+
+export function KullaniciRozeti({ onAc, uyari }: { onAc: () => void; uyari?: boolean }) {
+  const o = useOturum();
+  if (!o.hesapli) return null;
+  const u = o.session?.user;
+  const eposta = u?.email ?? '';
+  const ad = o.gorunenAd ?? (eposta ? eposta.split('@')[0] : 'Ben');
+  const meta = (u?.user_metadata ?? {}) as Record<string, unknown>;
+  const resim = (typeof meta.avatar_url === 'string' && meta.avatar_url) || (typeof meta.picture === 'string' && meta.picture) || null;
+  return (
+    <button type="button" className="rt-kullanici" onClick={onAc} title={eposta ? `${ad} · ${eposta}` : ad} aria-label={`${ad} — Ayarlar`}>
+      <span className="rt-kullanici-ad">{ad}</span>
+      <span className="rt-kullanici-av">
+        <Avatar ad={ad} resim={resim} />
+        {uyari && <i className="rt-sekme-rozet nokta" aria-label="Hesabını güvenceye al" />}
+      </span>
+    </button>
+  );
+}
