@@ -77,6 +77,26 @@ function BaglantiWidget({ b, onAyar }: { b: BaglantiRow; onAyar: () => void }) {
   );
 }
 
+/** Home › bağlantı widget'ı tam ekran (5 ekim): iframe bölmeyi doldurur; yalnız açılınca yüklenir. */
+export function BaglantiTam({ b, onAyar }: { b: BaglantiRow; onAyar: () => void }) {
+  const [anahtar, setAnahtar] = useState(0);
+  const cevrimici = useCevrimici();
+  const src = urlDoldur(b.url);
+  return (
+    <div className="rt-bag-tam-w">
+      <div className="rt-satir rt-bag-arac">
+        <span className="rt-muted">{(() => { try { return new URL(src).host; } catch { return ''; } })()}</span>
+        <span style={{ flex: 1 }} />
+        <button type="button" className="rt-ikon" aria-label="Yenile" title="Yenile" onClick={() => setAnahtar((x) => x + 1)}>↻</button>
+        <button type="button" className="rt-ikon" aria-label="Widget ayarları" title="Ayarlar" onClick={onAyar}>⋯</button>
+      </div>
+      {cevrimici
+        ? <iframe key={anahtar} className="rt-bag-tam" src={src} title={b.ad} sandbox={sandboxFor(src)} />
+        : <p className="rt-muted rt-bag-yok">Bağlantı yok — internet gelince yüklenir.</p>}
+    </div>
+  );
+}
+
 // Büyük açılış: geniş ekranda sağ panelde, telefonda tam ekran (Notlar ekranıyla aynı kalıp).
 function BaglantiEkrani({ b, src, onKapat }: { b: BaglantiRow; src: string; onKapat: () => void }) {
   const [anahtar, setAnahtar] = useState(0);
@@ -92,7 +112,7 @@ function BaglantiEkrani({ b, src, onKapat }: { b: BaglantiRow; src: string; onKa
   );
 }
 
-function BaglantiFormu({ b, onKapat }: { b: BaglantiRow | null; onKapat: () => void }) {
+export function BaglantiFormu({ b, onKapat }: { b: BaglantiRow | null; onKapat: () => void }) {
   const [ad, setAd] = useState(b?.ad ?? '');
   const [url, setUrl] = useState(b?.url ?? '');
   const [boy, setBoy] = useState<BaglantiRow['boy']>(b?.boy ?? 'o');

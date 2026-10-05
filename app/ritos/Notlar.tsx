@@ -21,16 +21,16 @@ const zamanMetni = (t: number) => {
 };
 const onizleme = (n: NotRow) => n.metin.split('\n').map((s) => s.trim()).filter(Boolean).slice(1).join(' · ');
 
-export function NotlarWidget() {
+export function NotlarWidget({ gomulu }: { gomulu?: boolean } = {}) {
   const liste = useCanli(notlar, [], [] as NotRow[]);
   const [hizli, setHizli] = useState('');
   const [acik, setAcik] = useState<{ id: string; yeni?: boolean } | null>(null);
   const [tumu, setTumu] = useState(false);
   const gorunen = [...liste.filter((n) => n.sabit), ...liste.filter((n) => !n.sabit).slice(0, 3)];
   return (
-    <div className="rt-notlar-w">
+    <div className={`rt-notlar-w${gomulu ? ' gomulu' : ''}`}>
       <div className="rt-notlar-hd">
-        <b>📝 Notlar</b>
+        {gomulu ? <span style={{ flex: 1 }} /> : <b>📝 Notlar</b>}
         {liste.length > 0 && <button type="button" className="rt-linkbtn" onClick={() => setTumu(true)}>Tümü ({liste.length}) ›</button>}
         <button type="button" className="rt-ikon" aria-label="Yeni not" onClick={async () => setAcik({ id: await hizliNot(''), yeni: true })}>＋</button>
       </div>

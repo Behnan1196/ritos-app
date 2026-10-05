@@ -36,7 +36,7 @@ export function OlcumlerSatiri() {
   );
 }
 
-function Cizgi({ seri }: { seri: { deger: number }[] }) {
+export function Cizgi({ seri }: { seri: { deger: number }[] }) {
   const s = seri.slice(-12);
   if (s.length < 2) return null;
   const W = 96, H = 28;
@@ -53,9 +53,14 @@ function Cizgi({ seri }: { seri: { deger: number }[] }) {
 }
 
 function OlcumlerModal({ ozet, onKapat }: { ozet: OlcuOzeti[]; onKapat: () => void }) {
+  return <Modal baslik="📏 Ölçümlerim" onKapat={onKapat}><OlcumlerListesi ozet={ozet} /></Modal>;
+}
+
+/** Ölçü listesi (Home › Ölçümlerim tam ekranı ve eski modal). */
+export function OlcumlerListesi({ ozet }: { ozet: OlcuOzeti[] }) {
   const [secili, setSecili] = useState<string | null>(null);
   return (
-    <Modal baslik="📏 Ölçümlerim" onKapat={onKapat}>
+    <>
       <div className="rt-olcumler">
         {ozet.map((o) => {
           const fark = o.onceki ? o.son.deger - o.onceki.deger : null;
@@ -82,6 +87,6 @@ function OlcumlerModal({ ozet, onKapat }: { ozet: OlcuOzeti[]; onKapat: () => vo
         })}
       </div>
       <p className="rt-muted">Değerler Ajanda'daki ölçüm kartlarından gelir. Kart silinse de ölçüm geçmişin kalır.</p>
-    </Modal>
+    </>
   );
 }

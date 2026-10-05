@@ -103,7 +103,7 @@ export function useGelenlerOzeti(): { davet: number; paylasim: number; toplam: n
   return { davet, paylasim, toplam: davet + paylasim };
 }
 
-export function GelenlerEkrani({ onGeri }: { onGeri?: () => void }) {
+export function GelenlerEkrani({ onGeri, gomulu }: { onGeri?: () => void; gomulu?: boolean }) {
   const d = useDanismanlik();
   const konusmalar = useKonusmalar();
   const ozet = useGelenlerOzeti();
@@ -127,11 +127,13 @@ export function GelenlerEkrani({ onGeri }: { onGeri?: () => void }) {
     );
   };
   return (
-    <div className="rt-gelenler">
-      <div className="rt-dan-bas">
-        {onGeri && <button type="button" className="rt-geri" onClick={onGeri}>‹ Home</button>}
-        <b>📥 Gelenler</b>
-      </div>
+    <div className={`rt-gelenler${gomulu ? ' gomulu' : ''}`}>
+      {!gomulu && (
+        <div className="rt-dan-bas">
+          {onGeri && <button type="button" className="rt-geri" onClick={onGeri}>‹ Home</button>}
+          <b>📥 Gelenler</b>
+        </div>
+      )}
       <BekleyenDavetler />
       <AileDavetleri />
       {yeni.map(satir)}

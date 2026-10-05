@@ -14,18 +14,13 @@
 import React, { useEffect, useRef, useState, type ReactNode } from 'react';
 import AjandaPane from './ritos/AjandaPane';
 import { useBeklemeIzleyici, useSayacIzleyici } from '@/lib/sayac';
-import { BaglantiWidgetlari } from './ritos/Baglanti';
-import { OrtakListeWidget } from './ritos/OrtakListe';
 import { useBildirimPlani } from '@/lib/bildirim';
 import { useDisKartlar } from '@/lib/disKart';
-import { OdakAlanlari } from './ritos/KisiselGelisim';
 import Atolye from './ritos/Atolye';
-import { V2 } from '@/lib/surum';
-import { DavetKarsilama, KoclarimSatiri } from './ritos/Danismanlik';
+import { DavetKarsilama } from './ritos/Danismanlik';
 import { SenkronIsareti, useGelenSenkron } from './ritos/Paylasim';
 import { GelenlerEkrani, useGelenlerOzeti } from './ritos/Sohbet';
-import { OlcumlerSatiri } from './ritos/Olcum';
-import { NotlarWidget } from './ritos/Notlar';
+import { HomeEkrani } from './ritos/HomeEkrani';
 import { AyarlarPane, GirisEkrani, KullaniciRozeti, SifreSifirlaEkrani, VeriSifresiEkrani, useKurtarmaHatirlat } from './ritos/Hesap';
 import { oauthBekliyor, useHesapBaslat, useOturum } from '@/lib/hesap';
 
@@ -78,12 +73,11 @@ function RitosUygulama() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const gelenlereGit = () => { if (isNarrow) setSekme('gelenler'); else setSag('gelenler'); };
   const homeyaDon = () => { if (isNarrow) setSekme('home'); else setSag('home'); };
   const ayarlaraGit = () => { if (isNarrow) setSekme('ayarlar'); else { setSag('ayarlar'); setSekme('gunum'); } };
   // 4 ekim: Home'daki Danışmanlık ekranı kalktı — davet, sonlananlar, alan açma Atölye seçicisinde;
   // şablonlar ve sınav paketi Atölye › Kütüphane'de; sonlandırma kişinin Bilgiler sekmesinde.
-  const home = <HomeEkrani onGelenler={gelenlereGit} />;
+  const home = <HomeEkrani />;
   const gelenler = useGelenlerOzeti();
   const kurtarma = useKurtarmaHatirlat();
   const rozet = (k: Sekme) => (
@@ -180,32 +174,6 @@ function SplitPane({
       <div className="split-main" style={{ width: ratio + '%' }}>{left}</div>
       <div className={`split-divider${dragging ? ' dragging' : ''}`} onPointerDown={(e) => { e.preventDefault(); setDragging(true); }} />
       <div className="split-side" style={{ width: 100 - ratio + '%' }}>{right}</div>
-    </div>
-  );
-}
-
-// ———————————————————————————————————— Home (V1: bizim tasarladığımız sabit düzen) ————————————————————————————————————
-
-function HomeEkrani({ onGelenler }: { onGelenler: () => void }) {
-  const gelenler = useGelenlerOzeti();
-  const [widgetEkle, setWidgetEkle] = useState(false);
-  return (
-    <div className="fixed-widgets">
-      <NotlarWidget />
-      <OrtakListeWidget />
-      <BaglantiWidgetlari ekleAcik={widgetEkle} onEkleKapat={() => setWidgetEkle(false)} />
-      {/* 30 eylül: alanlar V1'de yok (ileride üst klasörler alanlara karşılık gelebilir). */}
-      {V2 && <OdakAlanlari onAc={() => window.dispatchEvent(new Event('ritos-atolyeye-git'))} />}
-      <KoclarimSatiri />
-      <OlcumlerSatiri />
-      {gelenler.toplam > 0 && (
-        <button type="button" className="wrow tool" onClick={onGelenler}>
-          <span className="ic">📥</span>
-          <span className="tx"><span className="t">Gelenler</span><span className="s">{[gelenler.davet ? `${gelenler.davet} davet` : '', gelenler.paylasim ? `${gelenler.paylasim} yeni paylaşım` : ''].filter(Boolean).join(' · ')}</span></span>
-          <span className="chev">›</span>
-        </button>
-      )}
-      <button type="button" className="rt-widget-ekle" onClick={() => setWidgetEkle(true)}>＋ Bağlantı widget&apos;ı ekle</button>
     </div>
   );
 }

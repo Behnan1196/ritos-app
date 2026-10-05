@@ -10,7 +10,7 @@ import { aileAktifMi, benAile, ortakGonder, useDanismanlik } from '@/lib/danisma
 import { grupIkon } from '@/lib/grup';
 import { OnayKutusu } from './ortak';
 
-export function OrtakListeWidget() {
+export function OrtakListeWidget({ gomulu }: { gomulu?: boolean } = {}) {
   const d = useDanismanlik();
   // 5 ekim: birden çok grup — liste seçili grubun; grup birden fazlaysa başlıkta seçilir.
   const gruplar = useCanli(async () => (await db.aile.toArray()).filter((a) => a.uyeler.some((u) => u.uye === d.uid && u.durum === 'aktif')).sort((a, b) => a.ad.localeCompare(b.ad, 'tr')), [d.uid], [] as AileRow[]);
@@ -32,9 +32,9 @@ export function OrtakListeWidget() {
   });
 
   return (
-    <div className="rt-ortak-w">
+    <div className={`rt-ortak-w${gomulu ? ' gomulu' : ''}`}>
       <div className="rt-notlar-hd">
-        <b>🛒 Ortak listeler</b>
+        {!gomulu && <b>🛒 Ortak listeler</b>}
         {gruplar.length > 1
           ? <select className="rt-ortak-grup-sec" aria-label="Grup" value={aile.id} onChange={(e) => grupDegis(e.target.value)}>{gruplar.map((g) => <option key={g.id} value={g.id}>{grupIkon(g)} {g.ad}</option>)}</select>
           : <span className="rt-muted rt-ortak-aile">{grupIkon(aile)} {aile.ad}</span>}
