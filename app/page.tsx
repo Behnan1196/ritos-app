@@ -26,8 +26,8 @@ import { SenkronIsareti, useGelenSenkron } from './ritos/Paylasim';
 import { GelenlerEkrani, useGelenlerOzeti } from './ritos/Sohbet';
 import { OlcumlerSatiri } from './ritos/Olcum';
 import { NotlarWidget } from './ritos/Notlar';
-import { AyarlarPane, GirisEkrani, KullaniciRozeti, SifreSifirlaEkrani, useKurtarmaHatirlat } from './ritos/Hesap';
-import { useHesapBaslat, useOturum } from '@/lib/hesap';
+import { AyarlarPane, GirisEkrani, KullaniciRozeti, SifreSifirlaEkrani, VeriSifresiEkrani, useKurtarmaHatirlat } from './ritos/Hesap';
+import { oauthBekliyor, useHesapBaslat, useOturum } from '@/lib/hesap';
 
 const NARROW_BREAKPOINT = 760;
 // Testte (NEXT_PUBLIC_RITOS_TEST=1 ile derlenmiş sürüm) giriş kapısı atlanır; gerçek sürümde yok.
@@ -44,6 +44,8 @@ export default function RitosLab() {
   useEffect(() => { try { setSifirla(new URL(location.href).searchParams.has('sifirla')); } catch { /* yoksay */ } }, []);
   if (!o.hazir) return <div className="rt-kilit-bos" />;
   if (sifirla) return o.session ? <SifreSifirlaEkrani /> : <GirisEkrani />;
+  // Google'dan dönüldü: oturum var, veri anahtarı henüz açılmadı → veri şifresi.
+  if (o.session && oauthBekliyor() && (!o.hesapli || o.kilitli)) return <VeriSifresiEkrani />;
   if (!o.hesapli || (!TEST && o.kilitli)) return <GirisEkrani yeniden={o.hesapli} />;
   return <RitosUygulama />;
 }

@@ -7,8 +7,9 @@ import React, { useEffect, useState } from 'react';
 import { useCanli } from '@/lib/canli';
 import { db } from '@/lib/db';
 import {
-  SIFRE_EN_AZ, cikisYap, girisYap, gorunenAdDegistir, kayitOl, kurtarmaDurumu, kurtarmaGoster, kurtarmaKaydedildi,
-  sifirlamaIste, sifirlamaTamamla, sifreDegistir, useOturum, type KurtarmaDurumu,
+  SIFRE_EN_AZ, cikisYap, epostaGirisiVar, girisYap, googleIleGir, gorunenAdDegistir, kayitOl, kurtarmaDurumu, kurtarmaGoster, kurtarmaKaydedildi,
+  metaAd, oauthVazgec, sifirlamaIste, sifirlamaTamamla, sifreDegistir, useOturum, veriAnahtariVar, veriSifresiSifirla, veriSifresiyleAc,
+  type KurtarmaDurumu,
 } from '@/lib/hesap';
 import { senkronla, useSenkronDurum } from '@/lib/senkron';
 import { Chips, Kap, Modal } from './ortak';
@@ -52,7 +53,17 @@ export function GirisEkrani({ yeniden }: { yeniden?: boolean }) {
         {yeniden
           ? <p className="rt-muted">Oturumun kapanmış. Devam etmek için yeniden giriş yap; verin bu cihazda duruyor.</p>
           : <p className="rt-muted">Günlük düzenin, programların ve koçunla çalışman için. Verin cihazında şifrelenir; Ritos içeriği okuyamaz.</p>}
-        {kip !== 'unuttum' && <Chips secenekler={[['giris', 'Giriş'], ['kayit', 'Hesap oluştur']]} deger={kip} onSec={(k) => { setKip(k); setHata(null); }} />}
+        {kip !== 'unuttum' && (
+          <>
+            <button type="button" className="rt-btn rt-genis rt-google" disabled={bekle} onClick={async () => {
+              setBekle(true); setHata(null);
+              const r = await googleIleGir();
+              if (!r.tamam) { setHata(r.hata); setBekle(false); }
+            }}><b aria-hidden>G</b> Google ile devam et</button>
+            <div className="rt-ya-da"><span>ya da e-postayla</span></div>
+            <Chips secenekler={[['giris', 'Giriş'], ['kayit', 'Hesap oluştur']]} deger={kip} onSec={(k) => { setKip(k); setHata(null); }} />
+          </>
+        )}
         {kip === 'unuttum' && <p className="rt-metin"><b>Şifremi unuttum</b></p>}
         {kip === 'kayit' && <input className="rt-inp" placeholder="Adın" value={ad} onChange={(e) => setAd(e.target.value)} />}
         <input className="rt-inp" type="email" placeholder="E-posta" autoComplete="email" value={eposta} onChange={(e) => setEposta(e.target.value)} />
@@ -69,6 +80,88 @@ export function GirisEkrani({ yeniden }: { yeniden?: boolean }) {
         </button>
         {kip === 'giris' && <button type="button" className="rt-linkbtn" onClick={() => { setKip('unuttum'); setHata(null); }}>Şifremi unuttum</button>}
         {kip === 'unuttum' && <button type="button" className="rt-linkbtn" onClick={() => { setKip('giris'); setHata(null); setBilgi(null); }}>Girişe dön</button>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Google'dan dönüş (5 ekim): oturum açık, veri anahtarı henüz açılmadı.
+ *  • anahtar varsa: veri şifresi sorulur (e-postayla açılmış hesapta = eski giriş şifresi);
+ *  • yoksa: yeni veri şifresi belirlenir;
+ *  • unutulduysa: kurtarma kelimeleriyle yeni veri şifresi (ya da baştan başla).
+ */
+export function VeriSifresiEkrani() {
+  const o = useOturum();
+  const [var_, setVar] = useState<boolean | null | 'yukleniyor'>('yukleniyor');
+  const [kip, setKip] = useState<'ac' | 'unuttum'>('ac');
+  const [sifre, setSifre] = useState('');
+  const [sifre2, setSifre2] = useState('');
+  const [kelimeler, setKelimeler] = useState('');
+  const [kelimeYok, setKelimeYok] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  const [bekle, setBekle] = useState(false);
+  useEffect(() => { veriAnahtariVar().then(setVar); }, []);
+  const u = o.session?.user;
+  const ad = o.gorunenAd ?? metaAd(u) ?? (u?.email ?? '').split('@')[0];
+  const meta = (u?.user_metadata ?? {}) as Record<string, unknown>;
+  const resim = (typeof meta.avatar_url === 'string' && meta.avatar_url) || (typeof meta.picture === 'string' && meta.picture) || null;
+  const belirle = var_ === false || kip === 'unuttum';
+  const gecerli = belirle
+    ? sifre.length >= SIFRE_EN_AZ && sifre === sifre2 && (kip !== 'unuttum' || kelimeYok || kelimeler.trim().length > 0)
+    : sifre.length > 0;
+
+  async function gonder() {
+    setBekle(true); setHata(null);
+    try {
+      const r = kip === 'unuttum' ? await veriSifresiSifirla(sifre, kelimeYok ? null : kelimeler) : await veriSifresiyleAc(sifre);
+      if (!r.tamam) setHata(r.hata);
+    } catch (e) { setHata(e instanceof Error ? e.message : String(e)); }
+    finally { setBekle(false); }
+  }
+
+  return (
+    <div className="rt-giris">
+      <div className="rt-giris-kutu">
+        <div className="rt-giris-logo">Ritos</div>
+        <div className="rt-veri-kim">
+          <Avatar ad={ad || '?'} resim={resim} boyut={40} />
+          <span><b>{ad}</b><small>{u?.email}</small></span>
+        </div>
+        {var_ === 'yukleniyor' ? <p className="rt-muted">Bekle…</p>
+          : var_ === null ? <p className="rt-hata">Sunucuya ulaşılamadı. İnternetini kontrol edip sayfayı yenile.</p>
+          : (
+            <>
+              {var_ === false && <p className="rt-metin"><b>Veri şifresi belirle</b><br /><span className="rt-muted">Ritos'ta verin cihazında şifrelenir. Bu şifre Google şifrenden ayrıdır ve Ritos onu bilmez. Her yeni cihazda bir kez sorulur.</span></p>}
+              {var_ === true && kip === 'ac' && <p className="rt-metin"><b>Veri şifren</b><br /><span className="rt-muted">Verini açmak için bir kez gerekiyor; bu cihaz hatırlar. Daha önce e-posta ve şifreyle girdiysen veri şifren o şifredir.</span></p>}
+              {kip === 'unuttum' && (
+                !kelimeYok ? (
+                  <>
+                    <p className="rt-metin"><b>Veri şifremi unuttum</b><br /><span className="rt-muted">Verini açmak için kurtarma anahtarındaki 12 kelime gerekir; sonra yeni bir veri şifresi belirlersin.</span></p>
+                    <textarea className="rt-inp" rows={3} placeholder="12 kelime, aralarında boşluk" value={kelimeler} onChange={(e) => setKelimeler(e.target.value)} />
+                    <button type="button" className="rt-linkbtn" onClick={() => setKelimeYok(true)}>Kurtarma kelimelerim yok</button>
+                  </>
+                ) : (
+                  <>
+                    <p className="rt-uyari">Kelimeler olmadan eski verin açılamaz. Ritos yeni veri şifresiyle boş başlar. Bu cihazda verin duruyorsa kaybolmaz, yeniden yüklenir.</p>
+                    <button type="button" className="rt-linkbtn" onClick={() => setKelimeYok(false)}>Kelimelerim var</button>
+                  </>
+                )
+              )}
+              <input className="rt-inp" type="password" autoComplete={belirle ? 'new-password' : 'current-password'}
+                placeholder={belirle ? `${kip === 'unuttum' ? 'Yeni veri şifresi' : 'Veri şifresi'} (en az ${SIFRE_EN_AZ})` : 'Veri şifresi'}
+                value={sifre} onChange={(e) => setSifre(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && gecerli && !bekle) gonder(); }} />
+              {belirle && <input className="rt-inp" type="password" autoComplete="new-password" placeholder="Tekrar" value={sifre2} onChange={(e) => setSifre2(e.target.value)} />}
+              {belirle && sifre2 && sifre !== sifre2 && <p className="rt-hata">Şifreler aynı değil.</p>}
+              {hata && <p className="rt-hata">{hata}</p>}
+              <button type="button" className="rt-btn primary rt-genis" disabled={!gecerli || bekle} onClick={gonder}>
+                {bekle ? 'Bekle…' : kip === 'unuttum' ? (kelimeYok ? 'Baştan başla' : 'Verimi aç') : var_ === false ? 'Başla' : 'Aç'}
+              </button>
+              {var_ === true && kip === 'ac' && <button type="button" className="rt-linkbtn" onClick={() => { setKip('unuttum'); setHata(null); setSifre(''); setSifre2(''); }}>Veri şifremi unuttum</button>}
+              {kip === 'unuttum' && <button type="button" className="rt-linkbtn" onClick={() => { setKip('ac'); setHata(null); setKelimeYok(false); }}>Geri</button>}
+            </>
+          )}
+        <button type="button" className="rt-linkbtn" onClick={() => oauthVazgec()}>Başka hesapla gir</button>
       </div>
     </div>
   );
@@ -211,6 +304,7 @@ export function AyarlarPane() {
   const [adDuzenle, setAdDuzenle] = useState<string | null>(null);
   const [veriModal, setVeriModal] = useState<null | 'sifirla' | 'sil'>(null);
   const uid = o.session?.user.id;
+  const sadeceGoogle = !!o.session && !epostaGirisiVar(o.session.user);
 
   return (
     <div className="side-content" style={{ height: '100%', overflowY: 'auto' }}>
@@ -236,7 +330,7 @@ export function AyarlarPane() {
         <div className="rt-satir">
           {o.session && <button type="button" className="rt-btn" disabled={d.calisiyor} onClick={() => senkronla()}>{d.calisiyor ? 'Eşitleniyor…' : 'Şimdi eşitle'}</button>}
           <button type="button" className="rt-btn" onClick={() => setModal('kurtarma')}>Kurtarma anahtarı</button>
-          <button type="button" className="rt-btn" onClick={() => setModal('sifre')}>Şifre değiştir</button>
+          <button type="button" className="rt-btn" onClick={() => setModal('sifre')}>{sadeceGoogle ? 'Veri şifresini değiştir' : 'Şifre değiştir'}</button>
           <button type="button" className="rt-btn" onClick={() => setModal('cikis')}>Çıkış yap</button>
         </div>
       </Kap>
@@ -258,7 +352,7 @@ export function AyarlarPane() {
       {veriModal === 'sil' && <HesapSilModal onKapat={() => setVeriModal(null)} />}
 
       {modal === 'cikis' && <CikisModal onKapat={() => setModal(null)} bekleyen={d.bekleyen} />}
-      {modal === 'sifre' && <SifreModal onKapat={() => setModal(null)} />}
+      {modal === 'sifre' && <SifreModal onKapat={() => setModal(null)} veri={sadeceGoogle} />}
       {modal === 'kurtarma' && <KurtarmaIste onKapat={() => setModal(null)} onKaydedildi={async () => { if (uid) await kurtarmaKaydet(uid); setModal(null); }} />}
     </div>
   );
@@ -278,7 +372,8 @@ function CikisModal({ onKapat, bekleyen }: { onKapat: () => void; bekleyen: numb
   );
 }
 
-function SifreModal({ onKapat }: { onKapat: () => void }) {
+function SifreModal({ onKapat, veri }: { onKapat: () => void; veri?: boolean }) {
+  const ne = veri ? 'veri şifresi' : 'şifre';
   const [eski, setEski] = useState('');
   const [yeni, setYeni] = useState('');
   const [yeni2, setYeni2] = useState('');
@@ -286,16 +381,17 @@ function SifreModal({ onKapat }: { onKapat: () => void }) {
   const [bekle, setBekle] = useState(false);
   const [tamam, setTamam] = useState(false);
   if (tamam) return (
-    <Modal baslik="Şifre değişti" onKapat={onKapat}>
-      <p className="rt-metin">Yeni şifren diğer cihazlarda da geçerli.</p>
+    <Modal baslik={veri ? 'Veri şifresi değişti' : 'Şifre değişti'} onKapat={onKapat}>
+      <p className="rt-metin">Yeni {ne}n diğer cihazlarda da geçerli.</p>
       <div className="rt-satir"><button type="button" className="rt-btn primary" onClick={onKapat}>Tamam</button></div>
     </Modal>
   );
   return (
-    <Modal baslik="Şifre değiştir" onKapat={onKapat}>
-      <input className="rt-inp" type="password" placeholder="Mevcut şifre" autoComplete="current-password" value={eski} onChange={(e) => setEski(e.target.value)} />
-      <input className="rt-inp" type="password" placeholder={`Yeni şifre (en az ${SIFRE_EN_AZ})`} autoComplete="new-password" value={yeni} onChange={(e) => setYeni(e.target.value)} />
-      <input className="rt-inp" type="password" placeholder="Yeni şifre tekrar" autoComplete="new-password" value={yeni2} onChange={(e) => setYeni2(e.target.value)} />
+    <Modal baslik={veri ? 'Veri şifresini değiştir' : 'Şifre değiştir'} onKapat={onKapat}>
+      {veri && <p className="rt-muted">Google ile giriyorsun; bu şifre yalnız verini açar.</p>}
+      <input className="rt-inp" type="password" placeholder={`Mevcut ${ne}`} autoComplete="current-password" value={eski} onChange={(e) => setEski(e.target.value)} />
+      <input className="rt-inp" type="password" placeholder={`Yeni ${ne} (en az ${SIFRE_EN_AZ})`} autoComplete="new-password" value={yeni} onChange={(e) => setYeni(e.target.value)} />
+      <input className="rt-inp" type="password" placeholder={`Yeni ${ne} tekrar`} autoComplete="new-password" value={yeni2} onChange={(e) => setYeni2(e.target.value)} />
       {hata && <p className="rt-hata">{hata}</p>}
       <div className="rt-satir">
         <button type="button" className="rt-btn primary" disabled={bekle || !eski || yeni.length < SIFRE_EN_AZ || yeni !== yeni2}

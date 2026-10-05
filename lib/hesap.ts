@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from 'react';
 import Dexie from 'dexie';
-import type { Session, SupabaseClient } from '@supabase/supabase-js';
+import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
 import { aktifHesap, aktifHesapAyarla, db, dbAdi } from './db';
 import { supabase } from './supabase';
 import { dekGetir, dekSakla, dekSil } from './anahtarDeposu';
@@ -43,7 +43,7 @@ export function useOturum(): Oturum {
     let iptal = false;
     async function yukle(session: Session | null) {
       let gorunenAd: string | null = null;
-      if (session) gorunenAd = await profilGaranti(session.user.id, session.user.email ?? '');
+      if (session) gorunenAd = await profilGaranti(session.user.id, session.user.email ?? '', metaAd(session.user));
       const aktif = aktifHesap();
       const kilitli = !!aktif && (!session || session.user.id !== aktif || !(await dekGetir(aktif)));
       if (!iptal) setO({ hazir: true, session, gorunenAd, hesapli: !!aktif, kilitli });
@@ -71,14 +71,27 @@ export function useHesapBaslat() {
   }, []);
 }
 
+/** Google gibi sağlayıcıların verdiği ad (varsa). */
+export function metaAd(u: User | null | undefined): string | null {
+  const m = (u?.user_metadata ?? {}) as Record<string, unknown>;
+  const ad = (typeof m.full_name === 'string' && m.full_name) || (typeof m.name === 'string' && m.name) || '';
+  return ad.trim() || null;
+}
+
+/** Bu kullanıcı e-posta + şifreyle de girebiliyor mu? (Yalnız Google ise giriş şifresi yok.) */
+export function epostaGirisiVar(u: User | null | undefined): boolean {
+  const p = (u?.app_metadata?.providers as string[] | undefined) ?? [u?.app_metadata?.provider ?? 'email'];
+  return p.includes('email');
+}
+
 // Oturum açıldığında Ritos profili yoksa oluştur (yoksa kimse bu kişiyi e-postasıyla bulamaz).
-export async function profilGaranti(uid: string, eposta: string): Promise<string | null> {
+export async function profilGaranti(uid: string, eposta: string, adOnerisi?: string | null): Promise<string | null> {
   const sb = supabase();
   if (!sb) return null;
   const r = await sb.from('cat_profil').select('gorunen_ad').eq('id', uid).maybeSingle();
   if (r.data) return r.data.gorunen_ad;
   if (r.error || !eposta) return null;
-  const ad = eposta.split('@')[0];
+  const ad = adOnerisi || eposta.split('@')[0];
   const e = await sb.from('cat_profil').insert({ id: uid, gorunen_ad: ad, eposta: eposta.trim().toLowerCase() });
   return e.error ? null : ad;
 }
@@ -109,6 +122,7 @@ export async function kayitOl(gorunenAd: string, eposta: string, sifre: string):
   const sb = supabase();
   if (!sb) return { tamam: false, hata: 'Sunucu ayarı yok' };
   if (!navigator.onLine) return { tamam: false, hata: 'İnternet yok' };
+  oauthBayrak(false);
   const email = eposta.trim().toLowerCase();
   const r = await sb.auth.signUp({ email, password: await girisSifresi(sifre, email) });
   if (r.error) {
@@ -136,6 +150,7 @@ export async function girisYap(eposta: string, sifre: string): Promise<Sonuc> {
   const sb = supabase();
   if (!sb) return { tamam: false, hata: 'Sunucu ayarı yok' };
   if (!navigator.onLine) return { tamam: false, hata: 'İnternet yok' };
+  oauthBayrak(false);
   const email = eposta.trim().toLowerCase();
   const r = await sb.auth.signInWithPassword({ email, password: await girisSifresi(sifre, email) });
   if (r.error || !r.data.user) {
@@ -175,6 +190,84 @@ export async function girisYap(eposta: string, sifre: string): Promise<Sonuc> {
   return { tamam: true };
 }
 
+// ———————————————— Google ile giriş + veri şifresi (5 ekim) ————————————————
+// Google girişinde uygulama şifreyi hiç görmez; veri anahtarını açan "veri şifresi" ayrıca sorulur.
+// E-postayla açılmış hesaplarda veri şifresi = bugüne kadarki giriş şifresi (aynı e-postalı Google
+// girişi Supabase'de aynı kullanıcıya bağlanır). Yeni Google hesaplarında ilk girişte belirlenir.
+
+const OAUTH_BAYRAK = 'ritos-oauth';
+function oauthBayrak(v: boolean) {
+  try { if (v) localStorage.setItem(OAUTH_BAYRAK, '1'); else localStorage.removeItem(OAUTH_BAYRAK); } catch { /* yoksay */ }
+}
+/** Google'dan dönüldü, veri şifresi bekleniyor mu? */
+export function oauthBekliyor(): boolean {
+  try { return localStorage.getItem(OAUTH_BAYRAK) === '1'; } catch { return false; }
+}
+
+export async function googleIleGir(): Promise<Sonuc> {
+  const sb = supabase();
+  if (!sb) return { tamam: false, hata: 'Sunucu ayarı yok' };
+  if (!navigator.onLine) return { tamam: false, hata: 'İnternet yok' };
+  oauthBayrak(true);
+  const r = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: `${location.origin}/`, queryParams: { prompt: 'select_account' } },
+  });
+  if (r.error) { oauthBayrak(false); return { tamam: false, hata: r.error.message }; }
+  return { tamam: true }; // sayfa Google'a gider
+}
+
+/** Oturumdaki kullanıcının Ritos veri anahtarı var mı? (null: sorulamadı) */
+export async function veriAnahtariVar(): Promise<boolean | null> {
+  const sb = supabase();
+  const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
+  if (!sb || !data.session) return null;
+  const k = await sb.from('cat_anahtar').select('id').eq('id', data.session.user.id).maybeSingle();
+  return k.error ? null : !!k.data;
+}
+
+/** Veri şifresiyle anahtarı aç; hiç anahtar yoksa (yeni Ritos kullanıcısı) bu şifreyle oluştur. */
+export async function veriSifresiyleAc(sifre: string): Promise<Sonuc> {
+  const sb = supabase();
+  if (!sb) return { tamam: false, hata: 'Sunucu ayarı yok' };
+  const { data } = await sb.auth.getSession();
+  const user = data.session?.user;
+  if (!user) return { tamam: false, hata: 'Oturum kapanmış; yeniden giriş yap.' };
+  const uid = user.id;
+  const k = await sb.from('cat_anahtar').select('tuz, sarili_sifre').eq('id', uid).maybeSingle();
+  if (k.error) return { tamam: false, hata: k.error.message };
+  let dek: CryptoKey;
+  if (!k.data) {
+    const yeni = await anahtarlariOlustur(uid, sifre);
+    const a = await sb.from('cat_anahtar').insert(yeni.satir);
+    if (a.error) return { tamam: false, hata: `Anahtar kaydedilemedi: ${a.error.message}` };
+    dek = yeni.dek;
+  } else {
+    try { dek = await sarimiAc(k.data.sarili_sifre, await sarmaAnahtari(sifre, k.data.tuz)); }
+    catch { return { tamam: false, hata: 'Veri şifresi hatalı.' }; }
+  }
+  await profilGaranti(uid, user.email ?? '', metaAd(user));
+  const onceki = aktifHesap();
+  if (onceki && onceki !== uid) { await dekSil(onceki); db.close(); await Dexie.delete(dbAdi(onceki)); }
+  await dekSakla(uid, dek);
+  aktifHesapAyarla(uid);
+  oauthBayrak(false);
+  location.replace(location.pathname);
+  return { tamam: true };
+}
+
+/** Veri şifresi unutuldu: kurtarma kelimeleriyle (ya da baştan) yeni veri şifresi. Giriş şifresine dokunmaz. */
+export function veriSifresiSifirla(yeni: string, kelimeler: string | null): Promise<Sonuc> {
+  return sifirlamaTamamla(yeni, kelimeler, false);
+}
+
+/** Google'dan dönüldü ama vazgeçildi: oturumu kapat, giriş ekranına dön. */
+export async function oauthVazgec() {
+  oauthBayrak(false);
+  await supabase()?.auth.signOut({ scope: 'local' });
+  location.replace(location.pathname);
+}
+
 // ———————————————— çıkış ————————————————
 
 /** Çıkış: bekleyenler gönderilir, cihazdaki kopya silinir; veri hesapta durur. */
@@ -189,6 +282,7 @@ export async function cikisYap() {
     await Dexie.delete(dbAdi(uid));
   }
   aktifHesapAyarla(null);
+  oauthBayrak(false);
   location.reload();
 }
 
@@ -201,7 +295,7 @@ async function anahtarKaydi() {
   const k = await sb.from('cat_anahtar').select('*').eq('id', s.session.user.id).single();
   if (k.error) throw new Error(k.error.message);
   return {
-    sb, uid: s.session.user.id, email: s.session.user.email ?? '',
+    sb, uid: s.session.user.id, email: s.session.user.email ?? '', girisDe: epostaGirisiVar(s.session.user),
     k: k.data as { tuz: string; sarili_sifre: string; kurtarma_tuz: string; sarili_kurtarma: string; kurtarma_sifreli: string },
   };
 }
@@ -233,18 +327,20 @@ export async function kurtarmaKaydedildi(uid: string) {
 // ———————————————— şifre değiştirme ve sıfırlama ————————————————
 
 export async function sifreDegistir(eski: string, yeni: string) {
-  const { sb, uid, email, k } = await anahtarKaydi();
+  const { sb, uid, email, k, girisDe } = await anahtarKaydi();
   let dek: CryptoKey;
   try { dek = await sarimiAc(k.sarili_sifre, await sarmaAnahtari(eski, k.tuz), true); } catch { throw new Error('Mevcut şifre hatalı.'); }
-  await yeniSifreyleSar(sb, uid, email, dek, yeni, k);
+  await yeniSifreyleSar(sb, uid, email, dek, yeni, k, girisDe);
 }
 
-async function yeniSifreyleSar(sb: SupabaseClient, uid: string, email: string, dek: CryptoKey, yeni: string, eski: { tuz: string; sarili_sifre: string }) {
+// girisDe: e-postayla giriş şifresi de birlikte değişsin mi (yalnız Google kullanıcısında giriş şifresi yok).
+async function yeniSifreyleSar(sb: SupabaseClient, uid: string, email: string, dek: CryptoKey, yeni: string, eski: { tuz: string; sarili_sifre: string }, girisDe = true) {
   // Veri yeniden şifrelenmez; yalnız anahtar yeni şifreyle yeniden sarılır.
   const tuz = b64(rastgele(16));
   const sarili = await sar(dek, await sarmaAnahtari(yeni, tuz));
   const w = await sb.from('cat_anahtar').update({ tuz, sarili_sifre: sarili, guncellendi: new Date().toISOString() }).eq('id', uid);
   if (w.error) throw new Error(`Anahtar güncellenemedi: ${w.error.message}`);
+  if (!girisDe) return;
   const u = await sb.auth.updateUser({ password: await girisSifresi(yeni, email) });
   if (u.error) {
     await sb.from('cat_anahtar').update({ tuz: eski.tuz, sarili_sifre: eski.sarili_sifre }).eq('id', uid);
@@ -265,7 +361,7 @@ export async function sifirlamaIste(eposta: string): Promise<Sonuc> {
  *  • kurtarma kelimeleri verildiyse veri anahtarı onlarla açılır ve yeni şifreyle sarılır — veri geri gelir;
  *  • verilmediyse yeni bir anahtarla baştan başlanır — eski şifreli veri açılamaz, sunucudan silinir.
  */
-export async function sifirlamaTamamla(yeni: string, kelimeler: string | null): Promise<Sonuc> {
+export async function sifirlamaTamamla(yeni: string, kelimeler: string | null, girisDe = true): Promise<Sonuc> {
   const { sb, uid, email, k } = await anahtarKaydi();
   if (kelimeler) {
     const norm = kurtarmaNormalize(kelimeler);
@@ -273,14 +369,16 @@ export async function sifirlamaTamamla(yeni: string, kelimeler: string | null): 
     let dek: CryptoKey;
     try { dek = await sarimiAc(k.sarili_kurtarma, await sarmaAnahtari(norm, k.kurtarma_tuz, 'kurtarma'), true); }
     catch { return { tamam: false, hata: 'Kurtarma kelimeleri bu hesaba ait değil.' }; }
-    try { await yeniSifreyleSar(sb, uid, email, dek, yeni, k); } catch (e) { return { tamam: false, hata: e instanceof Error ? e.message : String(e) }; }
+    try { await yeniSifreyleSar(sb, uid, email, dek, yeni, k, girisDe); } catch (e) { return { tamam: false, hata: e instanceof Error ? e.message : String(e) }; }
     await dekSakla(uid, dek);
   } else {
     const { dek, satir } = await anahtarlariOlustur(uid, yeni);
     const w = await sb.from('cat_anahtar').update({ ...satir, cift_sifreli: null, guncellendi: new Date().toISOString() }).eq('id', uid);
     if (w.error) return { tamam: false, hata: w.error.message };
-    const u = await sb.auth.updateUser({ password: await girisSifresi(yeni, email) });
-    if (u.error) return { tamam: false, hata: u.error.message };
+    if (girisDe) {
+      const u = await sb.auth.updateUser({ password: await girisSifresi(yeni, email) });
+      if (u.error) return { tamam: false, hata: u.error.message };
+    }
     await sb.from('cat_kayit').delete().eq('sahip', uid);           // açılamayacak eski veri
     await sb.from('cat_acik_anahtar').delete().eq('id', uid);       // danışmanlık anahtar çifti yeniden üretilecek
     await sb.from('cat_profil').update({ kurtarma_kaydedildi: null }).eq('id', uid);
@@ -291,6 +389,7 @@ export async function sifirlamaTamamla(yeni: string, kelimeler: string | null): 
   const onceki = aktifHesap();
   if (onceki && onceki !== uid) { await dekSil(onceki); db.close(); await Dexie.delete(dbAdi(onceki)); }
   aktifHesapAyarla(uid);
+  oauthBayrak(false);
   location.replace(location.pathname);
   return { tamam: true };
 }

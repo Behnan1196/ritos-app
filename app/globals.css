@@ -1056,3 +1056,12 @@ textarea.rt-inp{font-family:inherit;}
 .rt-kullanici-av .rt-sekme-rozet.nokta{right:-2px;top:-2px;margin:0;box-shadow:0 0 0 2px #2c2a24;}
 .rt-avatar{border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:700;letter-spacing:.02em;object-fit:cover;flex:0 0 auto;}
 .rt-ust-sag .rt-senkron{white-space:nowrap;}
+
+/* Google ile giriş + veri şifresi (5 ekim) */
+.rt-google{background:#fff;border:1px solid var(--line);color:var(--ink,#2c2a24);font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;}
+.rt-google b{font-size:15px;font-weight:800;color:#4f7fa8;}
+.rt-ya-da{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;margin:2px 0;}
+.rt-ya-da::before,.rt-ya-da::after{content:'';flex:1;height:1px;background:var(--line);}
+.rt-veri-kim{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fff;border:1px solid var(--line);border-radius:12px;}
+.rt-veri-kim span{display:flex;flex-direction:column;min-width:0;}
+.rt-veri-kim small{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;}
