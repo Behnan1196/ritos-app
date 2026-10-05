@@ -1,20 +1,33 @@
 'use client';
 
-import React, { useState, type ReactNode } from 'react';
+import React, { useRef, useState, type ReactNode } from 'react';
 import type { Blok } from '@/lib/paket';
 import { BelgeGoster } from './Belge';
 import { YansitDugmesi } from './Yansit';
 
 // Modal — formlar ekranda sabit durmaz, modal ile açılır.
 // ust: başlığın sağında, ✕'ten önce duran ek öğe (örn. kart editöründe tarih-saat çipi).
+/**
+ * Arka plana dokununca kapat — ama yalnız dokunuş arka planda BAŞLADIYSA. Pencerede metin seçerken
+ * imleç dışarı taşınca bırakılan tıklama artık pencereyi kapatmaz (5 ekim).
+ */
+export function useArkaPlan(kapat: () => void) {
+  const basladi = useRef(false);
+  return {
+    onPointerDown: (e: React.PointerEvent) => { basladi.current = e.target === e.currentTarget; },
+    onClick: (e: React.MouseEvent) => { const b = basladi.current; basladi.current = false; if (b && e.target === e.currentTarget) kapat(); },
+  };
+}
+
 // 5 ekim: modalın içinde bir şey yazıldıysa (herhangi bir input olayı) dışarı dokunmak ya da × formu
 // kaybettirmez; önce "Kaydedilmemiş değişiklikler" sorulur. Hiç yazılmadıysa eskisi gibi hemen kapanır.
 export function Modal({ baslik, onKapat, children, ust }: { baslik: string; onKapat: () => void; children: ReactNode; ust?: ReactNode }) {
   const [kirli, setKirli] = useState(false);
   const [sor, setSor] = useState(false);
   const kapatIste = () => { if (kirli) setSor(true); else onKapat(); };
+  const arka = useArkaPlan(kapatIste);
   return (
-    <div className="rt-modal-bg" onClick={kapatIste}>
+    <div className="rt-modal-bg" {...arka}>
       <div className="rt-modal" onClick={(e) => e.stopPropagation()} onInput={() => { if (!kirli) setKirli(true); }} role="dialog" aria-label={baslik}>
         <div className="rt-modal-hd">
           <b>{baslik}</b>

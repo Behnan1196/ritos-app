@@ -26,7 +26,7 @@ import { teslimAl, kartGuncelle, kartTasi } from '@/lib/ajanda';
 import { GUN_KISA, PAKET_SURUM, TAM_IZIN, bugun, gunFarki, tarihEkle, tarihParse, tarihStr, type Blok, type Hatirlatma, type KartPaketi } from '@/lib/paket';
 import type { AjandaKartRow } from '@/lib/db';
 import type { KocKartTaslak, KocTekrar } from '@/lib/danisanAjanda';
-import { Adimlayici, Modal, VideoOynatici, instagramEmbed, youtubeId } from './ortak';
+import { Adimlayici, Modal, VideoOynatici, instagramEmbed, useArkaPlan, youtubeId } from './ortak';
 import { YansitDugmesi } from './Yansit';
 import { GorevFormu, gorevTeslim, useSinavOzeti } from './Sinav';
 import type { GorevTaslak } from '@/lib/sinavGorev';
@@ -571,8 +571,9 @@ function TarihSaatSecici({ tarih, saat, onTarih, onSaat, onKapat, not }: {
   const gunler = Array.from({ length: gunSayisi }, (_, i) => tarihStr(new Date(ay.getFullYear(), ay.getMonth(), i + 1)));
   const sec = (t: string) => { onTarih(t); const d = tarihParse(t); setAy(new Date(d.getFullYear(), d.getMonth(), 1)); };
   const gunSec = (t: string) => { sec(t); onKapat(); };
+  const arka = useArkaPlan(onKapat);
   return (
-    <div className="rt-ts-bg" onClick={onKapat}>
+    <div className="rt-ts-bg" {...arka}>
     <div className="rt-ts" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Tarih ve saat seç">
       <div className="rt-ts-saat">
         <span className="rt-muted">🕐 Saat</span>

@@ -7,7 +7,7 @@ import {
   bugun, degerBloklari, gunFarki, tarihEkle, tarihEtiket, tarihParse, tarihStr,
   type Blok,
 } from '@/lib/paket';
-import { BlokGoster, Kap, Modal, OnayKutusu, degerMetni } from './ortak';
+import { BlokGoster, Kap, Modal, OnayKutusu, degerMetni, useArkaPlan } from './ortak';
 import { DenemeGir } from './Sinav';
 import { sinavOzeti } from '@/lib/sinavGorev';
 import { kartPaketi } from '@/lib/paylasim';
@@ -573,9 +573,10 @@ export function AyTakvimi({ secili, onSec, onKapat }: { secili: string; onSec: (
   const tarihler = Array.from({ length: gunSayisi }, (_, i) => tarihStr(new Date(ay.getFullYear(), ay.getMonth(), i + 1)));
   const ozet = useCanli(() => ayOzeti(tarihler), [tarihler[0]], {} as Record<string, { toplam: number; yapildi: number }>);
   const t0 = bugun();
+  const arka = useArkaPlan(onKapat);
 
   return (
-    <div className="rt-modal-bg" onClick={onKapat}>
+    <div className="rt-modal-bg" {...arka}>
       <div className="rt-ay" onClick={(e) => e.stopPropagation()}>
         <div className="rt-ay-hd">
           <button className="arrow" onClick={() => setAy(new Date(ay.getFullYear(), ay.getMonth() - 1, 1))}>‹</button>
