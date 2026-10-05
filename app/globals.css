@@ -1156,3 +1156,11 @@ textarea.rt-inp{font-family:inherit;}
 .rt-profil-bas .tx{display:flex;flex-direction:column;gap:2px;min-width:0;}
 .rt-profil-bas .tx small{color:var(--muted);}
 .rt-profil-bas .rt-linkbtn{font-size:12.5px;}
+
+/* Kart açıklaması: stil şeridi Aa ile açılır, tek satır, yana kaydırılır (5 ekim) */
+.rt-ek-hd .rt-stil-dugme{margin-left:auto;margin-right:2px;border:1px solid var(--line);background:#fff;color:var(--muted);font-size:12px;font-weight:800;line-height:1;padding:4px 7px;border-radius:7px;cursor:pointer;font-family:Georgia,'Times New Roman',serif;}
+.rt-ek-hd .rt-stil-dugme.on{background:var(--green2);color:var(--green);border-color:var(--green2);}
+.rt-not-edit.kompakt .rt-not-arac{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none;-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 28px),transparent);padding-right:24px;}
+.rt-not-edit.kompakt .rt-not-arac::-webkit-scrollbar{display:none;}
+.rt-not-edit.kompakt .rt-not-arac button{flex:0 0 auto;}
+.rt-not-edit.kompakt .rt-not-arac .ayrac{flex:0 0 1px;}

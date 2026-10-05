@@ -37,7 +37,10 @@ const DUGMELER: (Dugme | '|')[] = [
 ];
 
 // Kartın açıklaması için sade araç çubuğu.
-const KOMPAKT = new Set(['Kalın', 'Vurgula', 'Madde listesi', 'Numaralı liste', 'Yapılacaklar listesi', 'Tablo']);
+// 5 ekim: kompakt şerit tek satır, yana kaydırılır; kompakt editörde kapalı uzantıların düğmeleri hariç her şey.
+const KOMPAKT_HARIC = new Set(['Başlık', 'Alt başlık', 'Alıntı', 'Ayraç']);
+const KOMPAKT_DUGMELER = DUGMELER.filter((d) => d === '|' || !KOMPAKT_HARIC.has(d.baslik))
+  .filter((d, i, l) => d !== '|' || (i > 0 && l[i - 1] !== '|'));
 
 // İmleç tablodayken çıkan ikinci satır: satır/sütun ekle-sil, başlık satırı, tabloyu sil.
 const TABLO: Dugme[] = [
@@ -50,8 +53,10 @@ const TABLO: Dugme[] = [
 ];
 
 /** Genel stilli editör — not ve kart açıklaması aynı editörü kullanır. */
-export function ZenginEditor({ icerik, onDegis, kompakt, placeholder, autofocus, ilkSatirBaslik }: {
+export function ZenginEditor({ icerik, onDegis, kompakt, placeholder, autofocus, ilkSatirBaslik, aracGizli }: {
   icerik: unknown; onDegis: (belge: object, metin: string) => void; kompakt?: boolean; placeholder?: string; autofocus?: boolean; ilkSatirBaslik?: boolean;
+  /** Stil şeridi kapalı (kart açıklaması: başlıktaki Aa düğmesiyle açılır). */
+  aracGizli?: boolean;
 }) {
   const degis = useRef(onDegis);
   degis.current = onDegis;
@@ -70,15 +75,15 @@ export function ZenginEditor({ icerik, onDegis, kompakt, placeholder, autofocus,
     autofocus: autofocus ? 'end' : false,
     onUpdate: ({ editor: e }) => degis.current(e.getJSON(), e.getText({ blockSeparator: '\n' })),
   });
-  const dugmeler = kompakt ? DUGMELER.filter((d) => d !== '|' && KOMPAKT.has(d.baslik)) : DUGMELER;
+  const dugmeler = kompakt ? KOMPAKT_DUGMELER : DUGMELER;
   return (
     <div className={`rt-not-edit${kompakt ? ' kompakt' : ''}`}>
-      <div className="rt-not-arac" role="toolbar" aria-label="Biçim">
+      {!aracGizli && <div className="rt-not-arac" role="toolbar" aria-label="Biçim">
         {dugmeler.map((d, i) => d === '|'
           ? <span key={i} className="ayrac" />
           : <button key={i} type="button" title={d.baslik} aria-label={d.baslik} className={editor && d.aktif?.(editor) ? 'on' : ''} onMouseDown={(e) => e.preventDefault()} onClick={() => editor && d.calis(editor)}>{d.etiket}</button>)}
-      </div>
-      {editor?.isActive('table') && (
+      </div>}
+      {!aracGizli && editor?.isActive('table') && (
         <div className="rt-not-arac tablo" role="toolbar" aria-label="Tablo">
           {TABLO.map((d, i) => <button key={i} type="button" title={d.baslik} aria-label={d.baslik} onMouseDown={(e) => e.preventDefault()} onClick={() => d.calis(editor)}>{d.etiket}</button>)}
         </div>

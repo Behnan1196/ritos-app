@@ -156,6 +156,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
   const [hatirlatma, setHatirlatma] = useState<Hatirlatma | null>(kart?.hatirlatma ?? null);
   const [bekle, setBekle] = useState<number | null>(kart?.bekle ?? null);
   const [panel, setPanel] = useState<Panel | null>(null);
+  const [stilAcik, setStilAcik] = useState(false); // 5 ekim: açıklamanın stil şeridi varsayılan kapalı
   // Aile ortak kartı (3 ekim): yeni kartta, aile grubundaysan — herkesin ajandasına düşer.
   // 5 ekim: birden çok grup olabilir — ortak kart hangi grubun, seçilir.
   const gruplar = useCanli(aktifGruplarim, [], []);
@@ -296,7 +297,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
   const vGuncelle = (p: Partial<VideoSatir>) => setVideolar(videolar.map((x, j) => (j === vsec ? { ...x, ...p } : x)));
 
   function icerikGovde(t: Icerik) {
-    if (t === 'aciklama') return <ZenginEditor icerik={aciklama} kompakt placeholder={izle ? 'İzlerken notların…' : 'Notun, adımlar… ( - madde, [ ] yapılacak )'} onDegis={(b) => setAciklama(b)} />;
+    if (t === 'aciklama') return <ZenginEditor icerik={aciklama} kompakt aracGizli={!stilAcik} placeholder={izle ? 'İzlerken notların…' : 'Notun, adımlar… ( - madde, [ ] yapılacak )'} onDegis={(b) => setAciklama(b)} />;
     if (t === 'video') {
       const vid = v ? youtubeId(v.url) : null;
       const bs = v ? sn(v.bas) : undefined, bt = v ? sn(v.bit) : undefined;
@@ -496,6 +497,9 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
             <div key={t} className={`rt-ek rt-blok${t === 'video' && izle ? ' rt-yapis' : ''}`}>
               <div className="rt-ek-hd">
                 <span>{ICERIK.find(([x]) => x === t)![1]}</span>
+                {t === 'aciklama' && (
+                  <button type="button" className={`rt-stil-dugme${stilAcik ? ' on' : ''}`} aria-pressed={stilAcik} aria-label={stilAcik ? 'Stil şeridini kapat' : 'Stil şeridini aç'} title="Stil" onClick={() => setStilAcik(!stilAcik)}>Aa</button>
+                )}
                 <button type="button" className="rt-blok-menu" onClick={() => setMenu(menu === t ? null : t)} aria-label="Blok menüsü">⋯</button>
               </div>
               {menu === t && (
