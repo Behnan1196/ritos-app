@@ -351,7 +351,8 @@ function HesapSilModal({ onKapat }: { onKapat: () => void }) {
   const [hata, setHata] = useState<string | null>(null);
   return (
     <Modal baslik="Hesabımı sil" onKapat={onKapat}>
-      <p className="rt-metin">Hesabın ve bütün verilerin sunucudan ve bu cihazdan silinir. Geri alınamaz.</p>
+      <p className="rt-metin">Ritos'taki bütün verilerin sunucudan ve bu cihazdan silinir. Geri alınamaz.</p>
+      <p className="rt-muted">Aynı e-postayla kullandığın başka uygulamalar etkilenmez. Aynı e-posta ve şifreyle yeniden girersen Ritos boş başlar.</p>
       <ul className="rt-maddeler rt-muted">
         <li>Koçların, danışanların ve ailen seninle bağlarının sonlandığını görür.</li>
         <li>Kurduğun aile grubu dağılır.</li>

@@ -149,13 +149,21 @@ export async function girisYap(eposta: string, sifre: string): Promise<Sonuc> {
   }
   const uid = r.data.user.id;
   const k = await sb.from('cat_anahtar').select('tuz, sarili_sifre').eq('id', uid).maybeSingle();
-  if (!k.data) { await sb.auth.signOut(); return { tamam: false, hata: 'Bu hesabın şifreleme anahtarı bulunamadı.' }; }
   let dek: CryptoKey;
-  try {
-    dek = await sarimiAc(k.data.sarili_sifre, await sarmaAnahtari(sifre, k.data.tuz));
-  } catch {
-    await sb.auth.signOut();
-    return { tamam: false, hata: 'Veri anahtarı açılamadı.' };
+  if (!k.data) {
+    // 5 ekim: Ritos verisi silinmiş (Hesabımı sil) ya da hiç oluşmamış hesap — şifre doğru olduğuna
+    // göre Ritos'a temiz başlangıç: yeni veri anahtarı oluşturulur.
+    const yeni = await anahtarlariOlustur(uid, sifre);
+    const a = await sb.from('cat_anahtar').insert(yeni.satir);
+    if (a.error) { await sb.auth.signOut(); return { tamam: false, hata: `Anahtar kaydedilemedi: ${a.error.message}` }; }
+    dek = yeni.dek;
+  } else {
+    try {
+      dek = await sarimiAc(k.data.sarili_sifre, await sarmaAnahtari(sifre, k.data.tuz));
+    } catch {
+      await sb.auth.signOut();
+      return { tamam: false, hata: 'Veri anahtarı açılamadı.' };
+    }
   }
   await profilGaranti(uid, email);
   // Cihazda başka bir hesabın verisi kalmışsa (beklenmez; çıkış siler) önce onu sil.
