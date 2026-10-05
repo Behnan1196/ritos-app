@@ -1164,3 +1164,8 @@ textarea.rt-inp{font-family:inherit;}
 .rt-not-edit.kompakt .rt-not-arac::-webkit-scrollbar{display:none;}
 .rt-not-edit.kompakt .rt-not-arac button{flex:0 0 auto;}
 .rt-not-edit.kompakt .rt-not-arac .ayrac{flex:0 0 1px;}
+
+/* Modal: kaydedilmemiş değişiklik sorusu (5 ekim) */
+.rt-modal-sor{position:sticky;bottom:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:#fbf1dc;border-top:1px solid var(--line);font-size:13.5px;font-weight:600;z-index:5;}
+.rt-modal-sor span{flex:1 1 100%;}
+.rt-modal-sor .rt-btn{flex:1;}

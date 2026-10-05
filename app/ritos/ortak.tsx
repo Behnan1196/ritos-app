@@ -7,16 +7,28 @@ import { YansitDugmesi } from './Yansit';
 
 // Modal — formlar ekranda sabit durmaz, modal ile açılır.
 // ust: başlığın sağında, ✕'ten önce duran ek öğe (örn. kart editöründe tarih-saat çipi).
+// 5 ekim: modalın içinde bir şey yazıldıysa (herhangi bir input olayı) dışarı dokunmak ya da × formu
+// kaybettirmez; önce "Kaydedilmemiş değişiklikler" sorulur. Hiç yazılmadıysa eskisi gibi hemen kapanır.
 export function Modal({ baslik, onKapat, children, ust }: { baslik: string; onKapat: () => void; children: ReactNode; ust?: ReactNode }) {
+  const [kirli, setKirli] = useState(false);
+  const [sor, setSor] = useState(false);
+  const kapatIste = () => { if (kirli) setSor(true); else onKapat(); };
   return (
-    <div className="rt-modal-bg" onClick={onKapat}>
-      <div className="rt-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={baslik}>
+    <div className="rt-modal-bg" onClick={kapatIste}>
+      <div className="rt-modal" onClick={(e) => e.stopPropagation()} onInput={() => { if (!kirli) setKirli(true); }} role="dialog" aria-label={baslik}>
         <div className="rt-modal-hd">
           <b>{baslik}</b>
           {ust}
-          <button type="button" className="rt-x" onClick={onKapat} aria-label="Kapat">×</button>
+          <button type="button" className="rt-x" onClick={kapatIste} aria-label="Kapat">×</button>
         </div>
         <div className="rt-modal-body">{children}</div>
+        {sor && (
+          <div className="rt-modal-sor" role="alertdialog" aria-label="Kaydedilmemiş değişiklikler">
+            <span>Kaydedilmemiş değişiklikler var.</span>
+            <button type="button" className="rt-btn" onClick={onKapat}>Kaydetmeden çık</button>
+            <button type="button" className="rt-btn primary" autoFocus onClick={() => setSor(false)}>Devam et</button>
+          </div>
+        )}
       </div>
     </div>
   );
