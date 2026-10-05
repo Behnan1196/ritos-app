@@ -16,6 +16,7 @@ import { PaketlerKap } from './Sinav';
 import { DanismanlikAyarlari } from './Danismanlik';
 import { AileAyarlari } from './Sohbet';
 import { useDanismanlik } from '@/lib/danismanlik';
+import { hesabimiSil, verileriSifirla, type SifirlaSecim } from '@/lib/sifirla';
 
 // ———————————————— giriş kapısı ————————————————
 
@@ -208,6 +209,7 @@ export function AyarlarPane() {
   const dn = useDanismanlik();
   const [modal, setModal] = useState<null | 'cikis' | 'sifre' | 'kurtarma'>(null);
   const [adDuzenle, setAdDuzenle] = useState<string | null>(null);
+  const [veriModal, setVeriModal] = useState<null | 'sifirla' | 'sil'>(null);
   const uid = o.session?.user.id;
 
   return (
@@ -243,6 +245,17 @@ export function AyarlarPane() {
       <DanismanlikAyarlari />
       <AileAyarlari />
       <BildirimAyarlari />
+      {o.hesapli && (
+        <Kap baslik="Veriler">
+          <p className="rt-muted">Bu cihazı temizlemek için &quot;Çıkış yap&quot; yeter: çıkışta cihazdaki kopya silinir, veri hesapta kalır.</p>
+          <div className="rt-satir">
+            <button type="button" className="rt-btn" onClick={() => setVeriModal('sifirla')}>Verilerimi sıfırla</button>
+            <button type="button" className="rt-btn tehlike" onClick={() => setVeriModal('sil')}>Hesabımı sil</button>
+          </div>
+        </Kap>
+      )}
+      {veriModal === 'sifirla' && <SifirlaModal onKapat={() => setVeriModal(null)} />}
+      {veriModal === 'sil' && <HesapSilModal onKapat={() => setVeriModal(null)} />}
 
       {modal === 'cikis' && <CikisModal onKapat={() => setModal(null)} bekleyen={d.bekleyen} />}
       {modal === 'sifre' && <SifreModal onKapat={() => setModal(null)} />}
@@ -289,6 +302,69 @@ function SifreModal({ onKapat }: { onKapat: () => void }) {
           onClick={async () => { setBekle(true); setHata(null); try { await sifreDegistir(eski, yeni); setTamam(true); } catch (e) { setHata((e as Error).message); } finally { setBekle(false); } }}>
           {bekle ? 'Değiştiriliyor…' : 'Değiştir'}
         </button>
+      </div>
+    </Modal>
+  );
+}
+
+// ———————————————— 5 ekim: verileri sıfırla, hesabı sil ————————————————
+
+function SifirlaModal({ onKapat }: { onKapat: () => void }) {
+  const [s, setS] = useState<SifirlaSecim>({ ajanda: true, programlar: false, kutuphane: false, baglar: false });
+  const [onay, setOnay] = useState('');
+  const [bekle, setBekle] = useState(false);
+  const [sonuc, setSonuc] = useState<string | null>(null);
+  const [hata, setHata] = useState<string | null>(null);
+  const secim = (k: keyof SifirlaSecim, ad: string, ac: string) => (
+    <label className="rt-sifirla-sec">
+      <input type="checkbox" checked={s[k]} onChange={(e) => setS({ ...s, [k]: e.target.checked })} />
+      <span><b>{ad}</b><small>{ac}</small></span>
+    </label>
+  );
+  const bos = !s.ajanda && !s.programlar && !s.kutuphane && !s.baglar;
+  if (sonuc) return <Modal baslik="Verilerimi sıfırla" onKapat={onKapat}><p className="rt-tamam">{sonuc}</p><div className="rt-satir"><button type="button" className="rt-btn" onClick={onKapat}>Kapat</button></div></Modal>;
+  return (
+    <Modal baslik="Verilerimi sıfırla" onKapat={onKapat}>
+      <p className="rt-metin">Seçtiklerin bu hesaptan, bütün cihazlarından silinir. Geri alınamaz.</p>
+      {secim('ajanda', 'Ajandam', 'kendi kartların, işaretlerin, ölçümlerin, dış uygulama kartları')}
+      {secim('programlar', 'Kişisel programlarım ve şablonlarım', 'kartlarıyla birlikte')}
+      {secim('kutuphane', 'Kütüphane ve notlar', 'kartlar, klasörler, notlar, bağlantı widget\'ları')}
+      {secim('baglar', 'Koçluk, danışmanlık ve aile bağları', 'bağlar bitirilir (karşı taraf "sonlandı" görür); onlardan gelen kartlar, planlar, paylaşımlar silinir')}
+      {!s.baglar && s.ajanda && <p className="rt-muted">Koçundan ya da ailenden gelen kartlar kalır; bağ sürdükçe yeniden gelirler.</p>}
+      <label className="rt-alan">Onay için <b>SIFIRLA</b> yaz<input className="rt-inp" value={onay} onChange={(e) => setOnay(e.target.value)} /></label>
+      {hata && <p className="rt-hata">{hata}</p>}
+      <div className="rt-satir">
+        <button type="button" className="rt-btn" onClick={onKapat}>Vazgeç</button>
+        <button type="button" className="rt-btn tehlike" disabled={bos || bekle || onay.trim().toLocaleUpperCase('tr') !== 'SIFIRLA'} onClick={async () => {
+          setBekle(true); setHata(null);
+          try { const n = await verileriSifirla(s); setSonuc(`${n} kayıt silindi.`); } catch (e) { setHata(e instanceof Error ? e.message : String(e)); }
+          setBekle(false);
+        }}>{bekle ? 'Siliniyor…' : 'Sıfırla'}</button>
+      </div>
+    </Modal>
+  );
+}
+
+function HesapSilModal({ onKapat }: { onKapat: () => void }) {
+  const [onay, setOnay] = useState('');
+  const [bekle, setBekle] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  return (
+    <Modal baslik="Hesabımı sil" onKapat={onKapat}>
+      <p className="rt-metin">Hesabın ve bütün verilerin sunucudan ve bu cihazdan silinir. Geri alınamaz.</p>
+      <ul className="rt-maddeler rt-muted">
+        <li>Koçların, danışanların ve ailen seninle bağlarının sonlandığını görür.</li>
+        <li>Kurduğun aile grubu dağılır.</li>
+        <li>Diğer cihazlarındaki kopyalar bir sonraki açılışta erişilemez olur.</li>
+      </ul>
+      <label className="rt-alan">Onay için <b>SİL</b> yaz<input className="rt-inp" value={onay} onChange={(e) => setOnay(e.target.value)} /></label>
+      {hata && <p className="rt-hata">{hata}</p>}
+      <div className="rt-satir">
+        <button type="button" className="rt-btn" onClick={onKapat}>Vazgeç</button>
+        <button type="button" className="rt-btn tehlike" disabled={bekle || onay.trim().toLocaleUpperCase('tr') !== 'SİL'} onClick={async () => {
+          setBekle(true); setHata(null);
+          try { await hesabimiSil(); } catch (e) { setHata(e instanceof Error ? e.message : String(e)); setBekle(false); }
+        }}>{bekle ? 'Siliniyor…' : 'Hesabımı sil'}</button>
       </div>
     </Modal>
   );

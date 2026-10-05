@@ -747,6 +747,14 @@ async function iliskileriCek() {
   for (const il of liste) {
     if (il.durum === 'sonlandi' && onceki.get(il.id)?.durum !== 'sonlandi') await sonlandiIsle(il);
   }
+  // 5 ekim: sunucuda artık olmayan ilişki (karşı taraf hesabını sildi) → sonlandı say.
+  const var_ = new Set(liste.map((x) => x.id));
+  for (const il of Array.from(onceki.values())) {
+    if (var_.has(il.id) || il.durum !== 'aktif') continue;
+    const son = { ...il, durum: 'sonlandi' as const, sonlandi: new Date().toISOString() };
+    await db.iliski.put(son);
+    await sonlandiIsle(son);
+  }
 }
 
 async function sonlandiIsle(il: IliskiRow) {
