@@ -12,7 +12,8 @@ import React, { useEffect, useState } from 'react';
 import { useCanli } from '@/lib/canli';
 import { db, type AileRow, type IliskiAyarRow, type IliskiRow, type KutuphaneKartRow, type ProgramRow } from '@/lib/db';
 import { bugun, degerBloklari, iyelik, tarihEkle, tarihEtiket, tarihParse } from '@/lib/paket';
-import { aileAktifMi, aileGorevIliski, kocOl, davetler, davetSil, haftaNotuGonder, iliskiBilgiYaz, type DavetSatir } from '@/lib/danismanlik';
+import { aileAktifMi, aileAyril, aileDavet, aileGorevIliski, aileKur, benimAileRolum, kocOl, davetler, davetSil, haftaNotuGonder, iliskiBilgiYaz, type DavetSatir } from '@/lib/danismanlik';
+import { GRUP_SINIR, GRUP_TUR, grupIkon, grupTuru, type GrupTur } from '@/lib/grup';
 import { danisanGunleri, gonderimAyarla, haftaUygula, kocKartEkle, planDurumu, sablonKartlari, type HaftaKarti, type KocKarti } from '@/lib/danisanAjanda';
 import { SURE_ANAHTAR } from './KartEditor';
 import { disiplinAdi, useDanismanlik } from '@/lib/danismanlik';
@@ -33,7 +34,7 @@ import { hazirKartlar, hazirSablonlariYenile, hazirSablonuAl, useHazirSablonlar,
 
 // 4 ekim (v6): üstte Planlar/Kütüphane düğmeleri yok. Telefonda ekranlar yığın gibi: liste → (kişi | alan | kütüphane),
 // her alt ekranın ilk satırı "‹ Geri  PLANLAR".
-type Ekran = 'liste' | 'hedef' | 'alan' | 'kut';
+type Ekran = 'liste' | 'hedef' | 'alan' | 'kut' | 'grup'; // grup (5 ekim): alan = grup id
 type Dosya = 'plan' | 'gelisim' | 'bilgi';   // telefonda kişi dosyasının sekmesi
 type Sag = 'gelisim' | 'bilgi' | 'kut';       // geniş ekranda sağ bölme
 type AlanSek = 'malzeme' | 'sablon' | 'ayar';
@@ -49,27 +50,42 @@ interface Hedef { id: string; grup: string; grupIc: string; ic: string; ad: stri
 /** 4 ekim — henüz görev verilmemiş aile üyesi: seçilince görev ilişkisi sessizce kurulur. */
 interface Aday { id: string; uye: string; ad: string }
 
-function useAdaylar(hedefler: Hedef[]): Aday[] {
+function useAdaylar(hedefler: Hedef[], gruplar: AileRow[]): Aday[] {
   const dn = useDanismanlik();
-  const aileler = useCanli(() => db.aile.toArray(), [], [] as AileRow[]);
-  const aile = aileler.find(aileAktifMi);
-  if (!aile) return [];
-  const var_ = new Set(hedefler.filter((x) => x.h.tur === 'danisan' && x.h.il.disiplin === 'aile').map((x) => (x.h as { il: IliskiRow }).il.danisan));
-  return aile.uyeler.filter((u) => u.uye !== dn.uid && u.durum === 'aktif' && !var_.has(u.uye)).map((u) => ({ id: `aile:${u.uye}`, uye: u.uye, ad: u.ad }));
+  const var_ = new Set(hedefler.filter((x) => grupKisisi(x)).map((x) => (x.h as { il: IliskiRow }).il.danisan));
+  const m = new Map<string, Aday>();
+  for (const g of gruplar) for (const u of g.uyeler) {
+    if (u.uye !== dn.uid && u.durum === 'aktif' && !var_.has(u.uye) && !m.has(u.uye)) m.set(u.uye, { id: `aile:${u.uye}`, uye: u.uye, ad: u.ad });
+  }
+  return Array.from(m.values());
+}
+
+/** Gruptaki biri (görev verdiğim kişi) mi? — disiplini 'aile' olan görev ilişkisi. */
+const grupKisisi = (h: Hedef | null | undefined) => !!h && h.h.tur === 'danisan' && h.h.il.disiplin === 'aile';
+const GRUP_ETIKET = 'Gruplarım';
+
+/** Aktif gruplarım (ada göre). */
+function useGruplarim(): AileRow[] | null {
+  const dn = useDanismanlik();
+  const l = useCanli(() => db.aile.toArray(), [dn.uid], null as AileRow[] | null);
+  return l ? l.filter(aileAktifMi).sort((a, b) => a.ad.localeCompare(b.ad, 'tr')) : null;
 }
 
 /** Hedefler; ilk okuma bitmeden null (seçim ekranı yanlışlıkla açılmasın diye). */
-function useHedeflerHazir(): Hedef[] | null {
+function useHedeflerHazir(gruplar: AileRow[] | null): Hedef[] | null {
   const dn = useDanismanlik();
   const iliskiler = useCanli(async () => (await db.iliski.toArray()).filter((i) => i.durum === 'aktif' && i.koc === dn.uid), [dn.uid], null as IliskiRow[] | null);
   const programlar = useCanli(() => db.program.filter((p) => !p.uzak && !p.sablon).toArray(), [], null as ProgramRow[] | null);
-  if (!iliskiler || !programlar) return null;
+  if (!iliskiler || !programlar || !gruplar) return null;
   const liste: Hedef[] = [];
   for (const i of iliskiler.filter((x) => x.disiplin !== 'aile').sort((a, b) => a.disiplin.localeCompare(b.disiplin) || a.danisan_ad.localeCompare(b.danisan_ad, 'tr'))) {
     liste.push({ id: i.id, grup: danismanlikBaslik(i.disiplin), grupIc: DISIPLIN_IKON[i.disiplin] ?? '🤝', ic: DISIPLIN_IKON[i.disiplin] ?? '🤝', ad: i.danisan_ad, alt: disiplinAdi(i.disiplin), h: { tur: 'danisan', il: i } });
   }
   for (const i of iliskiler.filter((x) => x.disiplin === 'aile').sort((a, b) => a.danisan_ad.localeCompare(b.danisan_ad, 'tr'))) {
-    liste.push({ id: i.id, grup: 'Ailem', grupIc: '👪', ic: '👪', ad: i.danisan_ad, alt: 'verdiğin görevler', h: { tur: 'danisan', il: i } });
+    // Aynı kişi birden çok grupta olabilir; plan kişiyle (ilişkiyle) tek, grup adları altta.
+    const ortak = gruplar.filter((g) => g.uyeler.some((u) => u.uye === i.danisan && u.durum === 'aktif'));
+    const ic = ortak[0] ? grupIkon(ortak[0]) : '👪';
+    liste.push({ id: i.id, grup: GRUP_ETIKET, grupIc: ic, ic, ad: i.danisan_ad, alt: ortak.length ? ortak.map((g) => g.ad).join(', ') : 'verdiğin görevler', h: { tur: 'danisan', il: i } });
   }
   for (const p of programlar.sort((a, b) => a.ad.localeCompare(b.ad, 'tr'))) {
     liste.push({ id: `p:${p.id}`, grup: 'Kişisel programlarım', grupIc: '🌱', ic: p.ikon ?? VARSAYILAN_IKON, ad: p.ad, alt: 'kişisel program', h: { tur: 'program', programId: p.id } });
@@ -83,7 +99,9 @@ export default function Atolye({ genis }: { genis: boolean }) {
 
 function Planlar({ genis }: { genis: boolean }) {
   const dn = useDanismanlik();
-  const hedeflerHazir = useHedeflerHazir();
+  const gruplarHazir = useGruplarim();
+  const gruplar = gruplarHazir ?? [];
+  const hedeflerHazir = useHedeflerHazir(gruplarHazir);
   const hazir = hedeflerHazir !== null;
   const hedefler = hedeflerHazir ?? [];
   const [secili, setSecili] = useSeciliDanisan();
@@ -99,7 +117,9 @@ function Planlar({ genis }: { genis: boolean }) {
   const setHafta = (h: boolean) => { durum.hafta = h; setHaftaS(h); };
   const setDosya = (d: Dosya) => { durum.dosya = d; setDosyaS(d); };
   const setSag = (d: Sag) => { durum.sag = d; setSagS(d); };
-  const adaylar = useAdaylar(hedefler);
+  const adaylar = useAdaylar(hedefler, gruplar);
+  const [grupKur, setGrupKur] = useState(false);
+  const [uyeDavet, setUyeDavet] = useState<string | null>(null); // hangi gruba
   const [kuruluyor, setKuruluyor] = useState<string | null>(null);
   const [progForm, setProgForm] = useState<null | { id?: string }>(null);
   const [yeniBekle, setYeniBekle] = useState<string | null>(null); // yeni program listeye düşene kadar liste açılmasın
@@ -147,6 +167,8 @@ function Planlar({ genis }: { genis: boolean }) {
       {progForm && <ProgramFormu id={progForm.id} onKapat={() => setProgForm(null)} onOlustu={(id) => { setProgForm(null); setYeniBekle(`p:${id}`); sec(`p:${id}`); }} />}
       {davet && <DavetModal sabitDisiplin={davet} onKapat={() => { setDavet(null); setDavetYenile((n) => n + 1); }} />}
       {alanEkle && <AlanEkleModal onKapat={() => setAlanEkle(false)} onEklendi={() => setAlanEkle(false)} />}
+      {grupKur && <GrupKurModal onKapat={() => setGrupKur(false)} onKuruldu={(id) => { setGrupKur(false); git('grup', id); }} />}
+      {uyeDavet && <UyeDavetModal grup={uyeDavet} onKapat={() => setUyeDavet(null)} />}
       {kartEkle && h && <KartEkle h={h} tarih={tarih < bugun() ? bugun() : tarih} onKapat={() => setKartEkle(false)} />}
       {ayAcik && <AyTakvimi secili={tarih} onSec={(t) => { setTarih(t); setAyAcik(false); }} onKapat={() => setAyAcik(false)} />}
     </>
@@ -158,8 +180,12 @@ function Planlar({ genis }: { genis: boolean }) {
       kuruluyor={kuruluyor} onSec={(x) => sec(x.id)} onAday={adaySec} onYeniProgram={() => setProgForm({})}
       alanlar={alanlar} bekleyen={bekleyen} sonlananlar={sonlananlar}
       onDavet={setDavet} onDavetIptal={async (kod) => { await davetSil(kod); setDavetYenile((n) => n + 1); }} onAlanEkle={() => setAlanEkle(true)}
-      acikAlan={ekran === 'alan' ? alan : null} kutAcik={ekran === 'kut'}
-      onAlan={(a) => git('alan', a)} onKutuphane={() => git('kut')} />
+      acikAlan={ekran === 'alan' || ekran === 'grup' ? alan : null} kutAcik={ekran === 'kut'}
+      onAlan={(a) => git('alan', a)} onKutuphane={() => git('kut')}
+      gruplar={gruplar} onGrup={(id) => git('grup', id)} onGrupKur={() => setGrupKur(true)} onUyeDavet={setUyeDavet} />
+  );
+  const grupDosyasi = ekran === 'grup' && alan && (
+    <GrupDosyasi id={alan} hedefler={hedefler} adaylar={adaylar} onSec={(x) => sec(x.id)} onAday={adaySec} onUyeDavet={() => setUyeDavet(alan)} onBitti={() => git('liste')} />
   );
 
   if (!hazir) return <div className="rt-atolye-plan" />;
@@ -169,6 +195,7 @@ function Planlar({ genis }: { genis: boolean }) {
   if (!genis) {
     if (ekran === 'kut') return <div className="rt-atolye-plan">{geri}<Kutuphane />{modallar}</div>;
     if (ekran === 'alan' && alan) return <div className="rt-atolye-plan">{geri}<AlanDosyasi alan={alan} />{modallar}</div>;
+    if (grupDosyasi) return <div className="rt-atolye-plan">{geri}{grupDosyasi}{modallar}</div>;
     if (ekran === 'liste' || (!h && !kuruluyor && !yeniBekle)) {
       return (
         <div className="rt-atolye-plan">
@@ -184,7 +211,7 @@ function Planlar({ genis }: { genis: boolean }) {
   const t0 = bugun();
   const adim = hafta ? 7 : 1;
   const bugunGorunur = hafta ? haftaBasi(tarih) === haftaBasi(t0) : tarih === t0;
-  const aileMi = h?.grup === 'Ailem';
+  const aileMi = grupKisisi(h);
   const dosyaSek: [Dosya, string][] = [['plan', '📅 Plan'], ['gelisim', '📈 Gelişim'], ...(aileMi ? [] : [['bilgi', '🗂 Bilgiler'] as [Dosya, string]])];
   const etkinDosya: Dosya = aileMi && dosya === 'bilgi' ? 'plan' : dosya;
   const programMi = h?.h.tur === 'program';
@@ -244,13 +271,14 @@ function Planlar({ genis }: { genis: boolean }) {
   }
 
   // ———— Geniş ekran: solda liste, ortada plan / alan dosyası / kütüphane, sağda dosya bölmesi ————
-  const ortaPlan = ekran !== 'alan' && ekran !== 'kut';
+  const ortaPlan = ekran !== 'alan' && ekran !== 'kut' && ekran !== 'grup';
   return (
     <div className="rt-atolye-plan">
       <aside className="rt-atolye-sol" aria-label="Plan seçimi">{secici}</aside>
       <section className="rt-atolye-orta">
         {ekran === 'kut' ? <div className="rt-orta-dar"><Kutuphane /></div>
           : ekran === 'alan' && alan ? <div className="rt-orta-dar"><AlanDosyasi alan={alan} /></div>
+          : grupDosyasi ? <div className="rt-orta-dar">{grupDosyasi}</div>
           : (
             <>
               {kuruluyor && <p className="rt-muted">Hazırlanıyor…</p>}
@@ -281,7 +309,7 @@ function Planlar({ genis }: { genis: boolean }) {
 
 function KartEkle({ h, tarih, onKapat }: { h: Hedef; tarih: string; onKapat: () => void }) {
   const [gun, setGun] = useState(tarih);
-  const [yol, setYol] = useState<null | 'yeni' | 'kut'>(h.h.tur === 'danisan' && h.grup !== 'Ailem' ? 'yeni' : null);
+  const [yol, setYol] = useState<null | 'yeni' | 'kut'>(h.h.tur === 'danisan' && !grupKisisi(h) ? 'yeni' : null);
   if (yol === 'yeni') return <KocKartFormu h={h.h} tarih={gun} onKapat={onKapat} />;
   if (yol === 'kut') return <KutuphanedenEkle h={h} tarih={gun} onKapat={onKapat} />;
   return (
@@ -654,32 +682,40 @@ function GeriBildirim({ h, haftaBas, kartlar, programId, hicGonderilmedi }: { h:
 
 const kucuk = (x: string) => x.toLocaleLowerCase('tr');
 
-function HedefSecici({ hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, onAday, onYeniProgram, alanlar, bekleyen, sonlananlar, onDavet, onDavetIptal, onAlanEkle, acikAlan, kutAcik, onAlan, onKutuphane }: {
+function HedefSecici({ hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, onAday, onYeniProgram, alanlar, bekleyen, sonlananlar, onDavet, onDavetIptal, onAlanEkle, acikAlan, kutAcik, onAlan, onKutuphane, gruplar, onGrup, onGrupKur, onUyeDavet }: {
   hedefler: Hedef[]; adaylar: Aday[]; seciliId: string | null; kompakt: boolean; kuruluyor: string | null;
   onSec: (h: Hedef) => void; onAday: (a: Aday) => void; onYeniProgram: () => void;
   alanlar: string[]; bekleyen: DavetSatir[]; sonlananlar: IliskiRow[];
   onDavet: (disiplin: string) => void; onDavetIptal: (kod: string) => void; onAlanEkle: () => void;
   acikAlan: string | null; kutAcik: boolean; onAlan: (alan: string) => void; onKutuphane: () => void;
+  gruplar: AileRow[]; onGrup: (id: string) => void; onGrupKur: () => void; onUyeDavet: (grup: string) => void;
 }) {
+  const dn = useDanismanlik();
   const [ara, setAra] = useState('');
   const [acik, setAcik] = useState<Record<string, boolean>>({});
   const [sonAcik, setSonAcik] = useState<Record<string, boolean>>({});
   const [sonlar, setSonlar] = useState<string[]>([]);
   useEffect(() => { setSonlar(sonlariOku()); }, []);
-  type Oge = { id: string; ad: string; ic: string; grup: string; hedef?: Hedef; aday?: Aday };
+  type Oge = { id: string; anahtar: string; ad: string; ic: string; grup: string; hedef?: Hedef; aday?: Aday };
+  // Grup üyeleri her grubun altında (aynı kişi iki grupta olabilir; seçince aynı plan açılır).
+  const grupOgeleri: Oge[] = gruplar.flatMap((g) => g.uyeler.filter((u) => u.uye !== dn.uid && u.durum === 'aktif').map((u) => {
+    const hedef = hedefler.find((x) => grupKisisi(x) && (x.h as { il: IliskiRow }).il.danisan === u.uye);
+    const aday = hedef ? undefined : adaylar.find((a) => a.uye === u.uye);
+    return { id: hedef?.id ?? `aile:${u.uye}`, anahtar: `${g.id}:${u.uye}`, ad: u.ad, ic: grupIkon(g), grup: `g:${g.id}`, hedef, aday };
+  }).sort((a, b) => a.ad.localeCompare(b.ad, 'tr')));
   const ogeler: Oge[] = [
-    ...hedefler.map((x) => ({ id: x.id, ad: x.ad, ic: x.ic, grup: x.grup, hedef: x })),
-    ...adaylar.map((a) => ({ id: a.id, ad: a.ad, ic: '👪', grup: 'Ailem', aday: a })),
+    ...hedefler.filter((x) => x.grup !== GRUP_ETIKET).map((x) => ({ id: x.id, anahtar: x.id, ad: x.ad, ic: x.ic, grup: x.grup, hedef: x })),
+    ...grupOgeleri,
   ];
   // Gruplar: önce danışmanlık alanları (boş olsa da — davet buradan), sonra Ailem, sonra Kişisel programlarım.
-  type Grup = { ad: string; ic: string; alan?: string; dosya?: string };
-  const alanGruplari: Grup[] = Array.from(new Set([...alanlar, ...hedefler.filter((x) => x.h.tur === 'danisan' && x.grup !== 'Ailem').map((x) => (x.h as { il: IliskiRow }).il.disiplin)]))
-    .map((d) => ({ ad: danismanlikBaslik(d), ic: DISIPLIN_IKON[d] ?? '🤝', alan: d, dosya: d }))
+  type Grup = { ad: string; ic: string; anahtar: string; alan?: string; dosya?: string; aile?: AileRow };
+  const alanGruplari: Grup[] = Array.from(new Set([...alanlar, ...hedefler.filter((x) => x.h.tur === 'danisan' && !grupKisisi(x)).map((x) => (x.h as { il: IliskiRow }).il.disiplin)]))
+    .map((d) => ({ ad: danismanlikBaslik(d), ic: DISIPLIN_IKON[d] ?? '🤝', anahtar: danismanlikBaslik(d), alan: d, dosya: d }))
     .sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
-  const gruplar: Grup[] = [
+  const bolumler: Grup[] = [
     ...alanGruplari,
-    ...(ogeler.some((o) => o.grup === 'Ailem') ? [{ ad: 'Ailem', ic: '👪' }] : []),
-    { ad: 'Kişisel programlarım', ic: '🌱', dosya: 'kisisel' },
+    ...gruplar.map((g) => ({ ad: g.ad, ic: grupIkon(g), anahtar: `g:${g.id}`, aile: g })),
+    { ad: 'Kişisel programlarım', ic: '🌱', anahtar: 'Kişisel programlarım', dosya: 'kisisel' },
   ];
   const toplam = ogeler.length;
   const q = kucuk(ara.trim());
@@ -687,7 +723,7 @@ function HedefSecici({ hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, o
   const tikla = (o: Oge) => (o.hedef ? onSec(o.hedef) : o.aday && onAday(o.aday));
   const son = !q && !kompakt && toplam > 6 ? sonlar.map((id) => ogeler.find((o) => o.id === id)).filter((o): o is Oge => !!o).slice(0, 4) : [];
   const satir = (o: Oge) => (
-    <button key={o.id} type="button" className={`rt-hedef-sat${o.id === seciliId || o.id === kuruluyor ? ' on' : ''}`} disabled={!!kuruluyor} onClick={() => tikla(o)}>
+    <button key={o.anahtar} type="button" className={`rt-hedef-sat${o.id === seciliId || o.id === kuruluyor ? ' on' : ''}`} disabled={!!kuruluyor} onClick={() => tikla(o)}>
       <span className="ic">{o.ic}</span><span className="ad">{o.ad}</span>
       {!kompakt && <span className="chev">›</span>}
     </button>
@@ -702,23 +738,40 @@ function HedefSecici({ hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, o
           <div className="rt-hedef-cipler">{son.map((o) => <button key={o.id} type="button" className={`rt-chip${o.id === seciliId ? ' on' : ''}`} onClick={() => tikla(o)}>{o.ic} {o.ad}</button>)}</div>
         </div>
       )}
-      {gruplar.map((g) => {
-        const tum = ogeler.filter((o) => o.grup === g.ad);
-        const grupOgeleri = gorunen.filter((o) => o.grup === g.ad);
-        if (q && !grupOgeleri.length) return null;
+      {bolumler.map((g) => {
+        const tum = ogeler.filter((o) => o.grup === g.anahtar);
+        const bolumOgeleri = gorunen.filter((o) => o.grup === g.anahtar);
+        if (q && !bolumOgeleri.length) return null;
         const varsayilan = tum.length <= 6 || tum.some((o) => o.id === seciliId);
-        const ac = q ? true : acik[g.ad] ?? varsayilan;
+        const ac = q ? true : acik[g.anahtar] ?? varsayilan;
+        const yonetici = g.aile && benimAileRolum(g.aile)?.rol === 'yonetici';
+        const davetliler = g.aile ? g.aile.uyeler.filter((u) => u.durum === 'davet') : [];
         const davetler_ = g.alan ? bekleyen.filter((x) => x.disiplin === g.alan) : [];
         const sonlanan = g.alan ? sonlananlar.filter((x) => x.disiplin === g.alan) : [];
         return (
-          <div key={g.ad} className="rt-secici-grup">
+          <div key={g.anahtar} className="rt-secici-grup">
             <div className="rt-grup-bas">
-              <button type="button" className="rt-grup-ad" aria-expanded={ac} onClick={() => setAcik({ ...acik, [g.ad]: !ac })}>
+              <button type="button" className="rt-grup-ad" aria-expanded={ac} onClick={() => setAcik({ ...acik, [g.anahtar]: !ac })}>
                 <span>{g.ic} {g.ad}</span><span className="say">{tum.length} {ac ? '▾' : '▸'}</span>
               </button>
               {g.dosya && <button type="button" className={`rt-alan-ac${acikAlan === g.dosya ? ' on' : ''}`} aria-label={`${g.ad} alan dosyası`} onClick={() => onAlan(g.dosya!)}>Alan ›</button>}
+              {g.aile && <button type="button" className={`rt-alan-ac${acikAlan === g.aile.id ? ' on' : ''}`} aria-label={`${g.ad} grup dosyası`} onClick={() => onGrup(g.aile!.id)}>Grup ›</button>}
             </div>
-            {ac && grupOgeleri.map(satir)}
+            {ac && bolumOgeleri.map(satir)}
+            {ac && !q && g.aile && (
+              <>
+                {davetliler.map((u) => (
+                  <div key={u.uye} className="rt-hedef-sat bekliyor">
+                    <span className="ic">✉️</span><span className="ad">{u.ad}</span><span className="ek">davet bekliyor</span>
+                    {yonetici && <button type="button" className="rt-ikon" aria-label="Daveti geri al" onClick={() => aileAyril(g.aile!.id, u.uye).catch(() => {})}>×</button>}
+                  </div>
+                ))}
+                {tum.length === 0 && !davetliler.length && <p className="rt-muted rt-grup-bos">Henüz yalnızsın.</p>}
+                {yonetici && g.aile.uyeler.filter((u) => u.durum !== 'ayrildi').length < GRUP_SINIR && (
+                  <button type="button" className="rt-hedef-sat yeni" onClick={() => onUyeDavet(g.aile!.id)}><span className="ic">✉️</span><span className="ad">＋ Üye davet et</span></button>
+                )}
+              </>
+            )}
             {ac && !q && g.alan && (
               <>
                 {davetler_.map((x) => (
@@ -733,10 +786,10 @@ function HedefSecici({ hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, o
                 </button>
                 {sonlanan.length > 0 && (
                   <>
-                    <button type="button" className="rt-hedef-sat soluk" onClick={() => setSonAcik({ ...sonAcik, [g.ad]: !sonAcik[g.ad] })}>
-                      <span className="ic">{sonAcik[g.ad] ? '▾' : '▸'}</span><span className="ad">Sonlananlar ({sonlanan.length})</span>
+                    <button type="button" className="rt-hedef-sat soluk" onClick={() => setSonAcik({ ...sonAcik, [g.anahtar]: !sonAcik[g.anahtar] })}>
+                      <span className="ic">{sonAcik[g.anahtar] ? '▾' : '▸'}</span><span className="ad">Sonlananlar ({sonlanan.length})</span>
                     </button>
-                    {sonAcik[g.ad] && sonlanan.map((x) => (
+                    {sonAcik[g.anahtar] && sonlanan.map((x) => (
                       <div key={x.id} className="rt-hedef-sat soluk"><span className="ic" /><span className="ad">{x.danisan_ad}</span><span className="ek">sonlandı</span></div>
                     ))}
                   </>
@@ -750,11 +803,134 @@ function HedefSecici({ hedefler, adaylar, seciliId, kompakt, kuruluyor, onSec, o
         );
       })}
       {q && gorunen.length === 0 && <p className="rt-muted">“{ara}” bulunamadı.</p>}
-      {!q && <button type="button" className="rt-linkbtn rt-yeni-program" onClick={onAlanEkle}>＋ Danışmanlık alanı aç</button>}
+      {!q && (
+        <div className="rt-secici-alt">
+          <button type="button" className="rt-linkbtn" onClick={onGrupKur}>＋ Grup kur</button>
+          <button type="button" className="rt-linkbtn" onClick={onAlanEkle}>＋ Danışmanlık alanı aç</button>
+        </div>
+      )}
       {!q && (
         <button type="button" className={`rt-kut-sat${kutAcik ? ' on' : ''}`} onClick={onKutuphane}>
           <span className="ic">📚</span><span className="tx"><b>Kütüphane</b><small>genel kartların ve klasörlerin</small></span>{!kompakt && <span className="chev">›</span>}
         </button>
+      )}
+    </div>
+  );
+}
+
+// ———————————————— Gruplar (5 ekim): kur, davet et, grup dosyası ————————————————
+// Aile / arkadaş / ekip — davranış aynı: herkes gruptakilere görev verir, ortak liste ve ortak kart.
+// Yönetici üye davet eder, çıkarır; yönetici ayrılırsa grup dağılır. En fazla 12 kişi.
+
+function GrupKurModal({ onKapat, onKuruldu }: { onKapat: () => void; onKuruldu: (id: string) => void }) {
+  const [tur, setTur] = useState<GrupTur>('aile');
+  const [ad, setAd] = useState('');
+  const [bekle, setBekle] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  const kur = async () => {
+    setBekle(true); setHata(null);
+    try { onKuruldu(await aileKur(ad.trim(), tur)); }
+    catch (e) { setHata(e instanceof Error ? e.message : String(e)); setBekle(false); }
+  };
+  return (
+    <Modal baslik="＋ Grup kur" onKapat={onKapat}>
+      {(Object.keys(GRUP_TUR) as GrupTur[]).map((k) => (
+        <button key={k} type="button" className={`rt-tur-kart${tur === k ? ' on' : ''}`} aria-pressed={tur === k} onClick={() => setTur(k)}>
+          <span className="ic">{GRUP_TUR[k].ikon}</span><span><b>{GRUP_TUR[k].ad}</b><small>{GRUP_TUR[k].aciklama}</small></span>
+        </button>
+      ))}
+      <input className="rt-inp" placeholder={`Grup adı (${GRUP_TUR[tur].ornek})`} value={ad} onChange={(e) => setAd(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && ad.trim() && !bekle) kur(); }} />
+      <p className="rt-muted">En fazla {GRUP_SINIR} kişi. Gruptakiler birbirine görev verir, ortak liste tutar; kimse kimsenin ajandasının geri kalanını görmez.</p>
+      {hata && <p className="rt-hata">{hata}</p>}
+      <div className="rt-satir" style={{ justifyContent: 'flex-end' }}>
+        <button type="button" className="rt-btn" onClick={onKapat}>Vazgeç</button>
+        <button type="button" className="rt-btn primary" disabled={!ad.trim() || bekle} onClick={kur}>{bekle ? 'Kuruluyor…' : 'Kur'}</button>
+      </div>
+    </Modal>
+  );
+}
+
+function UyeDavetModal({ grup, onKapat }: { grup: string; onKapat: () => void }) {
+  const g = useCanli(async () => (await db.aile.get(grup)) ?? null, [grup], null as AileRow | null);
+  const [eposta, setEposta] = useState('');
+  const [bekle, setBekle] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  const [tamam, setTamam] = useState<string | null>(null);
+  const gonder = async () => {
+    setBekle(true); setHata(null); setTamam(null);
+    try { const ad = await aileDavet(grup, eposta.trim()); setTamam(`${ad} davet edildi; Gelenler'inde görecek.`); setEposta(''); }
+    catch (e) { setHata(e instanceof Error ? e.message : String(e)); }
+    finally { setBekle(false); }
+  };
+  return (
+    <Modal baslik={`✉️ ${g ? `${grupIkon(g)} ${g.ad}` : 'Gruba'} davet`} onKapat={onKapat}>
+      <p className="rt-muted">Ritos kullanan birini e-postasıyla davet et. Kabul edince grupta görünür.</p>
+      <input className="rt-inp" type="email" placeholder="E-posta" value={eposta} onChange={(e) => setEposta(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && /\S+@\S+\.\S+/.test(eposta) && !bekle) gonder(); }} autoFocus />
+      {hata && <p className="rt-hata">{hata}</p>}
+      {tamam && <p className="rt-tamam">{tamam}</p>}
+      <div className="rt-satir" style={{ justifyContent: 'flex-end' }}>
+        <button type="button" className="rt-btn" onClick={onKapat}>{tamam ? 'Kapat' : 'Vazgeç'}</button>
+        <button type="button" className="rt-btn primary" disabled={!/\S+@\S+\.\S+/.test(eposta) || bekle} onClick={gonder}>{bekle ? 'Gönderiliyor…' : 'Davet et'}</button>
+      </div>
+    </Modal>
+  );
+}
+
+function GrupDosyasi({ id, hedefler, adaylar, onSec, onAday, onUyeDavet, onBitti }: {
+  id: string; hedefler: Hedef[]; adaylar: Aday[]; onSec: (h: Hedef) => void; onAday: (a: Aday) => void; onUyeDavet: () => void; onBitti: () => void;
+}) {
+  const dn = useDanismanlik();
+  const g = useCanli(async () => (await db.aile.get(id)) ?? null, [id], undefined as AileRow | null | undefined);
+  const [onay, setOnay] = useState<null | { uye: string; ad: string } | 'ayril'>(null);
+  const [hata, setHata] = useState<string | null>(null);
+  if (g === undefined) return null;
+  if (!g || !aileAktifMi(g)) return <p className="rt-muted">Bu grupta artık değilsin.</p>;
+  const ben = benimAileRolum(g);
+  const yonetici = ben?.rol === 'yonetici';
+  const uyeler = g.uyeler.filter((u) => u.durum !== 'ayrildi').sort((a, b) => (a.uye === dn.uid ? -1 : b.uye === dn.uid ? 1 : a.ad.localeCompare(b.ad, 'tr')));
+  const calistir = async (f: () => Promise<unknown>) => { setHata(null); try { await f(); } catch (e) { setHata(e instanceof Error ? e.message : String(e)); } };
+  const tur = GRUP_TUR[grupTuru(g)];
+  return (
+    <div className="rt-grup-dosyasi">
+      <div className="rt-tek"><span className="ic">{tur.ikon}</span><span className="tx"><b>{g.ad}</b><small>{tur.ad} grubu · {uyeler.filter((u) => u.durum === 'aktif').length} kişi</small></span></div>
+      <div className="rt-arac">
+        <h4>Üyeler</h4>
+        {uyeler.map((u) => {
+          const hedef = hedefler.find((x) => grupKisisi(x) && (x.h as { il: IliskiRow }).il.danisan === u.uye);
+          const aday = adaylar.find((a) => a.uye === u.uye);
+          const benim = u.uye === dn.uid;
+          const acilir = !benim && u.durum === 'aktif' && (hedef || aday);
+          return (
+            <div key={u.uye} className="rt-grup-uye">
+              <button type="button" className="rt-grup-uye-ad" disabled={!acilir} onClick={() => (hedef ? onSec(hedef) : aday && onAday(aday))}>
+                <b>{u.ad}{benim ? ' (sen)' : ''}</b>
+                <small>{u.rol === 'yonetici' ? 'yönetici' : u.durum === 'davet' ? 'davet bekliyor' : 'üye'}{acilir ? ' · görev ver ›' : ''}</small>
+              </button>
+              {yonetici && !benim && <button type="button" className="rt-ikon" aria-label={u.durum === 'davet' ? 'Daveti geri al' : 'Gruptan çıkar'} onClick={() => setOnay({ uye: u.uye, ad: u.ad })}>×</button>}
+            </div>
+          );
+        })}
+        {yonetici && uyeler.length < GRUP_SINIR && <button type="button" className="rt-btn" style={{ marginTop: 8 }} onClick={onUyeDavet}>✉️ Üye davet et</button>}
+        {!yonetici && <p className="rt-muted">Üyeleri grubun yöneticisi davet eder.</p>}
+      </div>
+      <div className="rt-arac">
+        <h4>Birlikte</h4>
+        <p className="rt-muted">Birine görev vermek için adına dokun. Ortak listeler Home&apos;da; ortak kart için Ajandam&apos;da yeni kartta &quot;Ortak kart&quot;ı seç.</p>
+      </div>
+      <div className="rt-satir" style={{ marginTop: 4 }}>
+        <button type="button" className="rt-btn tehlike" onClick={() => setOnay('ayril')}>{yonetici ? 'Grubu dağıt' : 'Gruptan ayrıl'}</button>
+      </div>
+      {hata && <p className="rt-hata">⚠ {hata}</p>}
+      {onay === 'ayril' && (
+        <OnayKutusu metin={yonetici ? `"${g.ad}" dağıtılsın mı? Herkes gruptan çıkar; başka ortak grubu olmayanlarla görevler biter.` : `"${g.ad}" grubundan ayrılınca başka ortak grubunuz olmayanlarla görevler biter.`}
+          evet={yonetici ? 'Dağıt' : 'Ayrıl'} onVazgec={() => setOnay(null)}
+          onEvet={() => { setOnay(null); calistir(async () => { await aileAyril(g.id); onBitti(); }); }} />
+      )}
+      {onay && onay !== 'ayril' && (
+        <OnayKutusu metin={`${onay.ad} gruptan çıkarılsın mı? Yeni mesajları ve ortak listeleri göremez.`} evet="Çıkar"
+          onVazgec={() => setOnay(null)} onEvet={() => { const u = onay.uye; setOnay(null); calistir(() => aileAyril(g.id, u)); }} />
       )}
     </div>
   );

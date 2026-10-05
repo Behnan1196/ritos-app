@@ -13,7 +13,8 @@
 //    aynı mesajı işlese de çift kayıt oluşmaz.
 // ————————————————————————————————————————————————————————————————
 
-import { ortakUygula, type OrtakOp } from './ortak';
+import { ortakKartId, ortakUygula, type OrtakOp } from './ortak';
+import type { GrupTur } from './grup';
 import { useEffect, useState } from 'react';
 import { db, type AileRow, type AileUyesi, type GeriBildirimRow, type IliskiRow, type MesajRow, type ProgramAdimRow, type ProgramRow, type UzakProgram } from './db';
 import { supabase } from './supabase';
@@ -62,7 +63,7 @@ export interface Tasima {
   davetGonder(alici: string, paket: unknown): Promise<void>;
   // aile grubu (F1–F4)
   aileler(): Promise<AileRow[]>;
-  aileKur(ad: string): Promise<string>;
+  aileKur(ad: string, tur: string): Promise<string>;
   aileDavet(aile: string, eposta: string): Promise<string>;
   aileYanit(aile: string, kabul: boolean): Promise<void>;
   aileAyril(aile: string, uye: string): Promise<void>;
@@ -170,13 +171,13 @@ function supabaseTasima(uid: string): Tasima {
       const idler = (ben.data ?? []).map((x) => x.aile as string);
       if (!idler.length) return [];
       const [a, u] = await Promise.all([
-        sb.from('cat_aile').select('id, ad, kurucu, anahtar_surum').in('id', idler),
+        sb.from('cat_aile').select('id, ad, kurucu, anahtar_surum, tur').in('id', idler),
         sb.from('cat_aile_uye').select('aile, uye, ad, rol, durum').in('aile', idler),
       ]);
       hata(a.error); hata(u.error);
       return (a.data ?? []).map((x) => ({ ...x, uyeler: (u.data ?? []).filter((y) => y.aile === x.id).map(({ aile: _, ...y }) => y) })) as AileRow[];
     },
-    async aileKur(ad) { const r = await sb.rpc('cat_aile_kur', { p_ad: ad }); hata(r.error); return r.data as string; },
+    async aileKur(ad, tur) { const r = await sb.rpc('cat_aile_kur', { p_ad: ad, p_tur: tur }); hata(r.error); return r.data as string; },
     async aileDavet(aile, eposta) { const r = await sb.rpc('cat_aile_davet', { p_aile: aile, p_eposta: eposta }); hata(r.error); return r.data as string; },
     async aileYanit(aile, kabul) { hata((await sb.rpc('cat_aile_yanit', { p_aile: aile, p_kabul: kabul })).error); },
     async aileAyril(aile, uye) { hata((await sb.rpc('cat_aile_ayril', { p_aile: aile, p_uye: uye })).error); },
@@ -922,26 +923,40 @@ async function aileMesajlariCek(a: AileRow) {
 
 // ———————————————— aile ortak listeleri / kartları (3 ekim) ————————————————
 
-/** Aktif aile grubum (yoksa null). */
+/** Aktif gruplarım (5 ekim: birden çok olabilir). */
+export async function aktifGruplarim(): Promise<AileRow[]> {
+  return (await db.aile.toArray()).filter((a) => aileAktifMi(a)).sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
+}
+/** İlk aktif grubum (yoksa null). */
 export async function aktifAilem(): Promise<AileRow | null> {
-  return (await db.aile.toArray()).find((a) => aileAktifMi(a)) ?? null;
+  return (await aktifGruplarim())[0] ?? null;
+}
+
+/** Ortak işlemin ait olduğu grup: liste / kart kaydından bulunur. */
+async function ortakGrubu(op: OrtakOp): Promise<string | null> {
+  if (op.o === 'madde' || op.o === 'isaret' || op.o === 'madde-sil') return (await db.ortak_liste.get(op.liste))?.aile ?? null;
+  if (op.o === 'liste-sil') return (await db.ortak_liste.get(op.id))?.aile ?? null;
+  if (op.o === 'kart-sil' || op.o === 'ustlen' || op.o === 'yapildi') return (await db.ajanda_kart.get(ortakKartId(op.id)))?.ortak?.aile ?? null;
+  return null;
 }
 export const benAile = () => ({ kim: uid ?? '', kim_ad: durum.profil?.ad ?? 'Ben' });
 
 /** Ortak işlem: önce bu cihazda uygulanır, sonra aile kanalına şifreli gider. */
-export async function ortakGonder(op: OrtakOp) {
-  const a = await aktifAilem();
-  if (!a) throw new Error('Aile grubunda değilsin.');
+export async function ortakGonder(op: OrtakOp, grup?: string) {
+  const id = grup ?? (await ortakGrubu(op)) ?? (await aktifAilem())?.id;
+  const a = id ? await db.aile.get(id) : undefined;
+  if (!a || !aileAktifMi(a)) throw new Error('Bu grupta değilsin.');
   await ortakUygula(op, a.id);
   await kuyruk('', '', { tur: 'ortak', op }, a.id);
   tetikle(200);
 }
 
-export async function aileKur(ad: string) {
+export async function aileKur(ad: string, tur: GrupTur = 'aile'): Promise<string> {
   await anahtarGaranti();
-  await tasimaVar().aileKur(ad);
+  const id = await tasimaVar().aileKur(ad, tur);
   await aileleriCek();
   tetikle();
+  return id;
 }
 export async function aileDavet(aile: string, eposta: string): Promise<string> {
   const ad = await tasimaVar().aileDavet(aile, eposta);

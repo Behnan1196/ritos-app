@@ -1065,3 +1065,17 @@ textarea.rt-inp{font-family:inherit;}
 .rt-veri-kim{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fff;border:1px solid var(--line);border-radius:12px;}
 .rt-veri-kim span{display:flex;flex-direction:column;min-width:0;}
 .rt-veri-kim small{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;}
+
+/* Gruplar (5 ekim) */
+.rt-secici-alt{display:flex;flex-wrap:wrap;gap:4px 16px;margin:6px 0 0;}
+.rt-hedef-secici .rt-secici-alt .rt-linkbtn{font-size:12.5px;text-decoration:none;}
+.rt-grup-bos{margin:2px 0 4px 34px;font-size:12.5px;}
+.rt-tur-kart.on{border-color:var(--green);background:var(--green2);}
+.rt-grup-uye{display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--line);}
+.rt-grup-uye:last-of-type{border-bottom:0;}
+.rt-grup-uye-ad{flex:1;display:flex;flex-direction:column;align-items:flex-start;background:none;border:0;padding:8px 2px;text-align:left;cursor:pointer;font:inherit;color:inherit;}
+.rt-grup-uye-ad:disabled{cursor:default;}
+.rt-grup-uye-ad small{color:var(--muted);font-size:12px;}
+.rt-grup-dosyasi{display:flex;flex-direction:column;gap:10px;}
+.rt-ortak-grup-sec{font:inherit;font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:2px 6px;background:#fff;color:inherit;max-width:160px;}
+.rt-notlar-hd .rt-ortak-grup-sec{margin-left:auto;}

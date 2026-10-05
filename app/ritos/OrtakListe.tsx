@@ -7,11 +7,16 @@ import React, { useState } from 'react';
 import { useCanli } from '@/lib/canli';
 import { db, type AileRow, type OrtakListeRow, type OrtakMaddeRow } from '@/lib/db';
 import { aileAktifMi, benAile, ortakGonder, useDanismanlik } from '@/lib/danismanlik';
+import { grupIkon } from '@/lib/grup';
 import { OnayKutusu } from './ortak';
 
 export function OrtakListeWidget() {
   const d = useDanismanlik();
-  const aile = useCanli(async () => (await db.aile.toArray()).find((a) => a.uyeler.some((u) => u.uye === d.uid && u.durum === 'aktif')) ?? null, [d.uid], null as AileRow | null);
+  // 5 ekim: birden çok grup — liste seçili grubun; grup birden fazlaysa başlıkta seçilir.
+  const gruplar = useCanli(async () => (await db.aile.toArray()).filter((a) => a.uyeler.some((u) => u.uye === d.uid && u.durum === 'aktif')).sort((a, b) => a.ad.localeCompare(b.ad, 'tr')), [d.uid], [] as AileRow[]);
+  const [grupSec, setGrupSec] = useState<string | null>(() => { try { return localStorage.getItem('ritos-ortak-grup'); } catch { return null; } });
+  const aile = gruplar.find((g) => g.id === grupSec) ?? gruplar[0] ?? null;
+  const grupDegis = (id: string) => { setGrupSec(id); setSecili(null); try { localStorage.setItem('ritos-ortak-grup', id); } catch { /* yoksay */ } };
   const listeler = useCanli(async () => (aile ? (await db.ortak_liste.where('aile').equals(aile.id).toArray()).filter((l) => !l.silindi).sort((a, b) => a.zaman - b.zaman) : []), [aile?.id], [] as OrtakListeRow[]);
   const [secili, setSecili] = useState<string | null>(null);
   const [yeniAd, setYeniAd] = useState<string | null>(null);
@@ -22,7 +27,7 @@ export function OrtakListeWidget() {
   const calistir = (f: () => Promise<void>) => { setHata(null); f().catch((e) => setHata(e instanceof Error ? e.message : String(e))); };
   const listeKur = (isim: string) => calistir(async () => {
     const id = crypto.randomUUID();
-    await ortakGonder({ o: 'liste', id, ad: isim, kim: benAile().kim, zaman: Date.now() });
+    await ortakGonder({ o: 'liste', id, ad: isim, kim: benAile().kim, zaman: Date.now() }, aile.id);
     setSecili(id); setYeniAd(null);
   });
 
@@ -30,7 +35,9 @@ export function OrtakListeWidget() {
     <div className="rt-ortak-w">
       <div className="rt-notlar-hd">
         <b>🛒 Ortak listeler</b>
-        <span className="rt-muted rt-ortak-aile">👪 {aile.ad}</span>
+        {gruplar.length > 1
+          ? <select className="rt-ortak-grup-sec" aria-label="Grup" value={aile.id} onChange={(e) => grupDegis(e.target.value)}>{gruplar.map((g) => <option key={g.id} value={g.id}>{grupIkon(g)} {g.ad}</option>)}</select>
+          : <span className="rt-muted rt-ortak-aile">{grupIkon(aile)} {aile.ad}</span>}
         <button type="button" className="rt-ikon" aria-label="Yeni liste" onClick={() => setYeniAd('')}>＋</button>
       </div>
       {listeler.length > 1 && (

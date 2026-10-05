@@ -5,6 +5,7 @@
 // Kanal kalır: paylaşımlar ve davetler 📥 Gelenler'de (GelenlerEkrani). SohbetEkrani V2 için durur.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { GRUP_TUR, grupIkon, grupTuru } from '@/lib/grup';
 import { db, type AileRow, type AjandaKartRow, type IliskiRow, type KlasorRow, type MesajRow, type ProgramRow, type KonusmaOkunduRow } from '@/lib/db';
 import { useCanli } from '@/lib/canli';
 import { bugun, tarihEtiket } from '@/lib/paket';
@@ -29,7 +30,7 @@ function useKonusmalar(): Konusma[] {
     const k: Konusma[] = [];
     for (const a of aileler.filter(aileAktifMi)) {
       const digerleri = a.uyeler.filter((u) => u.uye !== d.uid && u.durum === 'aktif').map((u) => u.ad);
-      k.push({ id: konusmaAile(a.id), ad: `👪 ${a.ad}`, alt: digerleri.length ? digerleri.join(', ') : 'henüz yalnızsın', aktif: true });
+      k.push({ id: konusmaAile(a.id), ad: `${grupIkon(a)} ${a.ad}`, alt: digerleri.length ? digerleri.join(', ') : 'henüz yalnızsın', aktif: true });
     }
     for (const il of iliskiler) {
       const benKoc = il.koc === d.uid;
@@ -319,7 +320,7 @@ function AileDavetleri() {
         const kurucu = a.uyeler.find((u) => u.rol === 'yonetici')?.ad;
         return (
           <div key={a.id} className="rt-davet">
-            <span>👪 {kurucu ? <><b>{kurucu}</b> seni </> : 'Seni '}<b>{a.ad}</b> aile grubuna çağırıyor</span>
+            <span>{grupIkon(a)} {kurucu ? <><b>{kurucu}</b> seni </> : 'Seni '}<b>{a.ad}</b> {GRUP_TUR[grupTuru(a)].ad.toLocaleLowerCase('tr')} grubuna çağırıyor</span>
             <span className="rt-satir" style={{ flexWrap: 'nowrap' }}>
               <button type="button" className="rt-btn" onClick={() => aileYanit(a.id, false).catch((e) => setHata(String(e.message ?? e)))}>Reddet</button>
               <button type="button" className="rt-btn primary" onClick={() => aileYanit(a.id, true).catch((e) => setHata(String(e.message ?? e)))}>Katıl</button>
@@ -332,57 +333,17 @@ function AileDavetleri() {
   );
 }
 
-/** Ayarlar › Aile: kur, davet et (e-postayla, en fazla 3 kişi), çıkar, ayrıl. */
+/** Ayarlar › Gruplar (5 ekim): yönetim Atölye'ye taşındı; burada yalnız özet. */
 export function AileAyarlari() {
   const d = useDanismanlik();
-  const aileler = useCanli(() => db.aile.toArray(), [], [] as AileRow[]);
-  const aile = aileler.find(aileAktifMi);
-  const [ad, setAd] = useState('');
-  const [eposta, setEposta] = useState('');
-  const [mesaj, setMesaj] = useState<string | null>(null);
-  const [hata, setHata] = useState<string | null>(null);
-  const [cikar, setCikar] = useState<string | null>(null);
+  const gruplar = useCanli(() => db.aile.toArray(), [], [] as AileRow[]).filter(aileAktifMi);
   if (!d.etkin) return null;
-  const calistir = async (f: () => Promise<unknown>, tamam?: string) => {
-    setHata(null); setMesaj(null);
-    try { await f(); if (tamam) setMesaj(tamam); } catch (e) { setHata(e instanceof Error ? e.message : String(e)); }
-  };
-  const ben = aile ? benimAileRolum(aile) : undefined;
-  const aktifSay = aile ? aile.uyeler.filter((u) => u.durum !== 'ayrildi').length : 0;
   return (
-    <Kap baslik="Aile">
-      {!aile ? (
-        <>
-          <p className="rt-muted">Ailenle (en fazla 3 kişi) birbirinize görev verir, ortak liste tutarsınız. Yalnız verdiğin görevlerin durumunu görürsün; kimse kimsenin Ajanda&apos;sının geri kalanını görmez.</p>
-          <div className="rt-satir" style={{ flexWrap: 'nowrap' }}>
-            <input className="rt-inp" placeholder="Grup adı, ör. Öztürkmen ailesi" value={ad} onChange={(e) => setAd(e.target.value)} />
-            <button type="button" className="rt-btn primary" disabled={!ad.trim()} onClick={() => calistir(() => aileKur(ad.trim()), 'Grup kuruldu. Şimdi ailenden birini davet et.')}>Kur</button>
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="rt-metin"><b>👪 {aile.ad}</b></p>
-          <p className="rt-muted">Görevleri 🗂 Atölye › Planlar&apos;dan verirsin; ailendekiler orada listelenir.</p>
-          {aile.uyeler.filter((u) => u.durum !== 'ayrildi').map((u) => (
-            <div key={u.uye} className="rt-kaynak">
-              <div className="rt-konu" style={{ cursor: 'default' }}><span>{u.ad}{u.uye === d.uid ? ' (sen)' : ''}</span><span className="rt-muted">{u.rol === 'yonetici' ? 'yönetici' : u.durum === 'davet' ? 'davet bekliyor' : 'üye'}</span></div>
-              {ben?.rol === 'yonetici' && u.uye !== d.uid && <button type="button" className="rt-btn" onClick={() => setCikar(u.uye)}>Çıkar</button>}
-            </div>
-          ))}
-          {cikar && <OnayKutusu metin="Bu kişi gruptan çıkarılır; yeni mesajları göremez." evet="Çıkar" onVazgec={() => setCikar(null)} onEvet={() => { const u = cikar; setCikar(null); calistir(() => aileAyril(aile.id, u)); }} />}
-          {ben?.rol === 'yonetici' && aktifSay < 3 && (
-            <div className="rt-satir" style={{ flexWrap: 'nowrap', marginTop: 8 }}>
-              <input className="rt-inp" type="email" placeholder="Davet için e-posta" value={eposta} onChange={(e) => setEposta(e.target.value)} />
-              <button type="button" className="rt-btn primary" disabled={!/\S+@\S+\.\S+/.test(eposta)} onClick={() => calistir(async () => { const n = await aileDavet(aile.id, eposta.trim()); setEposta(''); setMesaj(`${n} davet edildi; Gelenler'inde görecek.`); })}>Davet et</button>
-            </div>
-          )}
-          <div className="rt-satir" style={{ marginTop: 8 }}>
-            <button type="button" className="rt-btn tehlike" onClick={() => calistir(() => aileAyril(aile.id))}>{ben?.rol === 'yonetici' ? 'Grubu dağıt' : 'Gruptan ayrıl'}</button>
-          </div>
-        </>
-      )}
-      {mesaj && <p className="rt-tamam">{mesaj}</p>}
-      {hata && <p className="rt-hata">{hata}</p>}
+    <Kap baslik="Gruplar">
+      {gruplar.map((g) => (
+        <p key={g.id} className="rt-metin">{grupIkon(g)} <b>{g.ad}</b> <span className="rt-muted">· {g.uyeler.filter((u) => u.durum === 'aktif').length} kişi{benimAileRolum(g)?.rol === 'yonetici' ? ' · yöneticisin' : ''}</span></p>
+      ))}
+      <p className="rt-muted">Aile, arkadaş ve ekip gruplarını 🗂 Atölye&apos;de kurar, üye davet eder ve yönetirsin (listenin altında &quot;＋ Grup kur&quot;).</p>
     </Kap>
   );
 }

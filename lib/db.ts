@@ -367,6 +367,7 @@ export interface AileRow {
   ad: string;
   kurucu: string;
   anahtar_surum: number;
+  tur?: 'aile' | 'arkadas' | 'ekip'; // 5 ekim: grup türü (eski kayıtlarda yok = aile)
   uyeler: AileUyesi[];           // bana görünen üyeler (davetliyken yalnız ben)
 }
 
