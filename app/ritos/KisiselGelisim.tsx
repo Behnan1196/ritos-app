@@ -340,7 +340,7 @@ function ProgramDetay({ p, klasorler, onGeri }: { p: ProgramRow; klasorler: Klas
 
 /** 28 eylül — program Ajanda'dan planlanır: "Planla" Ajanda'yı bu programa odaklar; bu haftanın durumu burada. */
 function PlanSatiri({ p }: { p: ProgramRow }) {
-  const [, setOdak] = useSeciliDanisan();
+  const [, setOdak] = useSeciliDanisan('kendim');
   const t0 = bugun();
   const bas = tarihEkle(t0, -((tarihParse(t0).getDay() + 6) % 7));
   const hafta = useCanli(async () => {
@@ -351,7 +351,7 @@ function PlanSatiri({ p }: { p: ProgramRow }) {
   return (
     <div className="rt-plan-satiri">
       <span className="rt-muted">{hafta.toplam ? <>Bu hafta <b>{hafta.yapildi}/{hafta.toplam}</b> kart yapıldı</> : 'Kartlarını Ajanda\u2019da planlarsın; tekrar, geçen haftayı kopyala ve görev planı (şablon) orada.'}</span>
-      <button type="button" className="rt-btn primary" onClick={() => { setOdak(`p:${p.id}`); window.dispatchEvent(new Event('ritos-atolyeye-git')); }}>🗂 Planla</button>
+      <button type="button" className="rt-btn primary" onClick={() => { setOdak(`p:${p.id}`); window.dispatchEvent(new Event('ritos-rutinlere-git')); }}>🗂 Planla</button>
     </div>
   );
 }

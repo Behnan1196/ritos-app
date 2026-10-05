@@ -1,24 +1,26 @@
-// Atölye'de seçili hedef (danışan / aile üyesi / "p:<program>"). Danışmanlık ekranı ve Atölye aynı
-// seçimi paylaşır (3 ekim; önceden Ajanda odağıydı). Oturum boyunca korunur.
+// Seçili hedef — iki kapsam (5 ekim): Çevrem (danışan / grup üyesi) ve Rutinlerim ("p:<program>").
+// Program kimlikleri "p:" ile başlar; seçim kendi kapsamının anahtarına yazılır. Oturum boyunca korunur.
 import { useEffect, useState } from 'react';
 
-const ANAH = 'ritos-ajanda-kisi';
-const dinleyiciler = new Set<(v: string) => void>();
-let deger: string | null = null;
+export type Kapsam = 'cevre' | 'kendim';
+const ANAH: Record<Kapsam, string> = { cevre: 'ritos-ajanda-kisi', kendim: 'ritos-secili-rutin' };
+const dinleyiciler: Record<Kapsam, Set<(v: string) => void>> = { cevre: new Set(), kendim: new Set() };
+const deger: Record<Kapsam, string | null> = { cevre: null, kendim: null };
+const kapsamOf = (v: string): Kapsam => (v.startsWith('p:') ? 'kendim' : 'cevre');
 
-function oku(): string {
-  if (deger === null) { try { deger = sessionStorage.getItem(ANAH) ?? ''; } catch { deger = ''; } }
-  return deger;
+function oku(k: Kapsam): string {
+  if (deger[k] === null) { try { deger[k] = sessionStorage.getItem(ANAH[k]) ?? ''; } catch { deger[k] = ''; } }
+  return deger[k]!;
 }
 
-export function seciliDanisanAyarla(v: string) {
-  deger = v;
-  try { sessionStorage.setItem(ANAH, v); } catch { /* yok say */ }
-  dinleyiciler.forEach((f) => f(v));
+export function seciliDanisanAyarla(v: string, k: Kapsam = kapsamOf(v)) {
+  deger[k] = v;
+  try { sessionStorage.setItem(ANAH[k], v); } catch { /* yok say */ }
+  dinleyiciler[k].forEach((f) => f(v));
 }
 
-export function useSeciliDanisan(): [string, (v: string) => void] {
+export function useSeciliDanisan(k: Kapsam = 'cevre'): [string, (v: string) => void] {
   const [v, setV] = useState('');
-  useEffect(() => { setV(oku()); dinleyiciler.add(setV); return () => { dinleyiciler.delete(setV); }; }, []);
-  return [v, seciliDanisanAyarla];
+  useEffect(() => { setV(oku(k)); dinleyiciler[k].add(setV); return () => { dinleyiciler[k].delete(setV); }; }, [k]);
+  return [v, (x: string) => seciliDanisanAyarla(x, k)];
 }

@@ -345,7 +345,7 @@ export function AileAyarlari() {
       {gruplar.map((g) => (
         <p key={g.id} className="rt-metin">{grupIkon(g)} <b>{g.ad}</b> <span className="rt-muted">· {g.uyeler.filter((u) => u.durum === 'aktif').length} kişi{benimAileRolum(g)?.rol === 'yonetici' ? ' · yöneticisin' : ''}</span></p>
       ))}
-      <p className="rt-muted">Aile, arkadaş ve ekip gruplarını 🗂 Atölye&apos;de kurar, üye davet eder ve yönetirsin (listenin altında &quot;＋ Grup kur&quot;).</p>
+      <p className="rt-muted">Aile, arkadaş ve ekip gruplarını 👥 ÇevremAile, arkadaş ve ekip gruplarını 🗂 Atölye&apos;de kurarapos;de kurar, üye davet eder ve yönetirsin (listenin altında &quot;＋ Grup kur&quot;).</p>
     </Kap>
   );
 }

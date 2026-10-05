@@ -28,11 +28,12 @@ const NARROW_BREAKPOINT = 760;
 // Testte (NEXT_PUBLIC_RITOS_TEST=1 ile derlenmiş sürüm) giriş kapısı atlanır; gerçek sürümde yok.
 const TEST = process.env.NEXT_PUBLIC_RITOS_TEST === '1';
 
-type Sekme = 'home' | 'gunum' | 'atolye' | 'gelenler';
-type Sag = 'home' | 'atolye' | 'gelenler'; // geniş ekranda Ajandam'ın yanındaki bölme
+type Sekme = 'home' | 'gunum' | 'rutin' | 'atolye' | 'gelenler';
+type Sag = 'home' | 'rutin' | 'atolye' | 'gelenler'; // geniş ekranda Ajandam'ın yanındaki bölme
 // Alt menü (5 ekim): Ayarlar sekmesi kalktı, avatar menüsüne taşındı. Yeni sekme buraya eklenir.
-const MOBIL_SEKMELER: [Sekme, string, string][] = [['home', '🏠', 'Home'], ['gunum', '📅', 'Ajandam'], ['atolye', '🗂', 'Atölye']];
-const GENIS_SEKMELER: [Sag, string, string][] = [['home', '🏠', 'Home'], ['atolye', '🗂', 'Atölye']];
+// 5 ekim: Rutinlerim (kendim için: rutinler + Kütüphane) ve Çevrem (eski Atölye: danışmanlık + gruplar).
+const MOBIL_SEKMELER: [Sekme, string, string][] = [['home', '🏠', 'Home'], ['gunum', '📅', 'Ajandam'], ['rutin', '🌱', 'Rutinlerim'], ['atolye', '👥', 'Çevrem']];
+const GENIS_SEKMELER: [Sag, string, string][] = [['home', '🏠', 'Home'], ['rutin', '🌱', 'Rutinlerim'], ['atolye', '👥', 'Çevrem']];
 
 export default function RitosLab() {
   const o = useOturum();
@@ -63,10 +64,12 @@ function RitosUygulama() {
   useEffect(() => {
     const f = () => setSekme('gunum');
     // Atölye'ye git (ör. Ayarlar › Aile › Görev ver, Danışmanlık › Atölye'de planla): hedef önceden seçilir.
-    const a = () => { setSekme('atolye'); setSag('atolye'); };
+    const a = () => { setHesap(null); setSekme('atolye'); setSag('atolye'); };
+    const r = () => { setHesap(null); setSekme('rutin'); setSag('rutin'); };
     window.addEventListener('ritos-ajandaya-git', f);
     window.addEventListener('ritos-atolyeye-git', a);
-    return () => { window.removeEventListener('ritos-ajandaya-git', f); window.removeEventListener('ritos-atolyeye-git', a); };
+    window.addEventListener('ritos-rutinlere-git', r);
+    return () => { window.removeEventListener('ritos-ajandaya-git', f); window.removeEventListener('ritos-atolyeye-git', a); window.removeEventListener('ritos-rutinlere-git', r); };
   }, []);
 
   useEffect(() => {
@@ -96,7 +99,8 @@ function RitosUygulama() {
   const hesapEkrani = hesap && <HesapEkrani ekran={hesap} onGeri={() => setHesap(null)} />;
   const sagSekme = (s: Sekme) => (
     s === 'gelenler' ? <GelenlerEkrani onGeri={homeyaDon} />
-      : s === 'atolye' ? <Atolye genis={false} />
+      : s === 'atolye' ? <Atolye key="cevre" genis={false} kapsam="cevre" />
+      : s === 'rutin' ? <Atolye key="kendim" genis={false} kapsam="kendim" />
       : home
   );
   // Geniş ekran (4 ekim): solda Ajandam, sağ bölmede Home · Atölye (5 ekim: Ayarlar avatar menüsünde). Atölye de telefondaki
@@ -105,7 +109,7 @@ function RitosUygulama() {
   const sekmeler = (
     <div className="side-tabs">
       {GENIS_SEKMELER.map(([k, ic, ad]) => (
-        <button key={k} className={!hesap && genisSekme === k ? 'on' : ''} onClick={() => { setHesap(null); setSag(k); setSekme(k === 'atolye' ? 'atolye' : 'gunum'); }}><span>{ic}{rozet(k)}</span>{ad}</button>
+        <button key={k} className={!hesap && genisSekme === k ? 'on' : ''} onClick={() => { setHesap(null); setSag(k); setSekme(k === 'home' ? 'gunum' : k); }}><span>{ic}{rozet(k)}</span>{ad}</button>
       ))}
     </div>
   );
@@ -117,7 +121,7 @@ function RitosUygulama() {
       {isNarrow ? (
         <div className="mobile-app">
           <div className="mobile-hd"><b>Ritos</b>{ustSag}</div>
-          <div className="mobile-main">{hesapEkrani || (sekme === 'gunum' ? <AjandaPane /> : sekme === 'atolye' ? <Atolye genis={false} /> : sagSekme(sekme))}</div>
+          <div className="mobile-main">{hesapEkrani || (sekme === 'gunum' ? <AjandaPane /> : sagSekme(sekme))}</div>
           <div className="mobile-nav">
             {MOBIL_SEKMELER.map(([k, ic, ad]) => (
               <button key={k} className={!hesap && (sekme === 'gelenler' ? 'home' : sekme) === k ? 'on' : ''} onClick={() => { setHesap(null); setSekme(k); }}><span className="ic">{ic}{rozet(k)}</span>{ad}</button>
