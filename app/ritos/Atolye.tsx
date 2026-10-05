@@ -30,6 +30,8 @@ import { IKON_SECENEKLERI, VARSAYILAN_IKON, ikonOner } from '@/lib/programIkon';
 import { programGuncelle, programOlustur } from '@/lib/program';
 import { AKTIVITE, HIZLAR, beklenenKilo, beslenmeHesap, kiloDurumu, vkiEtiket, type HedefTur } from '@/lib/beslenme';
 import { HAZIR_OLCULER, OLC_ONEK, olcuBlok } from '@/lib/olcum';
+import { ALAN_IKONLARI, EN_FAZLA_GORUNEN, alanEkle as yAlanEkle, alanGuncelle, alanOner, alanSil, alanSirala, alanlar as yAlanlar, alanlariGaranti } from '@/lib/yasamAlani';
+import type { YasamAlaniRow } from '@/lib/db';
 import { hazirKartlar, hazirSablonlariYenile, hazirSablonuAl, useHazirSablonlar, type HazirSablon } from '@/lib/hazirSablon';
 
 // 4 ekim (v6): üstte Planlar/Kütüphane düğmeleri yok. Telefonda ekranlar yığın gibi: liste → (kişi | alan | kütüphane),
@@ -55,7 +57,7 @@ const SON_ANAH = 'ritos-atolye-son';
 function sonlariOku(): string[] { try { return JSON.parse(localStorage.getItem(SON_ANAH) ?? '[]'); } catch { return []; } }
 function sonaEkle(id: string) { try { localStorage.setItem(SON_ANAH, JSON.stringify([id, ...sonlariOku().filter((x) => x !== id)].slice(0, 5))); } catch { /* yok say */ } }
 
-interface Hedef { id: string; grup: string; grupIc: string; ic: string; ad: string; alt?: string; h: PlanHedef }
+interface Hedef { id: string; grup: string; grupIc: string; ic: string; ad: string; alt?: string; etiket?: string[]; h: PlanHedef }
 /** 4 ekim — henüz görev verilmemiş aile üyesi: seçilince görev ilişkisi sessizce kurulur. */
 interface Aday { id: string; uye: string; ad: string }
 
@@ -90,7 +92,7 @@ function useHedeflerHazir(gruplar: AileRow[] | null, kapsam: Kapsam): Hedef[] | 
   const liste: Hedef[] = [];
   if (kapsam === 'kendim') {
     for (const p of programlar.sort((a, b) => a.ad.localeCompare(b.ad, 'tr'))) {
-      liste.push({ id: `p:${p.id}`, grup: RUTIN_BOLUM, grupIc: '🌱', ic: p.ikon ?? VARSAYILAN_IKON, ad: p.ad, alt: 'rutin', h: { tur: 'program', programId: p.id } });
+      liste.push({ id: `p:${p.id}`, grup: RUTIN_BOLUM, grupIc: '🌱', ic: p.ikon ?? VARSAYILAN_IKON, ad: p.ad, alt: 'rutin', etiket: p.alanlar ?? [], h: { tur: 'program', programId: p.id } });
     }
     return liste;
   }
@@ -706,11 +708,17 @@ function HedefSecici({ kapsam, hedefler, adaylar, seciliId, kompakt, kuruluyor, 
 }) {
   const dn = useDanismanlik();
   const [ara, setAra] = useState('');
+  // 5 ekim — Rutinlerim: yaşam alanları üstte karo; dokununca rutinler o alana göre süzülür.
+  useEffect(() => { if (kapsam === 'kendim') alanlariGaranti().catch(() => {}); }, [kapsam]);
+  const yalanlar = useCanli(yAlanlar, [], [] as YasamAlaniRow[]);
+  const gorunurAlan = yalanlar.filter((a) => !a.gizli);
+  const [suz, setSuz] = useState<string | null>(null);
+  const [alanDuzen, setAlanDuzen] = useState(false);
   const [acik, setAcik] = useState<Record<string, boolean>>({});
   const [sonAcik, setSonAcik] = useState<Record<string, boolean>>({});
   const [sonlar, setSonlar] = useState<string[]>([]);
   useEffect(() => { setSonlar(sonlariOku()); }, []);
-  type Oge = { id: string; anahtar: string; ad: string; ic: string; grup: string; hedef?: Hedef; aday?: Aday };
+  type Oge = { id: string; anahtar: string; ad: string; ic: string; grup: string; hedef?: Hedef; aday?: Aday; etiket?: string[] };
   // Grup üyeleri her grubun altında (aynı kişi iki grupta olabilir; seçince aynı plan açılır).
   const grupOgeleri: Oge[] = gruplar.flatMap((g) => g.uyeler.filter((u) => u.uye !== dn.uid && u.durum === 'aktif').map((u) => {
     const hedef = hedefler.find((x) => grupKisisi(x) && (x.h as { il: IliskiRow }).il.danisan === u.uye);
@@ -718,7 +726,7 @@ function HedefSecici({ kapsam, hedefler, adaylar, seciliId, kompakt, kuruluyor, 
     return { id: hedef?.id ?? `aile:${u.uye}`, anahtar: `${g.id}:${u.uye}`, ad: u.ad, ic: grupIkon(g), grup: `g:${g.id}`, hedef, aday };
   }).sort((a, b) => a.ad.localeCompare(b.ad, 'tr')));
   const ogeler: Oge[] = [
-    ...hedefler.filter((x) => x.grup !== GRUP_ETIKET).map((x) => ({ id: x.id, anahtar: x.id, ad: x.ad, ic: x.ic, grup: x.grup, hedef: x })),
+    ...hedefler.filter((x) => x.grup !== GRUP_ETIKET && (!suz || x.etiket?.includes(suz))).map((x) => ({ id: x.id, anahtar: x.id, ad: x.ad, ic: x.ic, grup: x.grup, hedef: x, etiket: x.etiket })),
     ...grupOgeleri,
   ];
   // Gruplar: önce danışmanlık alanları (boş olsa da — davet buradan), sonra Ailem, sonra Kişisel programlarım.
@@ -739,12 +747,32 @@ function HedefSecici({ kapsam, hedefler, adaylar, seciliId, kompakt, kuruluyor, 
   const satir = (o: Oge) => (
     <button key={o.anahtar} type="button" className={`rt-hedef-sat${o.id === seciliId || o.id === kuruluyor ? ' on' : ''}`} disabled={!!kuruluyor} onClick={() => tikla(o)}>
       <span className="ic">{o.ic}</span><span className="ad">{o.ad}</span>
+      {kapsam === 'kendim' && !!o.etiket?.length && <span className="rt-etiket-ikon" aria-label={o.etiket.map((k) => yalanlar.find((a) => a.id === k)?.ad).filter(Boolean).join(', ')}>{o.etiket.map((k) => yalanlar.find((a) => a.id === k)?.ikon ?? '').join('')}</span>}
       {!kompakt && <span className="chev">›</span>}
     </button>
   );
   return (
     <div className={`rt-hedef-secici${kompakt ? ' kompakt' : ''}`}>
       {!kompakt && <p className="rt-ekran-bas">{KAPSAM_AD[kapsam]}</p>}
+      {kapsam === 'kendim' && gorunurAlan.length > 0 && (
+        <div className="rt-alan-blok">
+          <div className="rt-alan-karolar">
+            {gorunurAlan.map((a) => {
+              const say = hedefler.filter((x) => x.etiket?.includes(a.id)).length;
+              return (
+                <button key={a.id} type="button" className={`rt-alan-karo${suz === a.id ? ' on' : ''}${say === 0 ? ' bos' : ''}`} aria-pressed={suz === a.id} title={a.aciklama} onClick={() => setSuz(suz === a.id ? null : a.id)}>
+                  <span className="ic">{a.ikon}</span><span className="ad">{a.ad}</span><span className="say">{say || '·'}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="rt-alan-alt">
+            {suz ? <span className="rt-muted">{yalanlar.find((a) => a.id === suz)?.ad} alanına dokunan rutinler · <button type="button" className="rt-linkbtn" onClick={() => setSuz(null)}>tümü</button></span> : <span className="rt-muted">Alana dokun: o alana dokunan rutinler süzülür.</span>}
+            <button type="button" className="rt-linkbtn" onClick={() => setAlanDuzen(true)}>Alanları düzenle</button>
+          </div>
+        </div>
+      )}
+      {alanDuzen && <AlanlariDuzenle onKapat={() => setAlanDuzen(false)} />}
       {kapsam === 'cevre' && bolumler.length === 0 && (
         <p className="rt-muted rt-cevre-bos">Çevren; ailen, arkadaşların, ekibin ve danışmanlık verdiğin kişilerden oluşur. Bir grup kur ya da bir danışmanlık alanı aç; birbirinize görev verir, ortak liste tutarsınız.</p>
       )}
@@ -759,6 +787,7 @@ function HedefSecici({ kapsam, hedefler, adaylar, seciliId, kompakt, kuruluyor, 
         const tum = ogeler.filter((o) => o.grup === g.anahtar);
         const bolumOgeleri = gorunen.filter((o) => o.grup === g.anahtar);
         if (q && !bolumOgeleri.length) return null;
+        const suzBos = kapsam === 'kendim' && !!suz && bolumOgeleri.length === 0;
         const varsayilan = tum.length <= 6 || tum.some((o) => o.id === seciliId);
         const ac = q ? true : acik[g.anahtar] ?? varsayilan;
         const yonetici = g.aile && benimAileRolum(g.aile)?.rol === 'yonetici';
@@ -775,6 +804,7 @@ function HedefSecici({ kapsam, hedefler, adaylar, seciliId, kompakt, kuruluyor, 
               {g.aile && <button type="button" className={`rt-alan-ac${acikAlan === g.aile.id ? ' on' : ''}`} aria-label={`${g.ad} grup dosyası`} onClick={() => onGrup(g.aile!.id)}>Grup ›</button>}
             </div>
             {ac && bolumOgeleri.map(satir)}
+            {ac && suzBos && <p className="rt-muted rt-grup-bos">Bu alana dokunan rutin yok.</p>}
             {ac && !q && g.aile && (
               <>
                 {davetliler.map((u) => (
@@ -953,6 +983,63 @@ function GrupDosyasi({ id, hedefler, adaylar, onSec, onAday, onUyeDavet, onBitti
   );
 }
 
+// ———————————————— Yaşam alanlarını düzenle (5 ekim) ————————————————
+// Sırala (↑ ↓), gizle / göster, ad · simge · açıklama düzenle, ＋ yeni alan; yalnız kendi eklediğin alan silinir.
+
+function AlanlariDuzenle({ onKapat }: { onKapat: () => void }) {
+  const liste = useCanli(yAlanlar, [], [] as YasamAlaniRow[]);
+  const [duz, setDuz] = useState<null | { id?: string; ad: string; ikon: string; aciklama: string }>(null);
+  const [sil, setSil] = useState<YasamAlaniRow | null>(null);
+  const gorunen = liste.filter((a) => !a.gizli).length;
+  const tasi = (i: number, y: -1 | 1) => { const s = liste.map((a) => a.id); const j = i + y; if (j < 0 || j >= s.length) return; [s[i], s[j]] = [s[j], s[i]]; alanSirala(s); };
+  if (duz) {
+    return (
+      <Modal baslik={duz.id ? 'Alanı düzenle' : '＋ Yeni alan'} onKapat={() => setDuz(null)}>
+        <div className="rt-prog-ad">
+          <span className="rt-prog-ikon" aria-hidden="true">{duz.ikon}</span>
+          <input className="rt-inp" placeholder="Ad (ör. İş, Maddi düzen, İnanç)" value={duz.ad} onChange={(e) => setDuz({ ...duz, ad: e.target.value })} autoFocus />
+        </div>
+        <div className="rt-ikon-izgara" role="radiogroup" aria-label="Simge">
+          {ALAN_IKONLARI.map((x) => <button key={x} type="button" role="radio" aria-checked={duz.ikon === x} className={duz.ikon === x ? 'on' : ''} onClick={() => setDuz({ ...duz, ikon: x })}>{x}</button>)}
+        </div>
+        <input className="rt-inp" placeholder="Kısa açıklama (isteğe bağlı)" value={duz.aciklama} onChange={(e) => setDuz({ ...duz, aciklama: e.target.value })} />
+        <div className="rt-satir" style={{ justifyContent: 'flex-end' }}>
+          <button type="button" className="rt-btn" onClick={() => setDuz(null)}>Vazgeç</button>
+          <button type="button" className="rt-btn primary" disabled={!duz.ad.trim()} onClick={async () => {
+            if (duz.id) await alanGuncelle(duz.id, { ad: duz.ad.trim(), ikon: duz.ikon, aciklama: duz.aciklama.trim() });
+            else await yAlanEkle(duz.ad, duz.ikon, duz.aciklama);
+            setDuz(null);
+          }}>{duz.id ? 'Kaydet' : 'Ekle'}</button>
+        </div>
+      </Modal>
+    );
+  }
+  return (
+    <Modal baslik="Alanları düzenle" onKapat={onKapat}>
+      <p className="rt-muted">Alanlar rutinlerine etiket olur; dengeyi bunlar üzerinden görürsün. Hazır alanlar silinmez, gizlenir.</p>
+      <div className="rt-alan-duzen">
+        {liste.map((a, i) => (
+          <div key={a.id} className={`rt-alan-duzen-sat${a.gizli ? ' gizli' : ''}`}>
+            <span className="ic">{a.ikon}</span>
+            <button type="button" className="tx" onClick={() => setDuz({ id: a.id, ad: a.ad, ikon: a.ikon, aciklama: a.aciklama })}><b>{a.ad}</b><small>{a.aciklama || (a.kod ? 'hazır alan' : 'kendi alanın')}</small></button>
+            <button type="button" className="rt-ikon" aria-label={`${a.ad} yukarı`} disabled={i === 0} onClick={() => tasi(i, -1)}>↑</button>
+            <button type="button" className="rt-ikon" aria-label={`${a.ad} aşağı`} disabled={i === liste.length - 1} onClick={() => tasi(i, 1)}>↓</button>
+            <button type="button" className="rt-ikon" aria-label={a.gizli ? `${a.ad} göster` : `${a.ad} gizle`} title={a.gizli ? 'Göster' : 'Gizle'}
+              disabled={a.gizli && gorunen >= EN_FAZLA_GORUNEN} onClick={() => alanGuncelle(a.id, { gizli: !a.gizli })}>{a.gizli ? '🙈' : '👁'}</button>
+            {!a.kod && <button type="button" className="rt-ikon" aria-label={`${a.ad} sil`} onClick={() => setSil(a)}>🗑</button>}
+          </div>
+        ))}
+      </div>
+      {gorunen >= EN_FAZLA_GORUNEN && <p className="rt-muted">En fazla {EN_FAZLA_GORUNEN} alan görünür; yenisini göstermek için birini gizle.</p>}
+      {sil && <OnayKutusu metin={`"${sil.ad}" silinsin mi? Rutinlerdeki bu etiket de kalkar.`} evet="Sil" onVazgec={() => setSil(null)} onEvet={async () => { await alanSil(sil.id); setSil(null); }} />}
+      <div className="rt-satir" style={{ justifyContent: 'space-between' }}>
+        <button type="button" className="rt-btn" disabled={gorunen >= EN_FAZLA_GORUNEN} onClick={() => setDuz({ ad: '', ikon: '🌿', aciklama: '' })}>＋ Yeni alan</button>
+        <button type="button" className="rt-btn primary" onClick={onKapat}>Bitti</button>
+      </div>
+    </Modal>
+  );
+}
+
 // ———————————————— Kişisel program: oluştur / düzenle (4 ekim) ————————————————
 
 function ProgramFormu({ id, onKapat, onOlustu }: { id?: string; onKapat: () => void; onOlustu: (id: string) => void }) {
@@ -960,15 +1047,19 @@ function ProgramFormu({ id, onKapat, onOlustu }: { id?: string; onKapat: () => v
   const [ad, setAd] = useState('');
   const [amac, setAmac] = useState('');
   const [ikon, setIkon] = useState<string | null>(null); // null = ada göre öneri
+  const [etiket, setEtiket] = useState<string[]>([]);
   const [hazir, setHazir] = useState(!id);
-  useEffect(() => { if (p && !hazir) { setAd(p.ad); setAmac(p.amac); setIkon(p.ikon ?? null); setHazir(true); } }, [p, hazir]);
+  useEffect(() => { if (p && !hazir) { setAd(p.ad); setAmac(p.amac); setIkon(p.ikon ?? null); setEtiket(p.alanlar ?? []); setHazir(true); } }, [p, hazir]);
+  useEffect(() => { alanlariGaranti().catch(() => {}); }, []);
+  const yalanlar = useCanli(yAlanlar, [], [] as YasamAlaniRow[]).filter((a) => !a.gizli || etiket.includes(a.id));
+  const alanOnerisi = alanOner(ad).filter((x) => !etiket.includes(x));
   const oneri = ikonOner(ad);
   const secili = ikon ?? oneri ?? VARSAYILAN_IKON;
   const kaydet = async () => {
     if (!ad.trim()) return;
-    if (id) { await programGuncelle(id, { ad: ad.trim(), amac: amac.trim(), ikon: secili }); onKapat(); return; }
+    if (id) { await programGuncelle(id, { ad: ad.trim(), amac: amac.trim(), ikon: secili, alanlar: etiket }); onKapat(); return; }
     const yeni = await programOlustur(ad.trim(), amac.trim());
-    await programGuncelle(yeni, { ikon: secili, kimden: 'Kendim' });
+    await programGuncelle(yeni, { ikon: secili, kimden: 'Kendim', alanlar: etiket });
     onOlustu(yeni);
   };
   return (
@@ -985,6 +1076,14 @@ function ProgramFormu({ id, onKapat, onOlustu }: { id?: string; onKapat: () => v
             ))}
           </div>
           <p className="rt-muted">{ikon === null && oneri ? 'Simge addan önerildi; istersen başka birini seç.' : 'Simge, programın kartlarında ve listelerde görünür.'}</p>
+          <span className="rt-alan-lbl">Hangi alanlara dokunuyor?</span>
+          <div className="rt-alan-sec">
+            {yalanlar.map((a) => {
+              const sec = etiket.includes(a.id), oner = !sec && alanOnerisi.includes(a.id);
+              return <button key={a.id} type="button" aria-pressed={sec} className={`rt-chip${sec ? ' on' : ''}${oner ? ' oneri' : ''}`} onClick={() => setEtiket(sec ? etiket.filter((x) => x !== a.id) : [...etiket, a.id])}>{a.ikon} {a.ad}{oner ? ' ＋' : ''}</button>;
+            })}
+          </div>
+          <p className="rt-muted">{alanOnerisi.length ? 'Kesik çerçeveliler addan önerildi. ' : ''}Birden çok alan seçebilirsin; hiç seçmesen de olur.</p>
           <textarea className="rt-inp" rows={2} placeholder="Amaç (isteğe bağlı)" value={amac} onChange={(e) => setAmac(e.target.value)} />
           <div className="rt-satir" style={{ marginTop: 10, justifyContent: 'flex-end' }}>
             <button type="button" className="rt-btn" onClick={onKapat}>Vazgeç</button>

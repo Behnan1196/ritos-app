@@ -112,6 +112,7 @@ export interface ProgramRow {
   sablon_disiplin?: string | null; // D4 — şablonlar disipline göre gruplanır
   notlar?: string;               // 4 ekim — Atölye › Bilgiler: kişisel program notları
   ikon?: string;                 // 4 ekim — programın simgesi (emoji, ör. 🎸); yoksa 🌱
+  alanlar?: string[];            // 5 ekim — dokunduğu yaşam alanları (yasam_alani id'leri); boş = alansız
   plan?: boolean;                // 28 eylül — kişisel program Ajanda'dan planlanır: tarihler mutlak, kendiliğinden bitmez
   hafta_notlari?: Record<string, { metin: string; zaman: number }>; // 3 ekim — koçun haftalık değerlendirmesi (anahtar: haftanın pazartesisi)
   uzak?: UzakProgram | null;     // D5/D6 — danışana atanmış (koç tarafı) ya da koçtan gelen (danışan tarafı)
@@ -164,6 +165,21 @@ export interface KlasorRow {
 }
 
 // Alan öz değerlendirmesi — tarihiyle saklanır (denge zamanla izlenebilsin), şimdilik sonuncusu gösterilir.
+// 5 ekim — Rutinlerim yaşam alanı. Hazır alanların kimliği sabit ('alan:hareket'…) — her cihaz aynı
+// satırı kurar, çakışmaz. Hazırlar silinmez, gizlenir; kullanıcının eklediği alan silinebilir.
+export interface YasamAlaniRow {
+  id: string;
+  kod: string | null;            // hazır alan kodu (hareket…); kullanıcının alanında null
+  ad: string;
+  ikon: string;
+  aciklama: string;
+  sira: number;
+  gizli: boolean;
+  kriterler?: string[];          // 3. adım: kriterli öz değerlendirme
+  kriterli?: boolean;
+  guncellendi: number;
+}
+
 export interface AlanDegerlendirmeRow {
   id: string;
   alan_id: string;
@@ -413,6 +429,7 @@ export class RitosDB extends Dexie {
   baglanti!: EntityTable<BaglantiRow, 'id'>;
   ortak_liste!: EntityTable<OrtakListeRow, 'id'>;
   ortak_madde!: EntityTable<OrtakMaddeRow, 'id'>;
+  yasam_alani!: EntityTable<YasamAlaniRow, 'id'>;
 
   /** Sunucudan gelen değişiklik uygulanırken true — kancalar bunu yerel değişiklik saymaz. */
   uzaktan = false;
@@ -740,6 +757,40 @@ export class RitosDB extends Dexie {
       ortak_liste: 'id, aile',
       ortak_madde: 'id, liste',
     });
+    // v16 — 5 ekim: yaşam alanları (Rutinlerim). Rutin (program) alanlara etiketle dokunur: ProgramRow.alanlar.
+    this.version(16).stores({
+      home_widget: 'id, type',
+      ayar: 'anahtar',
+      ajanda_kart: 'id, kaynak_modul, kaynak_ref, baslangic',
+      ajanda_kayit: 'id, kart_id, tarih',
+      geri_bildirim: 'id, kart_id, kaynak_ref, zaman',
+      program: 'id, klasor_id',
+      program_adim: 'id, program_id',
+      klasor: 'id, ust_id',
+      gelen: 'id, gelis, alindi',
+      kisi: 'id, son',
+      bekleyen: 'anahtar, zaman',
+      alan_degerlendirme: 'id, alan_id, zaman',
+      katalog: 'kod, paket',
+      paket_kurulum: 'id',
+      katalog_duzen: 'id, sinav',
+      kaynak: 'id',
+      konu_durum: 'id',
+      iliski: 'id, durum',
+      giden: 'id, zaman',
+      iliski_ayar: 'id',
+      mesaj: 'id, konusma, zaman',
+      konusma_okundu: 'id',
+      aile: 'id',
+      olcu_tanim: 'id',
+      olcum: 'id, olcu_id, tarih, kart_id',
+      kutuphane_kart: 'id, klasor_id',
+      not: 'id, guncellendi',
+      baglanti: 'id, sira',
+      ortak_liste: 'id, aile',
+      ortak_madde: 'id, liste',
+      yasam_alani: 'id, sira', // 5 ekim — Rutinlerim yaşam alanları (rutinlere etiket)
+    });
 
     // Senkronlanan tablolardaki her yerel değişikliği "bekleyen"e işaretle.
     // Kanca transaction içinde çalışır; bekleyen'e yazmayı transaction dışına erteleriz.
@@ -784,7 +835,7 @@ export class RitosDB extends Dexie {
 // Hesapsız kullanımın verisi 'ritos' (misafir) veritabanında; her hesabın kendi veritabanı var.
 // Hangisinin açık olduğu cihazda küçük bir işarette tutulur; değişince sayfa yeniden yüklenir.
 
-export const SENKRON_TABLOLARI = ['home_widget', 'ajanda_kart', 'ajanda_kayit', 'geri_bildirim', 'program', 'program_adim', 'klasor', 'gelen', 'kisi', 'alan_degerlendirme', 'paket_kurulum', 'katalog_duzen', 'kaynak', 'konu_durum', 'iliski_ayar', 'mesaj', 'konusma_okundu', 'olcu_tanim', 'olcum', 'kutuphane_kart', 'not', 'baglanti'] as const;
+export const SENKRON_TABLOLARI = ['home_widget', 'ajanda_kart', 'ajanda_kayit', 'geri_bildirim', 'program', 'program_adim', 'klasor', 'gelen', 'kisi', 'alan_degerlendirme', 'paket_kurulum', 'katalog_duzen', 'kaynak', 'konu_durum', 'iliski_ayar', 'mesaj', 'konusma_okundu', 'olcu_tanim', 'olcum', 'kutuphane_kart', 'not', 'baglanti', 'yasam_alani'] as const;
 export type SenkronTablo = (typeof SENKRON_TABLOLARI)[number];
 
 export const MISAFIR_DB = 'ritos';

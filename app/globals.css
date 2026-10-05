@@ -1170,3 +1170,31 @@ textarea.rt-inp{font-family:inherit;}
 .rt-modal-sor span{flex:1 1 100%;}
 .rt-modal-sor .rt-btn{flex:1;}
 .rt-cevre-bos{margin:4px 0 6px;font-size:13px;line-height:1.5;}
+
+/* Rutinlerim — yaşam alanları (5 ekim) */
+.rt-alan-blok{display:flex;flex-direction:column;gap:6px;margin:2px 0 6px;}
+.rt-alan-karolar{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+.rt-hedef-secici.kompakt .rt-alan-karolar{grid-template-columns:repeat(2,1fr);}
+.rt-alan-karo{border:1px solid var(--line);background:#fff;border-radius:12px;padding:7px 3px 5px;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0;cursor:pointer;font:inherit;color:inherit;}
+.rt-alan-karo .ic{font-size:19px;line-height:1;}
+.rt-alan-karo .ad{font-size:10.5px;font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rt-alan-karo .say{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;}
+.rt-alan-karo.bos{background:transparent;border-style:dashed;}
+.rt-alan-karo.bos .ic{filter:grayscale(1);opacity:.55;}
+.rt-alan-karo.on{border-color:var(--green);box-shadow:0 0 0 1px var(--green) inset;background:var(--green2);}
+.rt-alan-alt{display:flex;align-items:center;gap:8px;font-size:12px;}
+.rt-alan-alt .rt-linkbtn{font-size:12px;}
+.rt-alan-alt > .rt-linkbtn{margin-left:auto;}
+.rt-etiket-ikon{font-size:12px;letter-spacing:1px;opacity:.85;margin-left:auto;}
+.rt-etiket-ikon + .chev{margin-left:6px;}
+.rt-alan-lbl{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);}
+.rt-alan-sec{display:flex;flex-wrap:wrap;gap:6px;}
+.rt-alan-sec .rt-chip.oneri{border-style:dashed;border-color:var(--green);color:var(--green);}
+.rt-alan-duzen{display:flex;flex-direction:column;}
+.rt-alan-duzen-sat{display:flex;align-items:center;gap:4px;padding:6px 0;border-bottom:1px solid var(--line);}
+.rt-alan-duzen-sat:last-child{border-bottom:0;}
+.rt-alan-duzen-sat .ic{font-size:20px;width:30px;text-align:center;}
+.rt-alan-duzen-sat .tx{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;border:0;background:none;padding:2px 4px;text-align:left;cursor:pointer;font:inherit;color:inherit;}
+.rt-alan-duzen-sat .tx small{color:var(--muted);font-size:11.5px;}
+.rt-alan-duzen-sat.gizli .ic,.rt-alan-duzen-sat.gizli .tx{opacity:.45;}
+.rt-alan-duzen-sat .rt-ikon:disabled{opacity:.3;cursor:default;}
