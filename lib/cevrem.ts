@@ -39,12 +39,16 @@ export interface IsKayit { is_id: string; tarih: string; grup_id: string; yapild
 export type RicaDurum = 'bekliyor' | 'kabul' | 'ret' | 'yapildi' | 'iptal';
 export interface Rica { id: string; grup_id: string; isteyen: string; istenen: string; ad: string; aciklama: string | null; tarih: string; saat: string | null; durum: RicaDurum; olusturuldu: string; guncellendi: string }
 
+/** Çevrem'deki birinin bana gönderdiği kart/program tanımı (supabase/v1/07-paylasim.sql). */
+export interface GelenPaylasim { id: string; gonderen: string; gonderen_ad: string; paket: unknown; alindi: string | null; olusturuldu: string }
+
 export interface CevremDurum {
   hazir: boolean; uid: string | null; hata: string | null;
   gruplar: Grup[]; uyeler: Uye[]; listeler: Liste[]; maddeler: Madde[]; isler: OrtakIs[]; kayitlar: IsKayit[]; ricalar: Rica[];
+  gelenler: GelenPaylasim[];
 }
 
-const BOS: CevremDurum = { hazir: false, uid: null, hata: null, gruplar: [], uyeler: [], listeler: [], maddeler: [], isler: [], kayitlar: [], ricalar: [] };
+const BOS: CevremDurum = { hazir: false, uid: null, hata: null, gruplar: [], uyeler: [], listeler: [], maddeler: [], isler: [], kayitlar: [], ricalar: [], gelenler: [] };
 let durum: CevremDurum = BOS;
 const dinleyiciler = new Set<(d: CevremDurum) => void>();
 function yay(p: Partial<CevremDurum>) {
@@ -81,7 +85,11 @@ async function yukle(): Promise<void> {
       const benim = await sb.from('grup_uye').select('grup_id').eq('uye_id', uid).eq('durum', 'aktif');
       hata(benim.error);
       const ids = (benim.data ?? []).map((r) => r.grup_id as string);
-      if (!ids.length) { yay({ ...BOS, hazir: true, uid }); return; }
+      // Bana gelen paylaşımlar (son 60 gün; alınmamışlar ve yakında alınanlar)
+      const pg = await sb.from('paylasim').select('id, gonderen, gonderen_ad, paket, alindi, olusturuldu').eq('alici', uid)
+        .gte('olusturuldu', new Date(Date.now() - 60 * 86400000).toISOString()).order('olusturuldu', { ascending: false }).limit(100);
+      const gelenler = (pg.error ? durum.gelenler : (pg.data ?? [])) as GelenPaylasim[];
+      if (!ids.length) { yay({ ...BOS, hazir: true, uid, gelenler }); return; }
       const [g, u, l, m, i, k, r] = await Promise.all([
         sb.from('grup').select('id, ad, tur, ikon, kurucu').in('id', ids).order('olusturuldu'),
         sb.from('grup_uye').select('grup_id, uye_id, rol, durum, katildi').in('grup_id', ids),
@@ -105,6 +113,7 @@ async function yukle(): Promise<void> {
         gruplar: (g.data ?? []) as Grup[], uyeler,
         listeler: (l.data ?? []) as Liste[], maddeler: (m.data ?? []) as Madde[],
         isler: (i.data ?? []) as OrtakIs[], kayitlar: (k.data ?? []) as IsKayit[], ricalar: (r.data ?? []) as Rica[],
+        gelenler,
       });
     } catch (e) {
       yay({ hazir: true, hata: e instanceof Error ? e.message : String(e) });
@@ -130,7 +139,7 @@ export function useCevremBaslat() {
     void yukle();
     const ad = `cevrem-${Math.random().toString(36).slice(2, 8)}`;
     let c = sb.channel(ad);
-    for (const t of ['grup', 'grup_uye', 'liste', 'liste_madde', 'ortak_is', 'ortak_is_kayit', 'rica']) {
+    for (const t of ['grup', 'grup_uye', 'liste', 'liste_madde', 'ortak_is', 'ortak_is_kayit', 'rica', 'paylasim']) {
       c = c.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => zamanla());
     }
     kanal = c.subscribe();
@@ -292,6 +301,35 @@ export async function ricaGonder(grup: string, g: RicaGirdi) {
 export async function ricaDurum(id: string, d: RicaDurum) {
   yerel('ricalar', (x) => (d === 'iptal' ? x.filter((r) => r.id !== id) : x.map((r) => (r.id === id ? { ...r, durum: d, guncellendi: simdi() } : r))));
   hata((await (await sb()).from('rica').update({ durum: d, guncellendi: simdi() }).eq('id', id)).error);
+}
+
+// ———————————————— paylaş (kart / program tanımı) ————————————————
+
+/** Çevrem'deki kişiler (benden başka, grupları birleşik): Paylaş'ta alıcı listesi. */
+export function paylasilacakKisiler(d: CevremDurum): { id: string; ad: string; gruplar: string[] }[] {
+  const m = new Map<string, { id: string; ad: string; gruplar: string[] }>();
+  for (const u of d.uyeler) {
+    if (u.uye_id === d.uid || u.durum !== 'aktif') continue;
+    const g = d.gruplar.find((x) => x.id === u.grup_id);
+    const k = m.get(u.uye_id) ?? { id: u.uye_id, ad: u.ad, gruplar: [] };
+    if (g) k.gruplar.push(g.ad);
+    m.set(u.uye_id, k);
+  }
+  return Array.from(m.values()).sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
+}
+
+export async function paylasimGonder(alici: string, paket: unknown) {
+  const s = await sb();
+  const benAd = durum.uyeler.find((u) => u.uye_id === durum.uid)?.ad ?? 'Biri';
+  hata((await s.from('paylasim').insert({ gonderen: durum.uid, gonderen_ad: benAd, alici, paket })).error);
+}
+export async function paylasimAlindi(id: string) {
+  yerel('gelenler', (x) => x.map((g) => (g.id === id ? { ...g, alindi: simdi() } : g)));
+  hata((await (await sb()).from('paylasim').update({ alindi: simdi() }).eq('id', id)).error);
+}
+export async function paylasimSil(id: string) {
+  yerel('gelenler', (x) => x.filter((g) => g.id !== id));
+  hata((await (await sb()).from('paylasim').delete().eq('id', id)).error);
 }
 
 // ———————————————— ajanda köprüsü ————————————————

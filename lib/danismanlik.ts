@@ -3,23 +3,19 @@
 // ————————————————————————————————————————————————————————————————
 // Danışmanlık motoru (D1–D10, 26 eylül). Bkz. User Story'ler "Danışmanlık".
 //
-//  • İlişki (koç ↔ danışan, disiplin başına) sunucuda; içerik yok.
-//  • Program ve geri bildirim iki taraf arasında ŞİFRELİ mesajla gider (ilişki anahtarı,
-//    lib/iliskiAnahtar.ts). Sunucu yalnız zarfı görür.
+//  • İlişki (koç ↔ danışan, disiplin başına) sunucuda (supabase/v1/04-danismanlik.sql).
+//  • Program, geri bildirim, haftalık not ve paylaşım iki taraf arasında mesajla gider (düz JSON;
+//    7 ekim — v1: şifreleme kalktı, yetki RLS). Aile/grup işleri lib/cevrem.ts'de.
 //  • Program iki tarafta aynı kimlikle durur: danışanın işaretleri koçta aynı program/adım
 //    kimliğine düşer, ilerleme ekranı (lib/program.ts ilerleme) değişmeden çalışır.
-//  • İlk atama danışanın Gelenler'ine düşer (onay); sonraki güncellemeler kendiliğinden uygulanır.
+//  • Onay davette verilir; program kartları doğrudan danışanın Ajandam'ına düşer.
 //  • Mesaj işlemek tekrarlanabilir (aynı kimlikler, sürüm numarası): danışanın iki cihazı
 //    aynı mesajı işlese de çift kayıt oluşmaz.
 // ————————————————————————————————————————————————————————————————
 
-import { ortakKartId, ortakUygula, type OrtakOp } from './ortak';
-import type { GrupTur } from './grup';
 import { useEffect, useState } from 'react';
-import { db, type AileRow, type AileUyesi, type GeriBildirimRow, type IliskiRow, type MesajRow, type ProgramAdimRow, type ProgramRow, type UzakProgram } from './db';
+import { db, type GeriBildirimRow, type IliskiRow, type MesajRow, type ProgramAdimRow, type ProgramRow, type UzakProgram } from './db';
 import { supabase } from './supabase';
-import { b64, b64Coz, coz, dekUret, rastgele, sifrele } from './sifre';
-import { ciftAc, ciftUret, iliskiAnahtariTuret, ozelSifrele, type AnahtarCifti } from './iliskiAnahtar';
 import { bugun, tarihEkle, type Izinler } from './paket';
 import { aktifMi, baslat, calisanaYansit, programBitisi, durdur, programKancalari } from './program';
 import { ajandaKancalari, kaynaktanCek } from './ajanda';
@@ -47,9 +43,6 @@ export interface UzakMesaj { sira: number; iliski: string; gonderen: string; ver
 export interface Tasima {
   profil(): Promise<Profil | null>;
   profilYaz(p: Partial<Pick<Profil, 'koc' | 'disiplinler' | 'koc_baslangic'>>): Promise<void>;
-  ozelAnahtarim(): Promise<{ acik: string; ozel: string } | null>;
-  anahtarKoy(acik: string, ozel: string): Promise<{ acik: string; ozel: string }>;
-  acikAnahtar(kisi: string): Promise<string | null>;
   iliskiler(): Promise<IliskiRow[]>;
   davetOlustur(kod: string, disiplin: string, kocAd: string, alici?: string | null): Promise<void>;
   davetler(): Promise<DavetSatir[]>;
@@ -59,28 +52,14 @@ export interface Tasima {
   sonlandir(iliskiId: string): Promise<void>;
   mesajGonder(iliski: string, alici: string, veri: string): Promise<void>;
   mesajCek(sonra: number): Promise<UzakMesaj[]>;
-  kisiBul(eposta: string): Promise<{ id: string; gorunen_ad: string } | null>;
-  davetGonder(alici: string, paket: unknown): Promise<void>;
-  // aile grubu (F1–F4)
-  aileler(): Promise<AileRow[]>;
-  aileKur(ad: string, tur: string): Promise<string>;
-  aileDavet(aile: string, eposta: string): Promise<string>;
-  aileYanit(aile: string, kabul: boolean): Promise<void>;
-  aileAyril(aile: string, uye: string): Promise<void>;
-  aileAnahtarlarim(aile: string): Promise<{ surum: number; saran: string; sarili: string }[]>;
-  aileAnahtarYaz(satirlar: { aile: string; uye: string; surum: number; saran: string; sarili: string }[]): Promise<void>;
-  aileMesajGonder(aile: string, surum: number, veri: string): Promise<void>;
-  aileMesajCek(aile: string, sonra: number): Promise<{ sira: number; gonderen: string; anahtar_surum: number; veri: string }[]>;
-  aileGorevIliski(uye: string): Promise<string>;
 }
 
 function hata(e: { message: string } | null) { if (e) throw new Error(e.message); }
 
 // 7 ekim — v1 köprüsü: yeni projenin şifresiz tabloları (supabase/v1/04-danismanlik.sql).
-// Anahtar işlemleri boştur (DUZ); aile/grup işleri artık lib/cevrem.ts'de.
+// Aile/grup işleri lib/cevrem.ts'de.
 function supabaseTasima(uid: string): Tasima {
   const sb = supabase()!;
-  const yok = (ne: string) => { throw new Error(`${ne} şimdilik yok.`); };
   return {
     async profil() {
       const r = await sb.from('profil').select('gorunen_ad, koc, koc_disiplinler, koc_baslangic').eq('id', uid).maybeSingle();
@@ -94,9 +73,6 @@ function supabaseTasima(uid: string): Tasima {
       if (p.koc_baslangic !== undefined) satir.koc_baslangic = p.koc_baslangic;
       hata((await sb.from('profil').update(satir).eq('id', uid)).error);
     },
-    async ozelAnahtarim() { return { acik: 'duz', ozel: 'duz' }; },
-    async anahtarKoy() { return { acik: 'duz', ozel: 'duz' }; },
-    async acikAnahtar() { return 'duz'; },
     async iliskiler() {
       const r = await sb.from('iliski').select('id, koc, danisan, disiplin, koc_ad, danisan_ad, durum, olusturuldu, sonlandi');
       hata(r.error);
@@ -123,7 +99,6 @@ function supabaseTasima(uid: string): Tasima {
       return (r.data as string | null) ?? null;
     },
     async sonlandir(id) { hata((await sb.rpc('iliski_sonlandir', { p_id: id })).error); },
-    async aileGorevIliski() { return yok('Aile içinde görev verme (Çevrem › Birinden iste kullan)'); },
     async mesajGonder(iliski, alici, veri) {
       hata((await sb.from('mesaj').insert({ iliski, gonderen: uid, alici, veri })).error);
     },
@@ -132,17 +107,6 @@ function supabaseTasima(uid: string): Tasima {
       hata(r.error);
       return (r.data ?? []) as UzakMesaj[];
     },
-    async kisiBul() { return yok("E-postayla davet (bağlantıyı gönder)"); },
-    async davetGonder() { return yok('E-postayla davet'); },
-    async aileler() { return []; },
-    async aileKur() { return yok('Bu işlem Çevrem\'de'); },
-    async aileDavet() { return yok('Bu işlem Çevrem\'de'); },
-    async aileYanit() { yok('Bu işlem Çevrem\'de'); },
-    async aileAyril() { yok('Bu işlem Çevrem\'de'); },
-    async aileAnahtarlarim() { return []; },
-    async aileAnahtarYaz() { /* yok */ },
-    async aileMesajGonder() { /* yok */ },
-    async aileMesajCek() { return []; },
   };
 }
 
@@ -166,24 +130,17 @@ export function kocDenemeKalan(p: Profil | null): number | null {
 
 let t: Tasima | null = null;
 let uid: string | null = null;
-let dek: CryptoKey | null = null;
-let cift: AnahtarCifti | null = null;
-const iliskiAnahtarlari = new Map<string, CryptoKey>();
 let calisiyor: Promise<void> | null = null;
 
-export function danismanlikBaslat(kullanici: string, anahtar: CryptoKey | null = null, tasima?: Tasima) {
+export function danismanlikBaslat(kullanici: string, _eski: unknown = null, tasima?: Tasima) {
   t = tasima ?? supabaseTasima(kullanici);
   uid = kullanici;
-  dek = anahtar;
-  cift = null;
-  iliskiAnahtarlari.clear();
   guncelle({ etkin: true, uid: kullanici, hata: null });
   profilYenile().catch(() => {});
 }
 
 export function danismanlikDurdur() {
-  t = null; uid = null; dek = null; cift = null;
-  iliskiAnahtarlari.clear();
+  t = null; uid = null;
   guncelle({ etkin: false, uid: null, profil: null });
 }
 
@@ -195,41 +152,6 @@ async function profilYenile() {
 function tasimaVar(): Tasima {
   if (!t || !uid) throw new Error('Danışmanlık için hesapla giriş yapmış olmalısın.');
   return t;
-}
-
-// ———————————————— anahtarlar ————————————————
-
-// 7 ekim — v1: şifre yok. Mesaj "zarfı" düz JSON metnidir; anahtar işlemleri boştur.
-const DUZ = true;
-const DUZ_ANAHTAR = {} as CryptoKey;
-async function zarfla(k: CryptoKey, x: unknown): Promise<string> { return DUZ ? JSON.stringify(x) : sifrele(k, x); }
-async function zarfAc<T>(k: CryptoKey, v: string): Promise<T> { return DUZ ? JSON.parse(v) as T : coz<T>(k, v); }
-
-async function anahtarGaranti(): Promise<AnahtarCifti> {
-  if (DUZ) return { ozel: DUZ_ANAHTAR, acik: 'duz' };
-  if (cift) return cift;
-  const tt = tasimaVar();
-  const var_ = await tt.ozelAnahtarim();
-  if (var_) cift = await ciftAc(dek!, var_.ozel, var_.acik);
-  else {
-    const { cift: yeni, ozelJwk } = await ciftUret();
-    const r = await tt.anahtarKoy(yeni.acik, await ozelSifrele(dek!, ozelJwk));
-    cift = await ciftAc(dek!, r.ozel, r.acik); // başka cihaz önce yazdıysa onunki
-  }
-  return cift;
-}
-
-async function iliskiAnahtari(il: IliskiRow): Promise<CryptoKey | null> {
-  if (DUZ) return DUZ_ANAHTAR;
-  const k = iliskiAnahtarlari.get(il.id);
-  if (k) return k;
-  const c = await anahtarGaranti();
-  const karsi = il.koc === uid ? il.danisan : il.koc;
-  const acik = await tasimaVar().acikAnahtar(karsi);
-  if (!acik) return null; // karşı taraf uygulamayı henüz açmadı — mesaj kuyrukta bekler
-  const yeni = await iliskiAnahtariTuret(c.ozel, acik, il.id);
-  iliskiAnahtarlari.set(il.id, yeni);
-  return yeni;
 }
 
 // ———————————————— mesajlar ————————————————
@@ -248,7 +170,6 @@ type MesajIcerik =
   | { tur: 'ret'; program_id: string }
   | { tur: 'gb'; olaylar: GeriBildirimRow[] }
   | { tur: 'sohbet'; mesaj: MesajRow }
-  | { tur: 'ortak'; op: OrtakOp }
   | { tur: 'hafta_notu'; program_id: string; hafta: string; metin: string; zaman: number }; // 3 ekim
 
 export interface KocPaketi { tur: 'koc_program'; iliski_id: string; koc_id: string; koc_ad: string; disiplin: string; program: ProgramOzeti }
@@ -261,21 +182,9 @@ async function gidenleriGonder() {
   const tt = tasimaVar();
   const liste = await db.giden.orderBy('zaman').toArray();
   for (const g of liste) {
-    if (g.aile_id) {
-      const a = await db.aile.get(g.aile_id);
-      if (!a || !aileAktifMi(a)) { await db.giden.delete(g.id); continue; }
-      const k = await aileAnahtari(a, a.anahtar_surum);
-      if (!k) continue;
-      await tt.aileMesajGonder(a.id, a.anahtar_surum, await sifrele(k, g.icerik));
-      await gittiIsaretle(g.icerik as MesajIcerik);
-      await db.giden.delete(g.id);
-      continue;
-    }
-    const il = await db.iliski.get(g.iliski_id);
+    const il = g.aile_id ? undefined : await db.iliski.get(g.iliski_id);
     if (!il || il.durum !== 'aktif') { await db.giden.delete(g.id); continue; }
-    const k = await iliskiAnahtari(il);
-    if (!k) continue;
-    await tt.mesajGonder(il.id, g.alici, await zarfla(k, g.icerik));
+    await tt.mesajGonder(il.id, g.alici, JSON.stringify(g.icerik));
     await gittiIsaretle(g.icerik as MesajIcerik);
     await db.giden.delete(g.id);
   }
@@ -291,10 +200,8 @@ async function mesajlariCek() {
     if (!liste.length) return;
     for (const m of liste) {
       const il = await db.iliski.get(m.iliski);
-      const k = il ? await iliskiAnahtari(il) : null;
-      if (il && !k) return; // anahtar henüz yok: imleç ilerlemez, sonraki turda yeniden denenir (mesaj kaybolmaz)
-      if (il && k) {
-        try { await mesajIsle(il, await zarfAc<MesajIcerik>(k, m.veri)); }
+      if (il) {
+        try { await mesajIsle(il, JSON.parse(m.veri) as MesajIcerik); }
         catch (e) { console.warn('[ritos] mesaj işlenemedi', e); }
       }
       sira = Number(m.sira);
@@ -491,7 +398,6 @@ function davetKodu(): string {
 
 export async function davetOlustur(disiplin: string, alici: string | null = null): Promise<{ kod: string; baglanti: string }> {
   const tt = tasimaVar();
-  await anahtarGaranti(); // danışan kabul edince hemen mesajlaşabilsin
   const kod = davetKodu();
   await tt.davetOlustur(kod, disiplin, durum.profil?.ad ?? 'Koç', alici);
   return { kod, baglanti: `${location.origin}/?davet=${kod}` };
@@ -540,19 +446,9 @@ export const davetBak = (kod: string) => tasimaVar().davetBak(kod);
 
 export async function davetYanit(kod: string, kabul: boolean): Promise<string | null> {
   const tt = tasimaVar();
-  if (kabul) await anahtarGaranti();
   const id = await tt.davetYanit(kod, kabul);
   await iliskileriCek();
   await banaGelenDavetler().catch(() => {});
-  return id;
-}
-
-// Aile içinde görev verme (3 ekim): veren → alan için 'aile' ilişkisi davetsiz kurulur (yoksa).
-export async function aileGorevIliski(uye: string): Promise<string> {
-  await anahtarGaranti();
-  const id = await tasimaVar().aileGorevIliski(uye);
-  await iliskileriCek();
-  tetikle();
   return id;
 }
 
@@ -765,14 +661,8 @@ export async function danismanlikTur(): Promise<void> {
     try {
       await iliskileriCek();
       await banaGelenDavetler().catch(() => {});
-      await aileleriCek();
       const aktifVar = (await db.iliski.toArray()).some((x) => x.durum === 'aktif');
-      const aileler = (await db.aile.toArray()).filter(aileAktifMi);
-      if (aktifVar || aileler.length || durum.profil?.koc) await anahtarGaranti();
-      for (const a of aileler) await aileAnahtarDagit(a);
-      if (aktifVar || aileler.length) await gidenleriGonder();
-      if (aktifVar) await mesajlariCek();
-      for (const a of aileler) await aileMesajlariCek(a);
+      if (aktifVar) { await gidenleriGonder(); await mesajlariCek(); }
       guncelle({ hata: null });
     } catch (e) {
       guncelle({ hata: e instanceof Error ? e.message : String(e) });
@@ -786,7 +676,6 @@ export async function danismanlikTur(): Promise<void> {
 // ———————————————— sohbet (C1–C4) ————————————————
 
 export const konusmaIliski = (id: string) => `i:${id}`;
-export const konusmaAile = (id: string) => `a:${id}`;
 
 /** Metin ya da paylaşım gönder. Mesaj önce cihaza yazılır ("gönderiliyor"), sonra şifreli gider. */
 export async function sohbetGonder(konusma: string, icerik: { metin: string } | { paket: unknown; metin?: string }) {
@@ -802,151 +691,12 @@ export async function sohbetGonder(konusma: string, icerik: { metin: string } | 
     if (!il || il.durum !== 'aktif') throw new Error('Bu danışmanlık sonlanmış.');
     await db.mesaj.put(m);
     await kuyruk(il.id, il.koc === uid ? il.danisan : il.koc, { tur: 'sohbet', mesaj: m });
-  } else {
-    await db.mesaj.put(m);
-    await kuyruk('', '', { tur: 'sohbet', mesaj: m }, konusma.slice(2));
-  }
+  } else throw new Error('Bu konuşma artık yok.');
   tetikle(200);
 }
 
 export async function okunduIsaretle(konusma: string) {
   await db.konusma_okundu.put({ id: konusma, zaman: Date.now() });
-}
-
-// ———————————————— aile grubu (F1–F4) ————————————————
-
-const aileAnahtarlari = new Map<string, CryptoKey>();
-export const aileAktifMi = (a: AileRow) => a.uyeler.some((u) => u.uye === uid && u.durum === 'aktif');
-export const benimAileRolum = (a: AileRow): AileUyesi | undefined => a.uyeler.find((u) => u.uye === uid);
-
-async function aileleriCek() {
-  const liste = await tasimaVar().aileler();
-  const idler = new Set(liste.map((a) => a.id));
-  await db.aile.bulkPut(liste);
-  for (const a of await db.aile.toArray()) if (!idler.has(a.id)) await db.aile.delete(a.id);
-}
-
-async function ciftAnahtari(karsi: string, aileId: string): Promise<CryptoKey | null> {
-  const c = await anahtarGaranti();
-  const acik = await tasimaVar().acikAnahtar(karsi);
-  if (!acik) return null;
-  return iliskiAnahtariTuret(c.ozel, acik, `aile:${aileId}`);
-}
-
-/** Grup anahtarı (belirli sürüm): bana sarılı bırakılmış satırdan açılır. */
-async function aileAnahtari(a: AileRow, surum: number): Promise<CryptoKey | null> {
-  const ad = `${a.id}:${surum}`;
-  const k = aileAnahtarlari.get(ad);
-  if (k) return k;
-  const satir = (await tasimaVar().aileAnahtarlarim(a.id)).find((x) => x.surum === surum);
-  if (!satir) return null;
-  const cift = await ciftAnahtari(satir.saran, a.id);
-  if (!cift) return null;
-  const ham = b64Coz(await coz<string>(cift, satir.sarili));
-  const yeni = await crypto.subtle.importKey('raw', ham, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
-  aileAnahtarlari.set(ad, yeni);
-  return yeni;
-}
-
-/** Yönetici cihazı: güncel sürümün grup anahtarı yoksa üretir; her aktif üyeye (kendisi dahil) sarılı bırakır. */
-async function aileAnahtarDagit(a: AileRow) {
-  if (benimAileRolum(a)?.rol !== 'yonetici') return;
-  const tt = tasimaVar();
-  let ham: Uint8Array;
-  const benim = (await tt.aileAnahtarlarim(a.id)).find((x) => x.surum === a.anahtar_surum);
-  if (benim) {
-    const cift = await ciftAnahtari(benim.saran, a.id);
-    if (!cift) return;
-    ham = b64Coz(await coz<string>(cift, benim.sarili));
-  } else {
-    ham = rastgele(32);
-  }
-  const satirlar: { aile: string; uye: string; surum: number; saran: string; sarili: string }[] = [];
-  for (const u of a.uyeler.filter((x) => x.durum === 'aktif')) {
-    const cift = await ciftAnahtari(u.uye, a.id);
-    if (!cift) continue; // üye uygulamayı henüz açmadı; sonraki turda
-    satirlar.push({ aile: a.id, uye: u.uye, surum: a.anahtar_surum, saran: uid!, sarili: await sifrele(cift, b64(ham)) });
-  }
-  if (satirlar.length) await tt.aileAnahtarYaz(satirlar); // var olan satırlar değişmez (ignoreDuplicates)
-}
-
-async function aileMesajlariCek(a: AileRow) {
-  const tt = tasimaVar();
-  const ANAH = `aile_sira2_${a.id}`; // 27 eylül: '2' — anahtar beklenirken atlanmış mesajlar baştan yeniden çekilsin
-  let sira = ((await db.ayar.get(ANAH))?.deger as number | undefined) ?? 0;
-  for (;;) {
-    const liste = await tt.aileMesajCek(a.id, sira);
-    if (!liste.length) return;
-    for (const m of liste) {
-      const k = await aileAnahtari(a, m.anahtar_surum);
-      // Grup anahtarı bana henüz bırakılmadı (yöneticinin cihazı açılınca bırakılır): imleç ilerlemez, mesaj kaybolmaz.
-      if (!k) return;
-      {
-        try {
-          const ic = await coz<MesajIcerik>(k, m.veri);
-          if (ic.tur === 'sohbet') await sohbetMesajiKaydet(ic.mesaj, konusmaAile(a.id));
-          else if (ic.tur === 'ortak') await ortakUygula(ic.op, a.id);
-        } catch (e) { console.warn('[ritos] aile mesajı çözülemedi', e); }
-      }
-      sira = Number(m.sira);
-      await db.ayar.put({ anahtar: ANAH, deger: sira });
-    }
-    if (liste.length < 200) return;
-  }
-}
-
-// ———————————————— aile ortak listeleri / kartları (3 ekim) ————————————————
-
-/** Aktif gruplarım (5 ekim: birden çok olabilir). */
-export async function aktifGruplarim(): Promise<AileRow[]> {
-  return (await db.aile.toArray()).filter((a) => aileAktifMi(a)).sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
-}
-/** İlk aktif grubum (yoksa null). */
-export async function aktifAilem(): Promise<AileRow | null> {
-  return (await aktifGruplarim())[0] ?? null;
-}
-
-/** Ortak işlemin ait olduğu grup: liste / kart kaydından bulunur. */
-async function ortakGrubu(op: OrtakOp): Promise<string | null> {
-  if (op.o === 'madde' || op.o === 'isaret' || op.o === 'madde-sil') return (await db.ortak_liste.get(op.liste))?.aile ?? null;
-  if (op.o === 'liste-sil') return (await db.ortak_liste.get(op.id))?.aile ?? null;
-  if (op.o === 'kart-sil' || op.o === 'ustlen' || op.o === 'yapildi') return (await db.ajanda_kart.get(ortakKartId(op.id)))?.ortak?.aile ?? null;
-  return null;
-}
-export const benAile = () => ({ kim: uid ?? '', kim_ad: durum.profil?.ad ?? 'Ben' });
-
-/** Ortak işlem: önce bu cihazda uygulanır, sonra aile kanalına şifreli gider. */
-export async function ortakGonder(op: OrtakOp, grup?: string) {
-  const id = grup ?? (await ortakGrubu(op)) ?? (await aktifAilem())?.id;
-  const a = id ? await db.aile.get(id) : undefined;
-  if (!a || !aileAktifMi(a)) throw new Error('Bu grupta değilsin.');
-  await ortakUygula(op, a.id);
-  await kuyruk('', '', { tur: 'ortak', op }, a.id);
-  tetikle(200);
-}
-
-export async function aileKur(ad: string, tur: GrupTur = 'aile'): Promise<string> {
-  await anahtarGaranti();
-  const id = await tasimaVar().aileKur(ad, tur);
-  await aileleriCek();
-  tetikle();
-  return id;
-}
-export async function aileDavet(aile: string, eposta: string): Promise<string> {
-  const ad = await tasimaVar().aileDavet(aile, eposta);
-  await aileleriCek();
-  return ad;
-}
-export async function aileYanit(aile: string, kabul: boolean) {
-  if (kabul) await anahtarGaranti();
-  await tasimaVar().aileYanit(aile, kabul);
-  await aileleriCek();
-  tetikle();
-}
-export async function aileAyril(aile: string, kisi: string | null = null) {
-  await tasimaVar().aileAyril(aile, kisi ?? uid!);
-  await aileleriCek();
-  tetikle();
 }
 
 // ———————————————— kancaları bağla ————————————————
@@ -962,7 +712,7 @@ programKancalari.durduruldu = kocDurdurdu;
 // Test: bellekteki bir taşımayla iki "hesabı" iki tarayıcı bağlamında konuşturmak için.
 if (typeof window !== 'undefined') {
   (window as unknown as { __ritosDanismanlikTest?: unknown }).__ritosDanismanlikTest = async (kullanici: string, tasima: Tasima) => {
-    danismanlikBaslat(kullanici, await dekUret(), tasima);
+    danismanlikBaslat(kullanici, null, tasima);
     await danismanlikTur();
   };
   (window as unknown as { __ritosDanismanlikTur?: unknown }).__ritosDanismanlikTur = () => danismanlikTur();

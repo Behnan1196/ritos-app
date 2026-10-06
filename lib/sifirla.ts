@@ -9,7 +9,7 @@ import Dexie from 'dexie';
 import { aktifHesap, aktifHesapAyarla, db, dbAdi } from './db';
 import { supabase } from './supabase';
 import { senkronDurdur, senkronla } from './senkron';
-import { aileAktifMi, aileAyril, sonlandir } from './danismanlik';
+import { sonlandir } from './danismanlik';
 
 export interface SifirlaSecim {
   ajanda: boolean;      // kendi kartlarım, işaretlerim, ölçümlerim, dış uygulama kartları
@@ -32,9 +32,6 @@ export async function verileriSifirla(s: SifirlaSecim): Promise<number> {
     // Sunucuda bağları bitir (karşı taraf "sonlandı" görür), sonra yerel izleri sil.
     for (const il of await db.iliski.toArray()) {
       if (il.durum === 'aktif') { try { await sonlandir(il.id); } catch { /* çevrimdışı: hesap silinirse yine düşer */ } }
-    }
-    for (const a of await db.aile.toArray()) {
-      if (aileAktifMi(a)) { try { await aileAyril(a.id); } catch { /* yoksay */ } }
     }
     for (const p of programlar) if (p.uzak) silinecekProgram.add(p.id);
     for (const k of kartlar) if (k.geri_bildirim === 'uzak' || k.kaynak_modul === 'danismanlik' || k.kaynak_modul === 'ortak') silinecekKart.add(k.id);

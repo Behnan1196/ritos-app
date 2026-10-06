@@ -9,7 +9,6 @@ import { senkronla, useSenkronDurum } from '@/lib/senkron';
 import { Chips, Kap, Modal } from './ortak';
 import { PaketlerKap } from './Sinav';
 import { DanismanlikAyarlari } from './Danismanlik';
-import { AileAyarlari } from './Sohbet';
 import { useDanismanlik } from '@/lib/danismanlik';
 import { hesabimiSil, verileriSifirla, type SifirlaSecim } from '@/lib/sifirla';
 
@@ -180,7 +179,6 @@ function AyarlarIcerik() {
     <>
       {dn.profil?.koc && <PaketlerKap />}
       <DanismanlikAyarlari />
-      <AileAyarlari />
       {o.hesapli && (
         <Kap baslik="Veriler">
           <p className="rt-muted">Bu cihazı temizlemek için &quot;Çıkış yap&quot; yeter: çıkışta cihazdaki kopya silinir, veri hesapta kalır.</p>

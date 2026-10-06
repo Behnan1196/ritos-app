@@ -18,7 +18,7 @@ import { useBildirimPlani } from '@/lib/bildirim';
 import { useDisKartlar } from '@/lib/disKart';
 import Atolye from './ritos/Atolye';
 import { DavetKarsilama } from './ritos/Danismanlik';
-import { SenkronIsareti, useGelenSenkron } from './ritos/Paylasim';
+import { SenkronIsareti } from './ritos/Paylasim';
 import { GelenlerEkrani, useGelenlerOzeti } from './ritos/Sohbet';
 import { HomeEkrani, homeEkraniAc } from './ritos/HomeEkrani';
 import { CikisOnayi, GirisEkrani, HesapEkrani, KullaniciRozeti, type HesapEkran, SifreSifirlaEkrani } from './ritos/Hesap';
@@ -53,7 +53,6 @@ function RitosUygulama() {
   useHesapBaslat();
   useDisKartlar(); // dış uygulamaların kartları (cat_dis_kart)
   useBildirimPlani(); // 🔔 ayarlı kartların bildirimlerini kuyruğa yazar
-  useGelenSenkron();
   useCevremBaslat(); // Çevrem (7 ekim): gruplar, listeler, ortak işler — Realtime
   const [isNarrow, setIsNarrow] = useState(false);
   const [ratio, setRatio] = useState(58);

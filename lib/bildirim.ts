@@ -1,8 +1,8 @@
 'use client';
 
 // ————————————————————————————————————————————————————————————————
-// Bildirimler (2 ekim) — Web Push. Bildirimler Supabase'deki cat_bildirim kuyruğundan
-// 'ritos-bildirim' Edge Function'ı tarafından gönderilir (bkz. supabase/cat-09-bildirim.sql).
+// Bildirimler (2 ekim; 7 ekim v1) — Web Push. Bildirimler Supabase'deki 'bildirim' kuyruğundan
+// 'ritos-bildirim' Edge Function'ı tarafından gönderilir (bkz. supabase/v1/06-bildirim.sql).
 // Bu dosya: cihaz aboneliği, test, kaynakların aç/kapat'ı ve Ritos kart hatırlatmalarını
 // kuyruğa yazan planlayıcı.
 // ————————————————————————————————————————————————————————————————
@@ -10,7 +10,7 @@
 import { useEffect } from 'react';
 import { liveQuery } from 'dexie';
 import { db } from './db';
-import { eskiSupabase } from './supabase';
+import { supabase } from './supabase';
 import { gorunur } from './ajanda';
 import { bugun, tarihEkle, tarihParse } from './paket';
 
@@ -38,7 +38,7 @@ export async function bildirimDurumu(): Promise<BildirimDurum> {
 
 /** Bu cihazda bildirimleri açar (izin ister, abone olur, aboneliği Supabase'e yazar). */
 export async function bildirimAc(): Promise<string | null> {
-  const sb = eskiSupabase();
+  const sb = supabase();
   if (!sb) return 'Bağlantı yok';
   const izin = await Notification.requestPermission();
   if (izin !== 'granted') return 'İzin verilmedi';
@@ -48,7 +48,7 @@ export async function bildirimAc(): Promise<string | null> {
   if (!ab) ab = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(VAPID_ACIK) });
   const j = ab.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
   const cihaz = /iPad/.test(navigator.userAgent) ? 'iPad' : /iPhone/.test(navigator.userAgent) ? 'iPhone' : /Android/.test(navigator.userAgent) ? 'Android' : 'Bilgisayar';
-  const r = await sb.from('cat_push_abone').upsert({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, cihaz });
+  const r = await sb.from('push_abone').upsert({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, cihaz });
   return r.error ? r.error.message : null;
 }
 
@@ -56,34 +56,34 @@ export async function bildirimKapat() {
   const reg = await navigator.serviceWorker.getRegistration();
   const ab = await reg?.pushManager.getSubscription();
   if (!ab) return;
-  await eskiSupabase()?.from('cat_push_abone').delete().eq('endpoint', ab.endpoint);
+  await supabase()?.from('push_abone').delete().eq('endpoint', ab.endpoint);
   await ab.unsubscribe();
 }
 
 export async function testBildirimi(): Promise<string | null> {
-  const r = await eskiSupabase()?.from('cat_bildirim').insert({ kaynak: 'ritos', baslik: 'Ritos', metin: 'Test bildirimi ✓ — kuyruk çalışıyor', ac: '/' });
+  const r = await supabase()?.from('bildirim').insert({ kaynak: 'ritos', baslik: 'Ritos', metin: 'Test bildirimi ✓ — kuyruk çalışıyor', ac: '/' });
   return r?.error ? r.error.message : null;
 }
 
 export interface KaynakDurum { kaynak: string; acik: boolean }
 export async function kaynaklar(): Promise<KaynakDurum[]> {
-  const sb = eskiSupabase();
+  const sb = supabase();
   if (!sb) return [];
   const [b, k] = await Promise.all([
-    sb.from('cat_bildirim').select('kaynak').order('olusturuldu', { ascending: false }).limit(300),
-    sb.from('cat_bildirim_kaynak').select('kaynak, acik'),
+    sb.from('bildirim').select('kaynak').order('olusturuldu', { ascending: false }).limit(300),
+    sb.from('bildirim_kaynak').select('kaynak, acik'),
   ]);
   const ad = new Set<string>(['ritos', ...(b.data ?? []).map((x) => x.kaynak as string), ...(k.data ?? []).map((x) => x.kaynak as string)]);
   return Array.from(ad).map((kaynak) => ({ kaynak, acik: (k.data ?? []).find((x) => x.kaynak === kaynak)?.acik ?? true }));
 }
 export async function kaynakAyarla(kaynak: string, acik: boolean) {
-  await eskiSupabase()?.from('cat_bildirim_kaynak').upsert({ kaynak, acik });
+  await supabase()?.from('bildirim_kaynak').upsert({ kaynak, acik });
 }
 
 // ———————— Ritos kart hatırlatmaları → kuyruk ————————
 // 🔔 ayarlı kartların önümüzdeki 8 günlük bildirimleri kuyruğa yazılır (anahtar: kart:<id>:<gün>);
-// kart değişince, silinince ya da yapıldı işaretlenince plan yenilenir. Kart içerikleri şifreli
-// kalır; kuyruğa yalnız başlık (ya da tercihe göre nötr metin) gider.
+// kart değişince, silinince ya da yapıldı işaretlenince plan yenilenir. Kuyruğa yalnız başlık
+// (ya da tercihe göre nötr metin) gider.
 const ADI_GOSTER = 'ritos-bildirim-kart-adi';
 const SON_PLAN = 'ritos-bildirim-son-plan';
 export function kartAdiGoster(): boolean { try { return localStorage.getItem(ADI_GOSTER) !== '0'; } catch { return true; } }
@@ -101,7 +101,7 @@ function zamanHesapla(t: string, h: { gun: number; dk?: number | null; saat?: st
 
 let calisiyor = false;
 export async function hatirlatmalariPlanla() {
-  const sb = eskiSupabase();
+  const sb = supabase();
   if (!sb || calisiyor) return;
   const { data: oturum } = await sb.auth.getSession();
   if (!oturum.session) return;
@@ -133,12 +133,12 @@ export async function hatirlatmalariPlanla() {
     try { onceki = localStorage.getItem(SON_PLAN); } catch { /* yoksay */ }
     if (onceki === imza) return;
     // Artık planda olmayan, gönderilmemiş kart bildirimlerini sil; yenileri yaz/güncelle.
-    const { data: mevcut } = await sb.from('cat_bildirim').select('id, anahtar').eq('kaynak', 'ritos').is('gonderildi', null).like('anahtar', 'kart:%');
+    const { data: mevcut } = await sb.from('bildirim').select('id, anahtar').eq('kaynak', 'ritos').is('gonderildi', null).like('anahtar', 'kart:%');
     const yeni = new Set(satirlar.map((s) => s.anahtar));
     const silinecek = (mevcut ?? []).filter((m) => !yeni.has(m.anahtar as string)).map((m) => m.id as string);
-    if (silinecek.length) await sb.from('cat_bildirim').delete().in('id', silinecek);
+    if (silinecek.length) await sb.from('bildirim').delete().in('id', silinecek);
     if (satirlar.length) {
-      const r = await sb.from('cat_bildirim').upsert(satirlar, { onConflict: 'alici,anahtar' });
+      const r = await sb.from('bildirim').upsert(satirlar, { onConflict: 'alici,anahtar' });
       if (r.error) return;
     }
     try { localStorage.setItem(SON_PLAN, imza); } catch { /* yoksay */ }

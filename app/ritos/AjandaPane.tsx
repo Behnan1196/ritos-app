@@ -18,7 +18,6 @@ import { gorevler, type BDugum } from '@/lib/belge';
 import { KlasorSecModal } from './Kutuphane';
 import { ajandadanKaydet } from '@/lib/kutuphane';
 import { db, type ProgramRow } from '@/lib/db';
-import { ortakGonder } from '@/lib/danismanlik';
 import { isUstlen } from '@/lib/cevrem';
 import { KAYNAK_TUR, filtreVar, filtreOku, filtreYaz, kaynakBilgi, uyar, type Filtre, type KaynakTur } from '@/lib/kaynakFiltre';
 
@@ -542,7 +541,7 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
           else await yapildiAyarla(kart.id, tarih, true);
         }}>✓ Yapıldı</button>
       )}
-      {tekSil && <OnayKutusu metin={kart.ortak ? 'Ortak kart herkesin ajandasından kaldırılsın mı?' : 'Kart silinsin mi?'} evet="Sil" onVazgec={() => setTekSil(false)} onEvet={() => (kart.ortak ? ortakGonder({ o: 'kart-sil', id: kart.id.replace(/^o-/, ''), zaman: Date.now() }) : kartKaldir(kart.id, tarih, 'tamamen')).then(onKapat)} />}
+      {tekSil && <OnayKutusu metin={kart.ortak ? 'Ortak kart herkesin ajandasından kaldırılsın mı?' : 'Kart silinsin mi?'} evet="Sil" onVazgec={() => setTekSil(false)} onEvet={() => kartKaldir(kart.id, tarih, 'tamamen').then(onKapat)} />}
       {tasiAcik && (
         <>
           <label className="rt-alan"><span>Yeni gün</span><input className="rt-inp" type="date" value={yeniTarih} onChange={(e) => setYeniTarih(e.target.value)} /></label>
