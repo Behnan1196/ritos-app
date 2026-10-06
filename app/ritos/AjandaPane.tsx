@@ -322,7 +322,9 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
   const belge = kart.bloklar.find((b): b is Extract<Blok, { tur: 'belge' }> => b.tur === 'belge');
   const gorevSay = belge ? gorevler(belge.belge as BDugum).length : 0;
   const isaretli = ((kayit?.degerler as { liste?: number[] } | null)?.liste ?? []).length;
-  const ekMeta = [videoSay ? `🎬 ${videoSay}` : '', gorevSay ? `☑ ${isaretli}/${gorevSay}` : ''].filter(Boolean).join(' ');
+  // 7 ekim: değer istenen "yap" kartı (ör. Haftalık tartı) satırda belli olsun: ✎ ve neyin sorulacağı.
+  const sorulan = kayitBl.filter((b) => b.anahtar !== SURE_ANAHTAR);
+  const ekMeta = [videoSay ? `🎬 ${videoSay}` : '', gorevSay ? `☑ ${isaretli}/${gorevSay}` : '', !yapildi && sorulan.length ? `📏 ${sorulan.map((b) => b.etiket).join(' · ')}` : ''].filter(Boolean).join(' ');
   function isaretle() {
     if (yapildi) { yapildiAyarla(kart.id, tarih, false); setDegerAcik(false); return; }
     if (sayac) { sayacBitti(); return; }
@@ -347,7 +349,7 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
         ) : kart.tip === 'kaydet' ? (
           <button type="button" className={`rt-chk${yapildi ? ' on' : ''}`} disabled={kilitli} title={kilitli ? 'Düzeltme süresi geçti' : undefined} onClick={() => setDegerAcik((v) => !v)} aria-label="Değer gir">{yapildi ? '✓' : '✎'}</button>
         ) : (
-          <button type="button" className={`rt-chk${yapildi ? ' on' : ''}`} disabled={kilitli} title={kilitli ? 'Düzeltme süresi geçti' : undefined} onClick={isaretle} aria-label="Yapıldı">{yapildi ? '✓' : ''}</button>
+          <button type="button" className={`rt-chk${yapildi ? ' on' : ''}`} disabled={kilitli} title={kilitli ? 'Düzeltme süresi geçti' : undefined} onClick={isaretle} aria-label={sorulan.length ? 'Değer gir' : 'Yapıldı'}>{yapildi ? '✓' : sorulan.length ? '✎' : ''}</button>
         )}
         <button type="button" className="rt-kart-ad" onClick={kart.izinler.ac ? onAc : undefined}>
           <span className="t">{kart.ad}{yeniGuncel && <span className="rt-rozet guncel">güncellendi</span>}</span>
