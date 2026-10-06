@@ -482,8 +482,8 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
       {/* 7 ekim: ölçü isteyen kartta değerler doğrudan burada girilir; kaydedince kart yapıldı olur. */}
       {olcular.some((o) => o.bicim !== 'adet') && !sureli && !kilitliDetay && (
         <DegerGir key={kayitCanli?.guncellendi ?? 0} bloklar={kart.bloklar} ilk={kayitCanli?.degerler ?? null}
-          onKaydet={async (d) => { await degerKaydet(kart.id, tarih, d); }}
-          onSadeceIsaretle={kayitCanli?.yapildi ? undefined : async () => { await yapildiAyarla(kart.id, tarih, true); }} />
+          onKaydet={async (d) => { await degerKaydet(kart.id, tarih, d); onKapat(); }}
+          onSadeceIsaretle={kayitCanli?.yapildi ? undefined : async () => { await yapildiAyarla(kart.id, tarih, true); onKapat(); }} />
       )}
       {olcular.some((o) => o.bicim !== 'adet') && sureli && detaySure === null && <p className="rt-muted">📏 Bitince sorulur: {olcular.filter((o) => o.bicim !== 'adet').map((o) => o.etiket + (o.birim && o.bicim !== 'olcek' ? ` (${o.birim})` : '')).join(', ')}</p>}
     </div>
