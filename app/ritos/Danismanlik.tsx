@@ -50,7 +50,7 @@ export function DanismanlikAyarlari() {
   return (
     <Kap baslik="Danışmanlık">
       {!d.etkin ? (
-        <p className="rt-muted">Koçla çalışmak ya da koç olmak için hesapla giriş yapman gerekir; programlar ve işaretler iki taraf arasında şifreli gider.</p>
+        <p className="rt-muted">Danışmanlık bağlanıyor… Bir süre sonra hâlâ bu yazıyı görüyorsan sayfayı yenile.</p>
       ) : (
         <>
           {d.profil?.koc ? (
@@ -61,13 +61,15 @@ export function DanismanlikAyarlari() {
                 <OnayKutusu metin="Koç araçları kapanır. Danışanlarının programları kesilmez; ilişkiler sürer." evet="Kapat" onVazgec={() => setKapat(false)} onEvet={async () => { await kocKapat(); setKapat(false); }} />
               ) : (
                 <div className="rt-satir">
+                  <button type="button" className="rt-btn" onClick={() => setKocModal(true)}>Alanları düzenle</button>
                   <button type="button" className="rt-btn tehlike" onClick={() => setKapat(true)}>Koçluğu kapat</button>
                 </div>
               )}
             </>
           ) : (
             <>
-              <p className="rt-muted">Danışanlarla çalışıyorsan Home&apos;daki Danışmanlık satırında ＋ ile alanını (ör. Beslenme) ekle.</p>
+              <p className="rt-muted">Danışanlarla çalışıyorsan (diyetisyen, antrenör, sınav koçu…) koç modunu aç. Home&apos;da 🧑‍⚕️ Danışanlarım belirir; davet, program ve takip oradan.</p>
+              <div className="rt-satir"><button type="button" className="rt-btn primary" onClick={() => setKocModal(true)}>Koç olarak çalış</button></div>
             </>
           )}
 
@@ -82,7 +84,7 @@ export function DanismanlikAyarlari() {
               ))}
             </div>
           )}
-          {danisanlar.length > 0 && <p className="rt-muted">{danisanlar.filter((x) => x.durum === 'aktif').length} aktif danışan — Home &gt; Danışmanlık&apos;tan yönetirsin.</p>}
+          {danisanlar.length > 0 && <p className="rt-muted">{danisanlar.filter((x) => x.durum === 'aktif').length} aktif danışan — Home › 🧑‍⚕️ Danışanlarım&apos;dan yönetirsin.</p>}
           {d.hata && <p className="rt-hata">⚠ {d.hata}</p>}
         </>
       )}
