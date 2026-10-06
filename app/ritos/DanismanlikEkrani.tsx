@@ -127,9 +127,9 @@ export function DanismanlikEkrani({ disiplin, dar, onKapat, onAjanda, onSinavPak
               <b>{il.danisan_ad}</b>
               <span className="rt-muted">{il.durum === 'aktif' ? `${new Date(il.olusturuldu).toLocaleDateString('tr-TR')}'den beri` : 'sonlandı'}</span>
             </span>
-            {il.durum === 'aktif' && <button type="button" className="rt-btn primary" onClick={onAjanda}>👥 Çevrem🗂 Atölye&apos;de planlaapos;de planla</button>}
+            {il.durum === 'aktif' && <button type="button" className="rt-btn primary" onClick={onAjanda}>🧑‍⚕️ Danışanlarım&apos;da planla</button>}
           </div>
-          <p className="rt-muted">Haftasını planlamak, uyumunu ve ölçümlerini görmek için 👥 Çevrem.</p>
+          <p className="rt-muted">Haftasını planlamak, uyumunu ve ölçümlerini görmek için Home › 🧑‍⚕️ Danışanlarım.</p>
           {il.durum === 'aktif' && <button type="button" className="rt-linkbtn" onClick={() => setBitir(true)}>Danışmanlığı sonlandır</button>}
         </div>
       )}

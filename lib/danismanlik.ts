@@ -76,11 +76,14 @@ export interface Tasima {
 
 function hata(e: { message: string } | null) { if (e) throw new Error(e.message); }
 
+// 7 ekim — v1 köprüsü: yeni projenin şifresiz tabloları (supabase/v1/04-danismanlik.sql).
+// Anahtar işlemleri boştur (DUZ); aile/grup işleri artık lib/cevrem.ts'de.
 function supabaseTasima(uid: string): Tasima {
   const sb = supabase()!;
+  const yok = (ne: string) => { throw new Error(`${ne} şimdilik yok.`); };
   return {
     async profil() {
-      const r = await sb.from('cat_profil').select('gorunen_ad, koc, koc_disiplinler, koc_baslangic').eq('id', uid).maybeSingle();
+      const r = await sb.from('profil').select('gorunen_ad, koc, koc_disiplinler, koc_baslangic').eq('id', uid).maybeSingle();
       hata(r.error);
       return r.data ? { ad: r.data.gorunen_ad, koc: !!r.data.koc, disiplinler: r.data.koc_disiplinler ?? [], koc_baslangic: r.data.koc_baslangic } : null;
     },
@@ -89,122 +92,56 @@ function supabaseTasima(uid: string): Tasima {
       if (p.koc !== undefined) satir.koc = p.koc;
       if (p.disiplinler) satir.koc_disiplinler = p.disiplinler;
       if (p.koc_baslangic !== undefined) satir.koc_baslangic = p.koc_baslangic;
-      hata((await sb.from('cat_profil').update(satir).eq('id', uid)).error);
+      hata((await sb.from('profil').update(satir).eq('id', uid)).error);
     },
-    async ozelAnahtarim() {
-      const [a, k] = await Promise.all([
-        sb.from('cat_acik_anahtar').select('acik').eq('id', uid).maybeSingle(),
-        sb.from('cat_anahtar').select('cift_sifreli').eq('id', uid).maybeSingle(),
-      ]);
-      hata(a.error); hata(k.error);
-      return a.data?.acik && k.data?.cift_sifreli ? { acik: a.data.acik, ozel: k.data.cift_sifreli } : null;
-    },
-    async anahtarKoy(acik, ozel) {
-      const r = await sb.rpc('cat_anahtar_cifti_koy', { p_acik: acik, p_ozel: ozel });
-      hata(r.error);
-      const s = (r.data as { acik: string; ozel: string }[])[0];
-      if (!s?.ozel) throw new Error('Anahtar çifti kaydedilemedi');
-      return s;
-    },
-    async acikAnahtar(kisi) {
-      const r = await sb.from('cat_acik_anahtar').select('acik').eq('id', kisi).maybeSingle();
-      hata(r.error);
-      return r.data?.acik ?? null;
-    },
+    async ozelAnahtarim() { return { acik: 'duz', ozel: 'duz' }; },
+    async anahtarKoy() { return { acik: 'duz', ozel: 'duz' }; },
+    async acikAnahtar() { return 'duz'; },
     async iliskiler() {
-      const r = await sb.from('cat_iliski').select('id, koc, danisan, disiplin, koc_ad, danisan_ad, durum, olusturuldu, sonlandi');
+      const r = await sb.from('iliski').select('id, koc, danisan, disiplin, koc_ad, danisan_ad, durum, olusturuldu, sonlandi');
       hata(r.error);
       return (r.data ?? []) as IliskiRow[];
     },
     async davetOlustur(kod, disiplin, kocAd, alici) {
-      const r = await sb.from('cat_davet').insert({ kod, koc: uid, koc_ad: kocAd, disiplin, ...(alici ? { alici } : {}) });
-      // cat-08 henüz çalıştırılmadıysa 'alici' sütunu yok: onsuz dene (davet yine çalışsın).
-      if (r.error && alici && /alici/.test(r.error.message)) { hata((await sb.from('cat_davet').insert({ kod, koc: uid, koc_ad: kocAd, disiplin })).error); return; }
-      hata(r.error);
+      hata((await sb.from('dan_davet').insert({ kod, koc: uid, koc_ad: kocAd, disiplin, ...(alici && /^[0-9a-f-]{36}$/.test(alici) ? { alici } : {}) })).error);
     },
     async davetler() {
-      const r = await sb.from('cat_davet').select('kod, disiplin, son, kullanildi, alici').eq('koc', uid).order('olusturuldu', { ascending: false });
-      if (r.error && /alici/.test(r.error.message)) {
-        const r2 = await sb.from('cat_davet').select('kod, disiplin, son, kullanildi').eq('koc', uid).order('olusturuldu', { ascending: false });
-        hata(r2.error);
-        return (r2.data ?? []) as DavetSatir[];
-      }
+      const r = await sb.from('dan_davet').select('kod, disiplin, son, kullanildi, alici').eq('koc', uid).order('olusturuldu', { ascending: false });
       hata(r.error);
       return (r.data ?? []) as DavetSatir[];
     },
-    async davetSil(kod) { hata((await sb.from('cat_davet').delete().eq('kod', kod)).error); },
+    async davetSil(kod) { hata((await sb.from('dan_davet').delete().eq('kod', kod)).error); },
     async davetBak(kod) {
-      const r = await sb.rpc('cat_davet_bak', { p_kod: kod });
+      const r = await sb.rpc('dan_davet_bak', { p_kod: kod });
       hata(r.error);
       return (r.data as { koc_ad: string; disiplin: string; gecerli: boolean; kendi: boolean }[])[0] ?? null;
     },
     async davetYanit(kod, kabul) {
-      const r = await sb.rpc('cat_davet_yanit', { p_kod: kod, p_kabul: kabul });
+      const r = await sb.rpc('dan_davet_yanit', { p_kod: kod, p_kabul: kabul });
       hata(r.error);
       return (r.data as string | null) ?? null;
     },
-    async sonlandir(id) { hata((await sb.rpc('cat_iliski_sonlandir', { p_id: id })).error); },
-    async aileGorevIliski(uye) {
-      const r = await sb.rpc('cat_aile_gorev_iliski', { p_uye: uye });
-      hata(r.error);
-      return r.data as string;
-    },
+    async sonlandir(id) { hata((await sb.rpc('iliski_sonlandir', { p_id: id })).error); },
+    async aileGorevIliski() { return yok('Aile içinde görev verme (Çevrem › Birinden iste kullan)'); },
     async mesajGonder(iliski, alici, veri) {
-      hata((await sb.from('cat_mesaj').insert({ iliski, gonderen: uid, alici, veri })).error);
+      hata((await sb.from('mesaj').insert({ iliski, gonderen: uid, alici, veri })).error);
     },
     async mesajCek(sonra) {
-      const r = await sb.from('cat_mesaj').select('sira, iliski, gonderen, veri').eq('alici', uid).gt('sira', sonra).order('sira').limit(200);
+      const r = await sb.from('mesaj').select('sira, iliski, gonderen, veri').eq('alici', uid).gt('sira', sonra).order('sira').limit(200);
       hata(r.error);
       return (r.data ?? []) as UzakMesaj[];
     },
-    async kisiBul(eposta) {
-      const r = await sb.rpc('cat_kisi_bul', { p_eposta: eposta });
-      hata(r.error);
-      return (r.data as { id: string; gorunen_ad: string }[] | null)?.[0] ?? null;
-    },
-    async davetGonder(alici, paket) {
-      hata((await sb.rpc('cat_gonder', { p_alici: alici, p_kaynak: 'dogrudan', p_paket: paket })).error);
-    },
-    async aileler() {
-      const ben = await sb.from('cat_aile_uye').select('aile').eq('uye', uid).in('durum', ['davet', 'aktif']);
-      hata(ben.error);
-      const idler = (ben.data ?? []).map((x) => x.aile as string);
-      if (!idler.length) return [];
-      const [a, u] = await Promise.all([
-        sb.from('cat_aile').select('id, ad, kurucu, anahtar_surum, tur').in('id', idler),
-        sb.from('cat_aile_uye').select('aile, uye, ad, rol, durum').in('aile', idler),
-      ]);
-      hata(a.error); hata(u.error);
-      return (a.data ?? []).map((x) => ({ ...x, uyeler: (u.data ?? []).filter((y) => y.aile === x.id).map(({ aile: _, ...y }) => y) })) as AileRow[];
-    },
-    async aileKur(ad, tur) { const r = await sb.rpc('cat_aile_kur', { p_ad: ad, p_tur: tur }); hata(r.error); return r.data as string; },
-    async aileDavet(aile, eposta) { const r = await sb.rpc('cat_aile_davet', { p_aile: aile, p_eposta: eposta }); hata(r.error); return r.data as string; },
-    async aileYanit(aile, kabul) { hata((await sb.rpc('cat_aile_yanit', { p_aile: aile, p_kabul: kabul })).error); },
-    async aileAyril(aile, uye) { hata((await sb.rpc('cat_aile_ayril', { p_aile: aile, p_uye: uye })).error); },
-    async aileAnahtarlarim(aile) {
-      const r = await sb.from('cat_aile_anahtar').select('surum, saran, sarili').eq('aile', aile).eq('uye', uid);
-      hata(r.error);
-      return (r.data ?? []) as { surum: number; saran: string; sarili: string }[];
-    },
-    async aileAnahtarYaz(satirlar) {
-      // upsert (ON CONFLICT) RLS'e takılıyordu: önce benim sardıklarımı oku, yalnız eksikleri düz insert et.
-      const { aile, surum } = satirlar[0];
-      const r = await sb.from('cat_aile_anahtar').select('uye').eq('aile', aile).eq('surum', surum).eq('saran', uid);
-      hata(r.error);
-      const var_ = new Set((r.data ?? []).map((x) => x.uye as string));
-      for (const s of satirlar.filter((x) => !var_.has(x.uye))) {
-        const e = (await sb.from('cat_aile_anahtar').insert(s)).error;
-        if (e && e.code !== '23505') hata(e); // 23505: aynı anda başka cihaz yazmış — sorun değil
-      }
-    },
-    async aileMesajGonder(aile, surum, veri) {
-      hata((await sb.from('cat_aile_mesaj').insert({ aile, gonderen: uid, anahtar_surum: surum, veri })).error);
-    },
-    async aileMesajCek(aile, sonra) {
-      const r = await sb.from('cat_aile_mesaj').select('sira, gonderen, anahtar_surum, veri').eq('aile', aile).gt('sira', sonra).order('sira').limit(200);
-      hata(r.error);
-      return (r.data ?? []) as { sira: number; gonderen: string; anahtar_surum: number; veri: string }[];
-    },
+    async kisiBul() { return yok("E-postayla davet (bağlantıyı gönder)"); },
+    async davetGonder() { return yok('E-postayla davet'); },
+    async aileler() { return []; },
+    async aileKur() { return yok('Bu işlem Çevrem\'de'); },
+    async aileDavet() { return yok('Bu işlem Çevrem\'de'); },
+    async aileYanit() { yok('Bu işlem Çevrem\'de'); },
+    async aileAyril() { yok('Bu işlem Çevrem\'de'); },
+    async aileAnahtarlarim() { return []; },
+    async aileAnahtarYaz() { /* yok */ },
+    async aileMesajGonder() { /* yok */ },
+    async aileMesajCek() { return []; },
   };
 }
 
@@ -233,7 +170,7 @@ let cift: AnahtarCifti | null = null;
 const iliskiAnahtarlari = new Map<string, CryptoKey>();
 let calisiyor: Promise<void> | null = null;
 
-export function danismanlikBaslat(kullanici: string, anahtar: CryptoKey, tasima?: Tasima) {
+export function danismanlikBaslat(kullanici: string, anahtar: CryptoKey | null = null, tasima?: Tasima) {
   t = tasima ?? supabaseTasima(kullanici);
   uid = kullanici;
   dek = anahtar;
@@ -255,13 +192,20 @@ async function profilYenile() {
 }
 
 function tasimaVar(): Tasima {
-  if (!t || !uid || !dek) throw new Error('Danışmanlık için hesapla giriş yapmış olmalısın.');
+  if (!t || !uid) throw new Error('Danışmanlık için hesapla giriş yapmış olmalısın.');
   return t;
 }
 
 // ———————————————— anahtarlar ————————————————
 
+// 7 ekim — v1: şifre yok. Mesaj "zarfı" düz JSON metnidir; anahtar işlemleri boştur.
+const DUZ = true;
+const DUZ_ANAHTAR = {} as CryptoKey;
+async function zarfla(k: CryptoKey, x: unknown): Promise<string> { return DUZ ? JSON.stringify(x) : sifrele(k, x); }
+async function zarfAc<T>(k: CryptoKey, v: string): Promise<T> { return DUZ ? JSON.parse(v) as T : coz<T>(k, v); }
+
 async function anahtarGaranti(): Promise<AnahtarCifti> {
+  if (DUZ) return { ozel: DUZ_ANAHTAR, acik: 'duz' };
   if (cift) return cift;
   const tt = tasimaVar();
   const var_ = await tt.ozelAnahtarim();
@@ -275,6 +219,7 @@ async function anahtarGaranti(): Promise<AnahtarCifti> {
 }
 
 async function iliskiAnahtari(il: IliskiRow): Promise<CryptoKey | null> {
+  if (DUZ) return DUZ_ANAHTAR;
   const k = iliskiAnahtarlari.get(il.id);
   if (k) return k;
   const c = await anahtarGaranti();
@@ -329,7 +274,7 @@ async function gidenleriGonder() {
     if (!il || il.durum !== 'aktif') { await db.giden.delete(g.id); continue; }
     const k = await iliskiAnahtari(il);
     if (!k) continue;
-    await tt.mesajGonder(il.id, g.alici, await sifrele(k, g.icerik));
+    await tt.mesajGonder(il.id, g.alici, await zarfla(k, g.icerik));
     await gittiIsaretle(g.icerik as MesajIcerik);
     await db.giden.delete(g.id);
   }
@@ -348,7 +293,7 @@ async function mesajlariCek() {
       const k = il ? await iliskiAnahtari(il) : null;
       if (il && !k) return; // anahtar henüz yok: imleç ilerlemez, sonraki turda yeniden denenir (mesaj kaybolmaz)
       if (il && k) {
-        try { await mesajIsle(il, await coz<MesajIcerik>(k, m.veri)); }
+        try { await mesajIsle(il, await zarfAc<MesajIcerik>(k, m.veri)); }
         catch (e) { console.warn('[ritos] mesaj işlenemedi', e); }
       }
       sira = Number(m.sira);
@@ -786,7 +731,7 @@ export function tetikle(ms = 300) {
 }
 
 export async function danismanlikTur(): Promise<void> {
-  if (!t || !uid || !dek) return;
+  if (!t || !uid) return;
   if (calisiyor) return calisiyor;
   calisiyor = (async () => {
     try {
@@ -977,7 +922,7 @@ export async function aileAyril(aile: string, kisi: string | null = null) {
 
 // ———————————————— kancaları bağla ————————————————
 
-senkronKancalari.basla = (k, a) => danismanlikBaslat(k, a);
+senkronKancalari.basla = (k) => danismanlikBaslat(k);
 senkronKancalari.tur = danismanlikTur;
 senkronKancalari.dur = danismanlikDurdur;
 ajandaKancalari.uzakGeriBildirim = geriBildirimKuyrugu;

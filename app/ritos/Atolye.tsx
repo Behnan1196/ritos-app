@@ -49,7 +49,7 @@ type Durum = { ekran: Ekran; alan: string | null; tarih: string | null; hafta: b
 const yeniDurum = (): Durum => ({ ekran: 'liste', alan: null, tarih: null, hafta: true, dosya: 'plan', sag: 'gelisim' });
 const DURUMLAR: Record<Kapsam, Durum> = { cevre: yeniDurum(), kendim: yeniDurum() };
 const alanSekDurum: { sek: AlanSek } = { sek: 'malzeme' };
-export const KAPSAM_AD: Record<Kapsam, string> = { cevre: 'ÇEVREM', kendim: 'RUTİNLERİM' };
+export const KAPSAM_AD: Record<Kapsam, string> = { cevre: 'DANIŞANLARIM', kendim: 'RUTİNLERİM' };
 // Başka ekrandan "planla" (hedef önceden seçili): liste atlanır. Sekme henüz açık değilken de yakalanır.
 if (typeof window !== 'undefined') {
   window.addEventListener('ritos-atolyeye-git', () => { DURUMLAR.cevre.ekran = 'hedef'; DURUMLAR.cevre.dosya = 'plan'; });

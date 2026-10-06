@@ -20,6 +20,7 @@ import { disiplinAdi, useDanismanlik } from '@/lib/danismanlik';
 import { sayiMetin } from '@/lib/olcum';
 import { NotlarWidget } from './Notlar';
 import { CevremListeleriWidget } from './Cevrem';
+import Atolye from './Atolye';
 import { grupIkonu, useCevrem } from '@/lib/cevrem';
 import { GelenlerEkrani, useGelenlerOzeti } from './Sohbet';
 import { Cizgi, OlcumlerListesi, useOlcumler } from './Olcum';
@@ -37,7 +38,7 @@ interface Widget {
 
 const DUZEN_ANAH = 'ritos-home-duzen';
 interface Duzen { sira: string[]; gizli: string[]; sabit: Record<string, boolean> }
-const VARSAYILAN_SIRA = ['gelenler', 'notlar', 'ortak', 'koc', 'olcum'];
+const VARSAYILAN_SIRA = ['gelenler', 'notlar', 'ortak', 'danisanlar', 'koc', 'olcum'];
 function duzenOku(): Duzen {
   try { const d = JSON.parse(localStorage.getItem(DUZEN_ANAH) ?? 'null'); if (d?.sira) return { sira: d.sira, gizli: d.gizli ?? [], sabit: d.sabit ?? {} }; } catch { /* yoksay */ }
   return { sira: VARSAYILAN_SIRA, gizli: [], sabit: {} };
@@ -46,6 +47,8 @@ function duzenYaz(d: Duzen) { try { localStorage.setItem(DUZEN_ANAH, JSON.string
 
 // Oturum boyunca: hangi yerinde widget açık, hangi tam ekran açık (sekme değişince korunur).
 const oturum: { acik: Record<string, boolean>; ekran: string | null } = { acik: {}, ekran: null };
+/** Home'u belirli bir tam ekran widget'la aç (ör. danışmanlıktan "Danışanlarım'da planla"). */
+export function homeEkraniAc(k: string | null) { oturum.ekran = k; }
 
 const host = (url: string) => { try { return new URL(urlDoldur(url)).host; } catch { return ''; } };
 
@@ -58,7 +61,8 @@ function useWidgetler(): Widget[] {
   // 7 ekim: ortak listeler Çevrem'den (sunucu + Realtime)
   const cv = useCevrem();
   const ortak = cv.gruplar.length ? { gruplar: cv.gruplar, listeler: cv.listeler, acikSay: cv.maddeler.filter((m) => !m.isaretli).length } : null;
-  const koclar = useIliskiler().filter((x) => x.danisan === dn.uid && x.durum === 'aktif' && x.disiplin !== 'aile');
+  const tumIliskiler = useIliskiler();
+  const koclar = tumIliskiler.filter((x) => x.danisan === dn.uid && x.durum === 'aktif' && x.disiplin !== 'aile');
   const olcum = useOlcumler();
   const bag = useCanli(baglantilar, [], [] as BaglantiRow[]);
   const [bagAyar, setBagAyar] = useState<BaglantiRow | null>(null);
@@ -101,6 +105,15 @@ function useWidgetler(): Widget[] {
           <p className="rt-muted">Koçunun kartları Ajandam&apos;da &quot;Koçum&quot; kaynağıyla görünür; karta not ve haftalık değerlendirme oradan.</p>
         </div>
       ) });
+  }
+
+  // 7 ekim — danışmanlık Çevrem'den Home'a taşındı: koç tarafı tam ekran "Danışanlarım" (Atölye kapsam: çevre).
+  if (dn.profil?.koc) {
+    const danisanlar = tumIliskiler.filter((x) => x.koc === dn.uid && x.durum === 'aktif' && x.disiplin !== 'aile');
+    w.push({ k: 'danisanlar', ic: '🧑‍⚕️', ad: 'Danışanlarım', mod: 'ekran',
+      durum: danisanlar.length ? <><b>{danisanlar.length}</b> danışan · {Array.from(new Set(danisanlar.map((x) => disiplinAdi(x.disiplin)))).join(', ')}</> : 'Henüz danışan yok · davet et',
+      imza: danisanlar.map((x) => x.id).join(','),
+      govde: () => <Atolye genis={false} kapsam="cevre" /> });
   }
 
   if (olcum.length) {

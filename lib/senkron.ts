@@ -15,9 +15,9 @@ import { supabase } from './supabase';
 
 // Danışmanlık motoru senkronla birlikte çalışır (lib/danismanlik.ts doldurur).
 // 7 ekim: v1 şemada danışmanlık tablolarla yeniden kurulana kadar kancalar çağrılmaz (DANISMANLIK_ACIK).
-const DANISMANLIK_ACIK = false;
+const DANISMANLIK_ACIK = true; // 7 ekim: v1 köprüsü (04-danismanlik.sql) ile açık
 export const senkronKancalari: {
-  basla?: (uid: string, dek: CryptoKey) => void;
+  basla?: (uid: string) => void;
   tur?: () => Promise<void>;
   dur?: () => void;
 } = {};
@@ -73,8 +73,11 @@ export async function senkronBaslat(kullanici: string) {
   if (sb) {
     kanal = sb.channel(`kayit-${kullanici}-${Math.random().toString(36).slice(2, 8)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'kayit', filter: `sahip=eq.${kullanici}` }, () => zamanla(300))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mesaj', filter: `alici=eq.${kullanici}` }, () => zamanla(300))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'iliski' }, () => zamanla(300))
       .subscribe();
   }
+  if (DANISMANLIK_ACIK) senkronKancalari.basla?.(kullanici);
   window.addEventListener('focus', odak);
   window.addEventListener('online', odak);
   aralik = setInterval(() => { if (document.visibilityState === 'visible') zamanla(0); }, 30_000);

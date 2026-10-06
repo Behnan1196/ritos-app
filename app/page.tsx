@@ -20,7 +20,7 @@ import Atolye from './ritos/Atolye';
 import { DavetKarsilama } from './ritos/Danismanlik';
 import { SenkronIsareti, useGelenSenkron } from './ritos/Paylasim';
 import { GelenlerEkrani, useGelenlerOzeti } from './ritos/Sohbet';
-import { HomeEkrani } from './ritos/HomeEkrani';
+import { HomeEkrani, homeEkraniAc } from './ritos/HomeEkrani';
 import { CikisOnayi, GirisEkrani, HesapEkrani, KullaniciRozeti, type HesapEkran, SifreSifirlaEkrani } from './ritos/Hesap';
 import Cevrem from './ritos/Cevrem';
 import { useCevremBaslat } from '@/lib/cevrem';
@@ -66,12 +66,14 @@ function RitosUygulama() {
     const f = () => setSekme('gunum');
     // Atölye'ye git (ör. Ayarlar › Aile › Görev ver, Danışmanlık › Atölye'de planla): hedef önceden seçilir.
     const a = () => { setHesap(null); setSekme('atolye'); setSag('atolye'); };
+    // 7 ekim: danışmanlık Home'da — "Atölye'de planla" artık Home › Danışanlarım'ı açar.
+    const d = () => { homeEkraniAc('danisanlar'); setHesap(null); setSekme('home'); setSag('home'); };
     const r = () => { setHesap(null); setSekme('rutin'); setSag('rutin'); };
     window.addEventListener('ritos-ajandaya-git', f);
-    window.addEventListener('ritos-atolyeye-git', a);
+    window.addEventListener('ritos-atolyeye-git', d);
     window.addEventListener('ritos-rutinlere-git', r);
     try { if (new URL(location.href).searchParams.has('katil')) a(); } catch { /* yoksay */ } // davet bağlantısı → Çevrem
-    return () => { window.removeEventListener('ritos-ajandaya-git', f); window.removeEventListener('ritos-atolyeye-git', a); window.removeEventListener('ritos-rutinlere-git', r); };
+    return () => { window.removeEventListener('ritos-ajandaya-git', f); window.removeEventListener('ritos-atolyeye-git', d); window.removeEventListener('ritos-rutinlere-git', r); };
   }, []);
 
   useEffect(() => {
