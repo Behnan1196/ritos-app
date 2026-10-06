@@ -11,7 +11,7 @@ import { useOturum } from '@/lib/hesap';
 import { bugun, gunFarki, tarihEkle, tarihEtiket } from '@/lib/paket';
 import { adimEkle, aktifMi, ilerleme } from '@/lib/program';
 import {
-  DISIPLINLER, KOC_DENEME_GUN, danisanIzinKaydet, danisanIzinleri, ePostaDaveti, davetBak, davetOlustur, davetSil, davetYanit, davetler, disiplinAdi, kendimeAl, kocDenemeKalan,
+  DISIPLINLER, KOC_DENEME_GUN, banaGelenDavetler, danisanIzinKaydet, danisanIzinleri, ePostaDaveti, davetBak, davetOlustur, davetSil, davetYanit, davetler, disiplinAdi, kendimeAl, kocDenemeKalan,
   kocKapat, kocOl, kocProgramiAl, kocProgramiReddet, programAta, programGonder, programiSil, sablonKaydet, sonlandir,
   useDanismanlik, type DavetSatir, type KocPaketi,
 } from '@/lib/danismanlik';
@@ -221,7 +221,7 @@ export function DanisanSatiri({ il, onAc, secili }: { il: IliskiRow; onAc: () =>
 export function DavetModal({ onKapat, sabitDisiplin }: { onKapat: () => void; sabitDisiplin?: string }) {
   const d = useDanismanlik();
   const [disiplin, setDisiplin] = useState(sabitDisiplin ?? d.profil?.disiplinler[0] ?? 'sinav');
-  const [yol, setYol] = useState<'baglanti' | 'eposta'>('baglanti'); // 7 ekim: e-postayla davet şimdilik yok
+  const [yol, setYol] = useState<'baglanti' | 'eposta'>('eposta');
   const [eposta, setEposta] = useState('');
   const [sonuc, setSonuc] = useState<string | null>(null);
   const [gonderildi, setGonderildi] = useState<string | null>(null);
@@ -231,7 +231,8 @@ export function DavetModal({ onKapat, sabitDisiplin }: { onKapat: () => void; sa
   const secenekler = DISIPLINLER.filter(([k]) => !d.profil?.disiplinler.length || d.profil.disiplinler.includes(k));
   if (gonderildi) return (
     <Modal baslik={sabitDisiplin === 'sinav' ? 'Öğrenci davet et' : 'Danışan davet et'} onKapat={onKapat}>
-      <p className="rt-tamam">Davet {gonderildi} adlı kişinin Gelenler&apos;ine gönderildi. Kabul edince danışanların arasında görünür.</p>
+      <p className="rt-tamam">Davet hazır: <b>{gonderildi}</b></p>
+      <p className="rt-metin">Danışanına Ritos&apos;a bu e-postayla girmesini söyle; açılışta davetini görecek. Kabul edince danışanların arasında görünür.</p>
       <div className="rt-satir"><button type="button" className="rt-btn" onClick={onKapat}>Kapat</button></div>
     </Modal>
   );
@@ -244,12 +245,12 @@ export function DavetModal({ onKapat, sabitDisiplin }: { onKapat: () => void; sa
             <Chips secenekler={secenekler} deger={disiplin} onSec={setDisiplin} />
           </>}
           {/* V1 (28 eylül): bağlantı/QR kapalı — telefonda PWA yerine tarayıcıda açılıp yeniden giriş istiyor; mobil uygulamada (V2) çözülecek. */}
-          {V2 && false && <div style={{ marginTop: sabitDisiplin ? 0 : 12 }}><Chips<'baglanti' | 'eposta'> secenekler={[['eposta', 'E-postayla'], ['baglanti', 'Bağlantı / QR']]} deger={yol} onSec={setYol} /></div>}
+          <div style={{ marginTop: sabitDisiplin ? 0 : 12 }}><Chips<'baglanti' | 'eposta'> secenekler={[['eposta', 'E-postayla'], ['baglanti', 'Bağlantı / kod']]} deger={yol} onSec={setYol} /></div>
           {yol === 'baglanti'
             ? <p className="rt-muted" style={{ marginTop: 10 }}>Bağlantı tek kullanımlık, 7 gün geçerli. Danışanın bağlantıyı açar, Ritos hesabıyla girer (yoksa oluşturur) ve kabul eder. Bağlantı açılmazsa kodu Çevrem › Davet kodum var&apos;a yazabilir. Yüz yüzeysen QR kodu okutabilir.</p>
             : (
               <>
-                <p className="rt-muted" style={{ marginTop: 10 }}>Danışanın Ritos hesabı varsa davet Home › Gelenler&apos;e düşer; oradan kabul eder.</p>
+                <p className="rt-muted" style={{ marginTop: 10 }}>Danışanın Ritos&apos;a bu e-postayla girdiğinde davetini görür ve kabul eder. Hesabı yoksa aynı e-postayla kayıt olması yeter. Davet 30 gün geçerli.</p>
                 <input className="rt-inp" type="email" placeholder="Danışanın e-postası" value={eposta} onChange={(e) => setEposta(e.target.value)} />
               </>
             )}
@@ -630,6 +631,8 @@ function ProgrameGorevModal({ programlar, ilk, onKapat }: { programlar: ProgramR
 // ———————————————— davet karşılama (D2) ————————————————
 
 const DAVET = 'ritos-davet';
+// Bu oturumda kapatılan (yanıtlanmayan) e-posta davetleri yeniden açılmasın; uygulama yeniden açılınca tekrar sorulur.
+const ertelenen = new Set<string>();
 
 /** Kod elle girildi (Çevrem › Davet kodum var): danışmanlık davet penceresini aç. */
 export function danismanlikDavetiAc(kod: string) {
@@ -661,12 +664,19 @@ export function DavetKarsilama() {
     window.addEventListener('ritos-davet-kodu', oku);
     return () => window.removeEventListener('ritos-davet-kodu', oku);
   }, []);
+  // 7 ekim: e-postama gelmiş davet varsa (ve açık bir davet penceresi yoksa) onu aç.
+  useEffect(() => {
+    if (!d.etkin || kod) return;
+    let iptal = false;
+    banaGelenDavetler().then((l) => { const x = l.find((y) => !ertelenen.has(y.kod)); if (!iptal && x) setKod(x.kod); }).catch(() => {});
+    return () => { iptal = true; };
+  }, [d.etkin, kod]);
   useEffect(() => {
     if (!kod || !d.etkin) return;
     davetBak(kod).then((b) => setBilgi(b ?? 'yok')).catch((e) => setHata(e instanceof Error ? e.message : String(e)));
   }, [kod, d.etkin]);
   if (!kod || !o.hazir) return null;
-  const bitir = () => { try { localStorage.removeItem(DAVET); } catch { /* yoksay */ } setKod(null); };
+  const bitir = () => { if (kod) ertelenen.add(kod); try { localStorage.removeItem(DAVET); } catch { /* yoksay */ } setKod(null); };
 
   return (
     <Modal baslik="Danışmanlık daveti" onKapat={bitir}>
@@ -686,7 +696,7 @@ export function DavetKarsilama() {
         <>
           <p className="rt-metin"><b>{bilgi.koc_ad}</b> ({disiplinAdi(bilgi.disiplin)}) seni danışanı olarak eklemek istiyor.</p>
           <ul className="rt-maddeler">
-            <li>Koçun sana program gönderebilir; ilk program Gelenler&apos;e düşer, sen kabul edersin.</li>
+            <li>Koçunun gönderdiği programın kartları doğrudan Ajandam&apos;a düşer.</li>
             <li>Koçuna yalnız onun programlarındaki işaretlerin ve değerlerin gider. Kendi programların, yaşam alanların ve Ajanda&apos;nın geri kalanı gitmez.</li>
             <li>İstediğin zaman Ayarlar &gt; Danışmanlık&apos;tan sonlandırabilirsin.</li>
           </ul>
@@ -694,7 +704,7 @@ export function DavetKarsilama() {
           <div className="rt-satir" style={{ marginTop: 10 }}>
             <button type="button" className="rt-btn" onClick={async () => { try { await davetYanit(kod, false); bitir(); } catch (e) { setHata(e instanceof Error ? e.message : String(e)); } }}>Reddet</button>
             <button type="button" className="rt-btn primary" onClick={async () => {
-              try { await davetYanit(kod, true); setSonuc(`${bilgi.koc_ad} ile bağlandınız. Gönderdiği programlar Gelenler'ine düşecek.`); try { localStorage.removeItem(DAVET); } catch { /* yoksay */ } }
+              try { await davetYanit(kod, true); setSonuc(`${bilgi.koc_ad} ile bağlandınız. Gönderdiği programların kartları Ajandam'a düşecek.`); try { localStorage.removeItem(DAVET); } catch { /* yoksay */ } }
               catch (e) { setHata(e instanceof Error ? e.message : String(e)); }
             }}>Kabul et</button>
           </div>

@@ -106,9 +106,10 @@ function supabaseTasima(uid: string): Tasima {
       hata((await sb.from('dan_davet').insert({ kod, koc: uid, koc_ad: kocAd, disiplin, ...(alici && /^[0-9a-f-]{36}$/.test(alici) ? { alici } : {}) })).error);
     },
     async davetler() {
-      const r = await sb.from('dan_davet').select('kod, disiplin, son, kullanildi, alici').eq('koc', uid).order('olusturuldu', { ascending: false });
+      let r = await sb.from('dan_davet').select('kod, disiplin, son, kullanildi, alici, alici_eposta').eq('koc', uid).order('olusturuldu', { ascending: false });
+      if (r.error && /alici_eposta/.test(r.error.message)) r = await sb.from('dan_davet').select('kod, disiplin, son, kullanildi, alici').eq('koc', uid).order('olusturuldu', { ascending: false }) as typeof r;
       hata(r.error);
-      return (r.data ?? []) as DavetSatir[];
+      return ((r.data ?? []) as (DavetSatir & { alici_eposta?: string | null })[]).map(({ alici_eposta, ...x }) => ({ ...x, alici: alici_eposta ?? null }));
     },
     async davetSil(kod) { hata((await sb.from('dan_davet').delete().eq('kod', kod)).error); },
     async davetBak(kod) {
@@ -496,15 +497,30 @@ export async function davetOlustur(disiplin: string, alici: string | null = null
   return { kod, baglanti: `${location.origin}/?davet=${kod}` };
 }
 
-/** D2 — e-postayla davet: davet kodu kişinin Gelenler'ine düşer (kişi Ritos'ta en az bir kez giriş yapmış olmalı). */
+/**
+ * 7 ekim — e-postayla davet: davet kişinin e-postasına bağlı bekler (supabase/v1/05-eposta-davet.sql).
+ * Kişi Ritos'a bu e-postayla girdiğinde davet penceresi açılır. Kayıtlı olup olmadığı koça söylenmez.
+ */
 export async function ePostaDaveti(eposta: string, disiplin: string): Promise<string> {
-  const tt = tasimaVar();
-  const kisi = await tt.kisiBul(eposta.trim());
-  if (!kisi) throw new Error("Bu e-postayla Ritos kullanan biri bulunamadı. Kişinin en az bir kez giriş yapmış olması gerekir; ya da bağlantıyı gönder.");
-  if (kisi.id === uid) throw new Error('Kendini davet edemezsin.');
-  const { kod } = await davetOlustur(disiplin, `${kisi.gorunen_ad} · ${eposta.trim().toLowerCase()}`);
-  await tt.davetGonder(kisi.id, { surum: 1, tur: 'davet', ad: 'Danışmanlık daveti', davet: { kod, koc_ad: durum.profil?.ad ?? 'Koç', disiplin } });
-  return kisi.gorunen_ad;
+  tasimaVar();
+  const sb = supabase();
+  if (!sb) throw new Error('Sunucu ayarı yok');
+  const e = eposta.trim().toLowerCase();
+  const { data } = await sb.auth.getSession();
+  if (data.session?.user.email?.toLowerCase() === e) throw new Error('Kendini davet edemezsin.');
+  const kod = davetKodu();
+  const son = new Date(Date.now() + 30 * 86400000).toISOString();
+  const r = await sb.from('dan_davet').insert({ kod, koc: uid, koc_ad: durum.profil?.ad ?? 'Koç', disiplin, alici_eposta: e, son });
+  if (r.error) throw new Error(/alici_eposta/.test(r.error.message) ? 'Sunucuda e-posta daveti kurulu değil (supabase/v1/05-eposta-davet.sql).' : r.error.message);
+  return e;
+}
+
+/** Bana e-postayla gelmiş açık davetler (danışan tarafı). */
+export async function banaGelenDavetler(): Promise<{ kod: string; koc_ad: string; disiplin: string }[]> {
+  const sb = supabase();
+  if (!sb || !uid) return [];
+  const r = await sb.rpc('bana_gelen_dan_davetler');
+  return r.error ? [] : ((r.data ?? []) as { kod: string; koc_ad: string; disiplin: string }[]);
 }
 
 export const davetler = () => tasimaVar().davetler();
