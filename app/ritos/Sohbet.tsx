@@ -13,8 +13,9 @@ import { kartPaketi, paketiAl, programPaketi, type PaylasimPaketi } from '@/lib/
 import { yol } from '@/lib/alan';
 import {
   aileAktifMi, aileAyril, aileDavet, aileKur, aileYanit, benimAileRolum, disiplinAdi, konusmaAile, konusmaIliski,
-  okunduIsaretle, sohbetGonder, useDanismanlik,
+  okunduIsaretle, sohbetGonder, useDanismanlik, useEpostaDavetleri,
 } from '@/lib/danismanlik';
+import { danismanlikDavetiAc } from './Danismanlik';
 import { Chips, Kap, Modal, OnayKutusu } from './ortak';
 import { BekleyenDavetler } from './Paylasim';
 
@@ -46,7 +47,7 @@ export function useSohbetOzeti(): { okunmamis: Record<string, number>; toplam: n
   const mesajlar = useCanli(() => db.mesaj.toArray(), [], [] as MesajRow[]);
   const okundu = useCanli(() => db.konusma_okundu.toArray(), [], [] as KonusmaOkunduRow[]);
   const aileDavetleri = useCanli(() => db.aile.toArray(), [], [] as AileRow[]).filter((a) => benimAileRolum(a)?.durum === 'davet').length;
-  const kocDavetleri = useCanli(() => db.gelen.filter((g) => !g.alindi && (g.paket as { tur?: string }).tur === 'davet').count(), [], 0);
+  const kocDavetleri = useCanli(() => db.gelen.filter((g) => !g.alindi && (g.paket as { tur?: string }).tur === 'davet').count(), [], 0) + useEpostaDavetleri().length;
   const son = new Map(okundu.map((o) => [o.id, o.zaman]));
   const okunmamis: Record<string, number> = {};
   for (const m of mesajlar) if (m.gonderen !== d.uid && m.zaman > (son.get(m.konusma) ?? 0)) okunmamis[m.konusma] = (okunmamis[m.konusma] ?? 0) + 1;
@@ -66,6 +67,7 @@ export function SohbetEkrani() {
   return (
     <div>
       <h4>💬 Sohbet</h4>
+      <EpostaDavetleri />
       <BekleyenDavetler />
       <AileDavetleri />
       {aktifler.length === 0 && (
@@ -143,6 +145,25 @@ export function GelenlerEkrani({ onGeri, gomulu }: { onGeri?: () => void; gomulu
       )}
       {al && <AlModal m={al} onKapat={() => setAl(null)} />}
     </div>
+  );
+}
+
+/** 7 ekim — e-postama gelmiş danışmanlık davetleri: "Bak" davet penceresini açar (Kabul / Reddet). */
+function EpostaDavetleri() {
+  const l = useEpostaDavetleri();
+  if (!l.length) return null;
+  return (
+    <>
+      {l.map((x) => (
+        <div key={x.kod} className="rt-gelen">
+          <span className="tx">
+            <span className="t">🤝 Danışmanlık daveti</span>
+            <span className="s">{x.koc_ad} · {disiplinAdi(x.disiplin)}</span>
+          </span>
+          <button type="button" className="rt-btn primary" onClick={() => danismanlikDavetiAc(x.kod)}>Bak</button>
+        </div>
+      ))}
+    </>
   );
 }
 

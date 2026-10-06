@@ -11,7 +11,7 @@ import { useOturum } from '@/lib/hesap';
 import { bugun, gunFarki, tarihEkle, tarihEtiket } from '@/lib/paket';
 import { adimEkle, aktifMi, ilerleme } from '@/lib/program';
 import {
-  DISIPLINLER, KOC_DENEME_GUN, banaGelenDavetler, danisanIzinKaydet, danisanIzinleri, ePostaDaveti, davetBak, davetOlustur, davetSil, davetYanit, davetler, disiplinAdi, kendimeAl, kocDenemeKalan,
+  DISIPLINLER, KOC_DENEME_GUN, danisanIzinKaydet, danisanIzinleri, ePostaDaveti, davetBak, davetOlustur, davetSil, davetYanit, davetler, disiplinAdi, kendimeAl, kocDenemeKalan,
   kocKapat, kocOl, kocProgramiAl, kocProgramiReddet, programAta, programGonder, programiSil, sablonKaydet, sonlandir,
   useDanismanlik, type DavetSatir, type KocPaketi,
 } from '@/lib/danismanlik';
@@ -232,7 +232,7 @@ export function DavetModal({ onKapat, sabitDisiplin }: { onKapat: () => void; sa
   if (gonderildi) return (
     <Modal baslik={sabitDisiplin === 'sinav' ? 'Öğrenci davet et' : 'Danışan davet et'} onKapat={onKapat}>
       <p className="rt-tamam">Davet hazır: <b>{gonderildi}</b></p>
-      <p className="rt-metin">Danışanına Ritos&apos;a bu e-postayla girmesini söyle; açılışta davetini görecek. Kabul edince danışanların arasında görünür.</p>
+      <p className="rt-metin">Danışanına Ritos&apos;a bu e-postayla girmesini söyle; davet Home › 📥 Gelenler&apos;de görünecek. Kabul edince danışanların arasında görünür.</p>
       <div className="rt-satir"><button type="button" className="rt-btn" onClick={onKapat}>Kapat</button></div>
     </Modal>
   );
@@ -250,7 +250,7 @@ export function DavetModal({ onKapat, sabitDisiplin }: { onKapat: () => void; sa
             ? <p className="rt-muted" style={{ marginTop: 10 }}>Bağlantı tek kullanımlık, 7 gün geçerli. Danışanın bağlantıyı açar, Ritos hesabıyla girer (yoksa oluşturur) ve kabul eder. Bağlantı açılmazsa kodu Çevrem › Davet kodum var&apos;a yazabilir. Yüz yüzeysen QR kodu okutabilir.</p>
             : (
               <>
-                <p className="rt-muted" style={{ marginTop: 10 }}>Danışanın Ritos&apos;a bu e-postayla girdiğinde davetini görür ve kabul eder. Hesabı yoksa aynı e-postayla kayıt olması yeter. Davet 30 gün geçerli.</p>
+                <p className="rt-muted" style={{ marginTop: 10 }}>Danışanın Ritos&apos;a bu e-postayla girdiğinde davet Gelenler&apos;ine düşer, oradan kabul eder. Hesabı yoksa aynı e-postayla kayıt olması yeter. Davet 30 gün geçerli.</p>
                 <input className="rt-inp" type="email" placeholder="Danışanın e-postası" value={eposta} onChange={(e) => setEposta(e.target.value)} />
               </>
             )}
@@ -631,8 +631,6 @@ function ProgrameGorevModal({ programlar, ilk, onKapat }: { programlar: ProgramR
 // ———————————————— davet karşılama (D2) ————————————————
 
 const DAVET = 'ritos-davet';
-// Bu oturumda kapatılan (yanıtlanmayan) e-posta davetleri yeniden açılmasın; uygulama yeniden açılınca tekrar sorulur.
-const ertelenen = new Set<string>();
 
 /** Kod elle girildi (Çevrem › Davet kodum var): danışmanlık davet penceresini aç. */
 export function danismanlikDavetiAc(kod: string) {
@@ -664,19 +662,12 @@ export function DavetKarsilama() {
     window.addEventListener('ritos-davet-kodu', oku);
     return () => window.removeEventListener('ritos-davet-kodu', oku);
   }, []);
-  // 7 ekim: e-postama gelmiş davet varsa (ve açık bir davet penceresi yoksa) onu aç.
-  useEffect(() => {
-    if (!d.etkin || kod) return;
-    let iptal = false;
-    banaGelenDavetler().then((l) => { const x = l.find((y) => !ertelenen.has(y.kod)); if (!iptal && x) setKod(x.kod); }).catch(() => {});
-    return () => { iptal = true; };
-  }, [d.etkin, kod]);
   useEffect(() => {
     if (!kod || !d.etkin) return;
     davetBak(kod).then((b) => setBilgi(b ?? 'yok')).catch((e) => setHata(e instanceof Error ? e.message : String(e)));
   }, [kod, d.etkin]);
   if (!kod || !o.hazir) return null;
-  const bitir = () => { if (kod) ertelenen.add(kod); try { localStorage.removeItem(DAVET); } catch { /* yoksay */ } setKod(null); };
+  const bitir = () => { try { localStorage.removeItem(DAVET); } catch { /* yoksay */ } setKod(null); };
 
   return (
     <Modal baslik="Danışmanlık daveti" onKapat={bitir}>

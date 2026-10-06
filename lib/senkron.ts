@@ -59,6 +59,7 @@ let tekrar = false;
 // eski nesil yarıda kalırsa kendini iptal eder; kanal adı her seferinde benzersiz.
 let nesil = 0;
 const odak = () => zamanla(0);
+const gorunur = () => { if (document.visibilityState === 'visible') zamanla(0); };
 
 export async function senkronBaslat(kullanici: string) {
   senkronDurdur();
@@ -80,7 +81,9 @@ export async function senkronBaslat(kullanici: string) {
   if (DANISMANLIK_ACIK) senkronKancalari.basla?.(kullanici);
   window.addEventListener('focus', odak);
   window.addEventListener('online', odak);
-  aralik = setInterval(() => { if (document.visibilityState === 'visible') zamanla(0); }, 30_000);
+  // 7 ekim: değişiklikler Realtime ile anında gelir; aralıklı tur yalnız yedek (kaçan bildirim, e-posta davetleri).
+  aralik = setInterval(() => { if (document.visibilityState === 'visible') zamanla(0); }, 3 * 60_000);
+  document.addEventListener('visibilitychange', gorunur);
   await senkronla();
 }
 
@@ -97,6 +100,7 @@ export function senkronDurdur() {
   if (typeof window !== 'undefined') {
     window.removeEventListener('focus', odak);
     window.removeEventListener('online', odak);
+    document.removeEventListener('visibilitychange', gorunur);
   }
   uid = null;
   guncelle({ etkin: false });

@@ -515,12 +515,23 @@ export async function ePostaDaveti(eposta: string, disiplin: string): Promise<st
   return e;
 }
 
-/** Bana e-postayla gelmiş açık davetler (danışan tarafı). */
-export async function banaGelenDavetler(): Promise<{ kod: string; koc_ad: string; disiplin: string }[]> {
+/** Bana e-postayla gelmiş açık davetler (danışan tarafı) — Gelenler'de görünür. Her danışmanlık turunda yenilenir. */
+export interface EpostaDaveti { kod: string; koc_ad: string; disiplin: string }
+let epostaDavetleri: EpostaDaveti[] = [];
+const epostaDinleyici = new Set<(l: EpostaDaveti[]) => void>();
+export async function banaGelenDavetler(): Promise<EpostaDaveti[]> {
   const sb = supabase();
   if (!sb || !uid) return [];
   const r = await sb.rpc('bana_gelen_dan_davetler');
-  return r.error ? [] : ((r.data ?? []) as { kod: string; koc_ad: string; disiplin: string }[]);
+  if (r.error) return epostaDavetleri;
+  epostaDavetleri = (r.data ?? []) as EpostaDaveti[];
+  epostaDinleyici.forEach((f) => f(epostaDavetleri));
+  return epostaDavetleri;
+}
+export function useEpostaDavetleri(): EpostaDaveti[] {
+  const [l, setL] = useState(epostaDavetleri);
+  useEffect(() => { epostaDinleyici.add(setL); setL(epostaDavetleri); return () => { epostaDinleyici.delete(setL); }; }, []);
+  return l;
 }
 
 export const davetler = () => tasimaVar().davetler();
@@ -532,6 +543,7 @@ export async function davetYanit(kod: string, kabul: boolean): Promise<string | 
   if (kabul) await anahtarGaranti();
   const id = await tt.davetYanit(kod, kabul);
   await iliskileriCek();
+  await banaGelenDavetler().catch(() => {});
   return id;
 }
 
@@ -752,6 +764,7 @@ export async function danismanlikTur(): Promise<void> {
   calisiyor = (async () => {
     try {
       await iliskileriCek();
+      await banaGelenDavetler().catch(() => {});
       await aileleriCek();
       const aktifVar = (await db.iliski.toArray()).some((x) => x.durum === 'aktif');
       const aileler = (await db.aile.toArray()).filter(aileAktifMi);

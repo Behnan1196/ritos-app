@@ -16,7 +16,8 @@ import { DavetGelenDetay, type DavetPaketi } from './Danismanlik';
 export function SenkronIsareti() {
   const d = useSenkronDurum();
   if (!d.etkin) return null;
-  const metin = d.hata ? 'Senkron sorunu' : d.ilkIndirme ? 'Verilerin getiriliyor…' : d.calisiyor ? 'Eşitleniyor…' : null;
+  // 7 ekim: arka planda çekiş sessiz; yalnız gönderilecek değişiklik varken "Eşitleniyor…" görünür.
+  const metin = d.hata ? 'Eşitleme sorunu' : d.ilkIndirme ? 'Verilerin getiriliyor…' : d.calisiyor && d.bekleyen > 0 ? 'Eşitleniyor…' : null;
   return <span className={`rt-senkron${d.hata ? ' hata' : ''}`} title={d.hata ?? 'Eşitlendi'}>{d.hata ? '⚠' : '●'}{metin ? ` ${metin}` : ''}</span>;
 }
 
