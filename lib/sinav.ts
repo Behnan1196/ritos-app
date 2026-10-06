@@ -3,7 +3,7 @@
 // ————————————————————————————————————————————————————————————————
 // Sınav hazırlığı paketi — katalog (26 eylül). Bkz. User Story'ler P1–P6.
 //
-// Katalog sunucuda herkese açık (cat_paket). Cihaz son sürümü `katalog` tablosuna indirir.
+// Katalog sunucuda herkese açık (paket). Cihaz son sürümü `katalog` tablosuna indirir.
 // Kullanıcının gördüğü katalog = indirilen katalog + kendi düzenlemeleri (katalog_duzen).
 // Düzenlemeler ayrı durduğu için yeni sürüm onları asla ezmez; katalogdan çıkan konu
 // düzenlenmişse "katalogda yok" olarak kalır. Kimlikler sabittir (tyt-kimya.mol-kavrami).
@@ -45,7 +45,7 @@ async function sunucudanAl(): Promise<SunucuSatir[] | null> {
   const sb = supabase();
   if (!sb) return null;
   try {
-    const { data, error } = await sb.from('cat_paket').select('kod, surum, onayli, veri').eq('paket', PAKET);
+    const { data, error } = await sb.from('paket').select('kod, surum, onayli, veri').eq('paket', PAKET);
     if (error || !data?.length) return null;
     return data as SunucuSatir[];
   } catch { return null; }

@@ -1,5 +1,5 @@
 // ————————————————————————————————————————————————————————————————
-// Hazır hafta şablonları (4 ekim) — sunucuda herkese açık cat_paket (paket = 'sablon').
+// Hazır hafta şablonları (4 ekim) — sunucuda herkese açık paket (paket = 'sablon').
 // Sınav kataloğuyla aynı yol: cihaz son sürümü `katalog` tablosuna indirir (kod: 'sablon:<kod>');
 // sunucuya ulaşılamazsa uygulamayla gelen kopya (public/paketler/sablonlar.v1.json).
 // Kullanıcı "Benim şablonlarıma al" deyince kendi şablonu (ProgramRow, sablon) olur; sunucudaki
@@ -27,7 +27,7 @@ async function sunucudan(): Promise<Satir[] | null> {
   const sb = supabase();
   if (!sb) return null;
   try {
-    const { data, error } = await sb.from('cat_paket').select('kod, surum, onayli, veri').eq('paket', PAKET);
+    const { data, error } = await sb.from('paket').select('kod, surum, onayli, veri').eq('paket', PAKET);
     if (error || !data?.length) return null;
     return data as Satir[];
   } catch { return null; }

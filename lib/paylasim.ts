@@ -9,7 +9,7 @@
 // ————————————————————————————————————————————————————————————————
 
 import { db, type AjandaKartRow, type GelenRow, type ProgramAdimRow } from './db';
-import { supabase } from './supabase';
+import { eskiSupabase } from './supabase';
 import { teslimAl } from './ajanda';
 import { adimEkle, programGuncelle } from './program';
 import { PAKET_SURUM, TAM_IZIN, gunFarki, tarihEkle, type Blok, type PaketEk, type TemelTip } from './paket';
@@ -62,7 +62,7 @@ export async function programPaketi(programId: string): Promise<PaylasimPaketi |
 export type KisiSonuc = { kisi: { id: string; gorunen_ad: string } } | { hata: string };
 
 export async function kisiBul(eposta: string): Promise<KisiSonuc> {
-  const sb = supabase();
+  const sb = eskiSupabase();
   if (!sb) return { hata: 'Sunucu ayarı yok.' };
   if (!navigator.onLine) return { hata: 'İnternet yok.' };
   const r = await sb.rpc('cat_kisi_bul', { p_eposta: eposta });
@@ -74,7 +74,7 @@ export async function kisiBul(eposta: string): Promise<KisiSonuc> {
 }
 
 export async function gonder(paket: PaylasimPaketi, aliciIdler: string[], kaynak: 'dogrudan' | 'sohbet' = 'dogrudan') {
-  const sb = supabase();
+  const sb = eskiSupabase();
   if (!sb) return { basarili: 0, hata: 'Sunucu ayarı yok' };
   let basarili = 0;
   let sonHata = '';
@@ -93,7 +93,7 @@ export async function gonder(paket: PaylasimPaketi, aliciIdler: string[], kaynak
 
 // Sunucudaki bekleyen paketleri cihaza indir, indirilenleri sunucudan sil (P6).
 export async function gelenleriCek(): Promise<number> {
-  const sb = supabase();
+  const sb = eskiSupabase();
   if (!sb || !navigator.onLine) return 0;
   const { data: oturum } = await sb.auth.getSession();
   if (!oturum.session) return 0;
@@ -174,7 +174,7 @@ export async function gelenSil(ids: string[]) {
 
 // P10 — göndereni engelle (sunucuda; sonraki gönderimleri sessizce düşer).
 export async function engelle(gonderenId: string, gorunenAd: string) {
-  const sb = supabase();
+  const sb = eskiSupabase();
   const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
   if (!sb || !data.session) return false;
   const r = await sb.from('cat_engel').upsert({ engelleyen: data.session.user.id, engellenen: gonderenId, gorunen_ad: gorunenAd });
@@ -182,14 +182,14 @@ export async function engelle(gonderenId: string, gorunenAd: string) {
 }
 
 export async function engellenenler(): Promise<{ engellenen: string; gorunen_ad: string | null }[]> {
-  const sb = supabase();
+  const sb = eskiSupabase();
   if (!sb) return [];
   const r = await sb.from('cat_engel').select('engellenen, gorunen_ad');
   return r.data ?? [];
 }
 
 export async function engelKaldir(gonderenId: string) {
-  await supabase()?.from('cat_engel').delete().eq('engellenen', gonderenId);
+  await eskiSupabase()?.from('cat_engel').delete().eq('engellenen', gonderenId);
 }
 
 // ———————————————— Sohbet'ten gelen paylaşımı almak (C3, 27 eylül) ————————————————

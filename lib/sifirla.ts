@@ -8,7 +8,6 @@
 import Dexie from 'dexie';
 import { aktifHesap, aktifHesapAyarla, db, dbAdi } from './db';
 import { supabase } from './supabase';
-import { dekSil } from './anahtarDeposu';
 import { senkronDurdur, senkronla } from './senkron';
 import { aileAktifMi, aileAyril, sonlandir } from './danismanlik';
 
@@ -89,11 +88,10 @@ export async function hesabimiSil(): Promise<void> {
   if (!sb || !uid) throw new Error('Hesap açık değil.');
   // Bağları önce bitir: karşı taraf "sonlandı" görür (hesap silinince satırlar zaten kalkar).
   for (const il of await db.iliski.toArray()) if (il.durum === 'aktif') { try { await sonlandir(il.id); } catch { /* yoksay */ } }
-  const { error } = await sb.rpc('cat_hesabimi_sil');
-  if (error) throw new Error(error.message.includes('cat_hesabimi_sil') ? 'Sunucuda hesap silme işlevi kurulu değil (supabase/cat-13-hesap-sil.sql).' : error.message);
+  const { error } = await sb.rpc('hesabimi_sil');
+  if (error) throw new Error(error.message.includes('hesabimi_sil') ? 'Sunucuda hesap silme işlevi kurulu değil (supabase/v1/01-temel.sql).' : error.message);
   senkronDurdur();
   await sb.auth.signOut({ scope: 'local' }).catch(() => {});
-  await dekSil(uid);
   db.close();
   await Dexie.delete(dbAdi(uid));
   aktifHesapAyarla(null);

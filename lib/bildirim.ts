@@ -10,7 +10,7 @@
 import { useEffect } from 'react';
 import { liveQuery } from 'dexie';
 import { db } from './db';
-import { supabase } from './supabase';
+import { eskiSupabase } from './supabase';
 import { gorunur } from './ajanda';
 import { bugun, tarihEkle, tarihParse } from './paket';
 
@@ -38,7 +38,7 @@ export async function bildirimDurumu(): Promise<BildirimDurum> {
 
 /** Bu cihazda bildirimleri açar (izin ister, abone olur, aboneliği Supabase'e yazar). */
 export async function bildirimAc(): Promise<string | null> {
-  const sb = supabase();
+  const sb = eskiSupabase();
   if (!sb) return 'Bağlantı yok';
   const izin = await Notification.requestPermission();
   if (izin !== 'granted') return 'İzin verilmedi';
@@ -56,18 +56,18 @@ export async function bildirimKapat() {
   const reg = await navigator.serviceWorker.getRegistration();
   const ab = await reg?.pushManager.getSubscription();
   if (!ab) return;
-  await supabase()?.from('cat_push_abone').delete().eq('endpoint', ab.endpoint);
+  await eskiSupabase()?.from('cat_push_abone').delete().eq('endpoint', ab.endpoint);
   await ab.unsubscribe();
 }
 
 export async function testBildirimi(): Promise<string | null> {
-  const r = await supabase()?.from('cat_bildirim').insert({ kaynak: 'ritos', baslik: 'Ritos', metin: 'Test bildirimi ✓ — kuyruk çalışıyor', ac: '/' });
+  const r = await eskiSupabase()?.from('cat_bildirim').insert({ kaynak: 'ritos', baslik: 'Ritos', metin: 'Test bildirimi ✓ — kuyruk çalışıyor', ac: '/' });
   return r?.error ? r.error.message : null;
 }
 
 export interface KaynakDurum { kaynak: string; acik: boolean }
 export async function kaynaklar(): Promise<KaynakDurum[]> {
-  const sb = supabase();
+  const sb = eskiSupabase();
   if (!sb) return [];
   const [b, k] = await Promise.all([
     sb.from('cat_bildirim').select('kaynak').order('olusturuldu', { ascending: false }).limit(300),
@@ -77,7 +77,7 @@ export async function kaynaklar(): Promise<KaynakDurum[]> {
   return Array.from(ad).map((kaynak) => ({ kaynak, acik: (k.data ?? []).find((x) => x.kaynak === kaynak)?.acik ?? true }));
 }
 export async function kaynakAyarla(kaynak: string, acik: boolean) {
-  await supabase()?.from('cat_bildirim_kaynak').upsert({ kaynak, acik });
+  await eskiSupabase()?.from('cat_bildirim_kaynak').upsert({ kaynak, acik });
 }
 
 // ———————— Ritos kart hatırlatmaları → kuyruk ————————
@@ -101,7 +101,7 @@ function zamanHesapla(t: string, h: { gun: number; dk?: number | null; saat?: st
 
 let calisiyor = false;
 export async function hatirlatmalariPlanla() {
-  const sb = supabase();
+  const sb = eskiSupabase();
   if (!sb || calisiyor) return;
   const { data: oturum } = await sb.auth.getSession();
   if (!oturum.session) return;

@@ -10,7 +10,7 @@
 import { useEffect } from 'react';
 import { liveQuery } from 'dexie';
 import { db, type AjandaKartRow } from './db';
-import { supabase } from './supabase';
+import { eskiSupabase } from './supabase';
 import { metindenBelge } from './belge';
 import { HAZIR_OLCULER, OLC_ONEK } from './olcum';
 import type { Blok, Izinler } from './paket';
@@ -43,7 +43,7 @@ function bloklar(r: DisKart): Blok[] {
 let cekiliyor = false;
 /** Yeni / değişen satırları çekip ajandaya koyar. */
 export async function disKartCek() {
-  const sb = supabase();
+  const sb = eskiSupabase();
   if (!sb || cekiliyor) return;
   const { data: o } = await sb.auth.getSession();
   const uid = o.session?.user.id;
@@ -81,7 +81,7 @@ export async function disKartCek() {
 
 /** Dış kartların sonucunu (yapıldı, zaman, değerler) satıra geri yazar — yalnız değişenleri. */
 export async function disSonucGonder() {
-  const sb = supabase();
+  const sb = eskiSupabase();
   if (!sb) return;
   const { data: o } = await sb.auth.getSession();
   const uid = o.session?.user.id;

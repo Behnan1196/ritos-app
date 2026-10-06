@@ -1,10 +1,10 @@
 'use client';
 
 // ————————————————————————————————————————————————————————————————
-// Uçtan uca şifreli senkron motoru (S4, S7). Yalnızca hesaplı veritabanında çalışır.
+// Eşitleme motoru (S4, S7; 7 ekim — v1 şema: şifreleme kalktı). Yalnızca hesaplı veritabanında çalışır.
 //
-//  gönder: "bekleyen" tablosundaki her satırın güncel halini cihazda şifreleyip cat_kayit'e yaz
-//  çek:    cat_kayit'te son gördüğüm sıradan sonrasını al, çöz, yerel tabloya uygula
+//  gönder: "bekleyen" tablosundaki her satırın güncel halini `kayit` tablosuna düz JSON olarak yaz
+//  çek:    `kayit`ta son gördüğüm sıradan sonrasını al, yerel tabloya uygula
 //  çakışma: aynı satır yerelde daha yeni değiştiyse (bekleyen.zaman > uzak.guncellendi) yerel kazanır
 // ————————————————————————————————————————————————————————————————
 
@@ -12,9 +12,10 @@ import { useEffect, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { SENKRON_TABLOLARI, db, degisiklikDinle, type SenkronTablo } from './db';
 import { supabase } from './supabase';
-import { coz, sifrele } from './sifre';
 
 // Danışmanlık motoru senkronla birlikte çalışır (lib/danismanlik.ts doldurur).
+// 7 ekim: v1 şemada danışmanlık tablolarla yeniden kurulana kadar kancalar çağrılmaz (DANISMANLIK_ACIK).
+const DANISMANLIK_ACIK = false;
 export const senkronKancalari: {
   basla?: (uid: string, dek: CryptoKey) => void;
   tur?: () => Promise<void>;
@@ -47,7 +48,6 @@ export function useSenkronDurum(): SenkronDurum {
 }
 
 let uid: string | null = null;
-let dek: CryptoKey | null = null;
 let kanal: RealtimeChannel | null = null;
 let aralik: ReturnType<typeof setInterval> | null = null;
 let gecikme: ReturnType<typeof setTimeout> | null = null;
@@ -60,11 +60,10 @@ let tekrar = false;
 let nesil = 0;
 const odak = () => zamanla(0);
 
-export async function senkronBaslat(kullanici: string, anahtar: CryptoKey) {
+export async function senkronBaslat(kullanici: string) {
   senkronDurdur();
   const benim = ++nesil;
   uid = kullanici;
-  dek = anahtar;
   const son = (await db.ayar.get(SON))?.deger as number | undefined;
   const sira = (await db.ayar.get(SIRA))?.deger as number | undefined;
   if (benim !== nesil) return; // bu arada durduruldu
@@ -73,24 +72,18 @@ export async function senkronBaslat(kullanici: string, anahtar: CryptoKey) {
   const sb = supabase();
   if (sb) {
     kanal = sb.channel(`kayit-${kullanici}-${Math.random().toString(36).slice(2, 8)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cat_kayit', filter: `sahip=eq.${kullanici}` }, () => zamanla(300))
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cat_mesaj', filter: `alici=eq.${kullanici}` }, () => zamanla(300))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cat_iliski' }, () => zamanla(300))
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cat_aile_mesaj' }, () => zamanla(300))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cat_aile_uye' }, () => zamanla(300))
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cat_aile_anahtar', filter: `uye=eq.${kullanici}` }, () => zamanla(300))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'kayit', filter: `sahip=eq.${kullanici}` }, () => zamanla(300))
       .subscribe();
   }
   window.addEventListener('focus', odak);
   window.addEventListener('online', odak);
   aralik = setInterval(() => { if (document.visibilityState === 'visible') zamanla(0); }, 30_000);
-  senkronKancalari.basla?.(kullanici, anahtar);
   await senkronla();
 }
 
 export function senkronDurdur() {
   nesil++;
-  senkronKancalari.dur?.();
+  if (DANISMANLIK_ACIK) senkronKancalari.dur?.();
   degisiklikDinle(null);
   if (kanal) supabase()?.removeChannel(kanal);
   kanal = null;
@@ -103,7 +96,6 @@ export function senkronDurdur() {
     window.removeEventListener('online', odak);
   }
   uid = null;
-  dek = null;
   guncelle({ etkin: false });
 }
 
@@ -114,7 +106,7 @@ function zamanla(ms: number) {
 
 /** Bir tur gönder + çek. Aynı anda tek tur; o sırada istek gelirse bittiğinde bir tur daha. */
 export async function senkronla(): Promise<void> {
-  if (!uid || !dek) return;
+  if (!uid) return;
   if (tur) { tekrar = true; return tur; }
   tur = (async () => {
     guncelle({ calisiyor: true });
@@ -123,7 +115,7 @@ export async function senkronla(): Promise<void> {
       await gonder();
       await cek();
       // Danışmanlık: önce kendi verim güncellensin, sonra mesajlar (başka cihazda alınmış program tekrar gelmesin).
-      if (senkronKancalari.tur) await senkronKancalari.tur().catch((e) => console.warn('[ritos] danışmanlık', e));
+      if (DANISMANLIK_ACIK && senkronKancalari.tur) await senkronKancalari.tur().catch((e) => console.warn('[ritos] danışmanlık', e));
       const son = Date.now();
       await db.ayar.put({ anahtar: SON, deger: son });
       guncelle({ son, hata: null, ilkIndirme: false });
@@ -145,9 +137,9 @@ async function gonder() {
     if (!parti.length) return;
     const satirlar = await Promise.all(parti.map(async (b) => {
       const r = await db.table(b.tablo).get(b.id);
-      return { sahip: uid!, tablo: b.tablo, kayit_id: b.id, veri: r ? await sifrele(dek!, r) : null, silindi: !r, guncellendi: b.zaman };
+      return { sahip: uid!, tablo: b.tablo, kayit_id: b.id, veri: r ?? null, silindi: !r, guncellendi: b.zaman };
     }));
-    const { error } = await sb.from('cat_kayit').upsert(satirlar, { onConflict: 'sahip,tablo,kayit_id' });
+    const { error } = await sb.from('kayit').upsert(satirlar, { onConflict: 'sahip,tablo,kayit_id' });
     if (error) throw new Error(`Gönderilemedi: ${error.message}`);
     // Gönderirken yeniden değişen satır bekleyende kalsın.
     await db.transaction('rw', db.bekleyen, async () => {
@@ -160,13 +152,13 @@ async function gonder() {
   }
 }
 
-interface UzakSatir { tablo: string; kayit_id: string; veri: string | null; silindi: boolean; guncellendi: number; sira: number }
+interface UzakSatir { tablo: string; kayit_id: string; veri: unknown | null; silindi: boolean; guncellendi: number; sira: number }
 
 async function cek() {
   const sb = supabase()!;
   let sira = ((await db.ayar.get(SIRA))?.deger as number | undefined) ?? 0;
   for (;;) {
-    const { data, error } = await sb.from('cat_kayit')
+    const { data, error } = await sb.from('kayit')
       .select('tablo, kayit_id, veri, silindi, guncellendi, sira')
       .eq('sahip', uid!).gt('sira', sira).order('sira').limit(500);
     if (error) throw new Error(`Alınamadı: ${error.message}`);
@@ -178,7 +170,7 @@ async function cek() {
       if (!(SENKRON_TABLOLARI as readonly string[]).includes(u.tablo)) continue;
       const yerel = await db.bekleyen.get(`${u.tablo}|${u.kayit_id}`);
       if (yerel && yerel.zaman > Number(u.guncellendi)) continue; // yerel daha yeni — gönderilecek
-      uygulanacak.push({ tablo: u.tablo as SenkronTablo, id: u.kayit_id, satir: u.silindi || !u.veri ? null : await coz(dek!, u.veri) });
+      uygulanacak.push({ tablo: u.tablo as SenkronTablo, id: u.kayit_id, satir: u.silindi || !u.veri ? null : u.veri });
     }
     const tablolar = SENKRON_TABLOLARI.map((t) => db.table(t));
     db.uzaktan = true;

@@ -21,8 +21,8 @@ import { DavetKarsilama } from './ritos/Danismanlik';
 import { SenkronIsareti, useGelenSenkron } from './ritos/Paylasim';
 import { GelenlerEkrani, useGelenlerOzeti } from './ritos/Sohbet';
 import { HomeEkrani } from './ritos/HomeEkrani';
-import { CikisOnayi, GirisEkrani, HesapEkrani, KullaniciRozeti, type HesapEkran, SifreSifirlaEkrani, VeriSifresiEkrani, useKurtarmaHatirlat } from './ritos/Hesap';
-import { oauthBekliyor, useHesapBaslat, useOturum } from '@/lib/hesap';
+import { CikisOnayi, GirisEkrani, HesapEkrani, KullaniciRozeti, type HesapEkran, SifreSifirlaEkrani } from './ritos/Hesap';
+import { useHesapBaslat, useOturum } from '@/lib/hesap';
 
 const NARROW_BREAKPOINT = 760;
 // Testte (NEXT_PUBLIC_RITOS_TEST=1 ile derlenmiş sürüm) giriş kapısı atlanır; gerçek sürümde yok.
@@ -43,8 +43,6 @@ export default function RitosLab() {
   useEffect(() => { try { setSifirla(new URL(location.href).searchParams.has('sifirla')); } catch { /* yoksay */ } }, []);
   if (!o.hazir) return <div className="rt-kilit-bos" />;
   if (sifirla) return o.session ? <SifreSifirlaEkrani /> : <GirisEkrani />;
-  // Google'dan dönüldü: oturum var, veri anahtarı henüz açılmadı → veri şifresi.
-  if (o.session && oauthBekliyor() && (!o.hesapli || o.kilitli)) return <VeriSifresiEkrani />;
   if (!o.hesapli || (!TEST && o.kilitli)) return <GirisEkrani yeniden={o.hesapli} />;
   return <RitosUygulama />;
 }
@@ -89,7 +87,7 @@ function RitosUygulama() {
   // şablonlar ve sınav paketi Atölye › Kütüphane'de; sonlandırma kişinin Bilgiler sekmesinde.
   const home = <HomeEkrani />;
   const gelenler = useGelenlerOzeti();
-  const kurtarma = useKurtarmaHatirlat();
+  const kurtarma = false; // 7 ekim: kurtarma kelimeleri kalktı — avatar noktası şimdilik kullanılmıyor
   const rozet = (k: Sekme) => (
     k === 'home' && gelenler.toplam > 0 ? <i className="rt-sekme-rozet">{gelenler.toplam}</i>
       : null
