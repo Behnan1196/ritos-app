@@ -76,6 +76,27 @@ export function GirisEkrani({ yeniden, onVazgec }: { yeniden?: boolean; onVazgec
   );
 }
 
+/** İlk açılış (hesapsız): kısa karşılama — hesapsız başla ya da giriş. Bir kez görünür. */
+export const KARSILAMA_ANAHTAR = 'ritos-karsilandi';
+export function Karsilama({ onBasla, onGiris }: { onBasla: () => void; onGiris: () => void }) {
+  return (
+    <div className="rt-giris">
+      <div className="rt-giris-kutu rt-karsilama">
+        <div className="rt-giris-logo">Ritos</div>
+        <p className="rt-metin">Günlük düzenin, rutinlerin ve yaşam alanlarının dengesi için.</p>
+        <ul className="rt-karsilama-liste">
+          <li><span>📅</span><div><b>Ajandam</b><small>Günün kartları; yaptıkça işaretle.</small></div></li>
+          <li><span>🌱</span><div><b>Rutinlerim</b><small>Alışkanlıklarını kur, alanlarının dengesini gör.</small></div></li>
+          <li><span>🏡</span><div><b>Çevrem</b><small>Ailen ve arkadaşlarınla listeler, ortak işler, ricalar (hesapla).</small></div></li>
+        </ul>
+        <button type="button" className="rt-btn primary rt-genis" onClick={onBasla}>Hesapsız başla</button>
+        <button type="button" className="rt-btn rt-genis" onClick={onGiris}>Giriş yap · Hesap aç</button>
+        <p className="rt-muted rt-karsilama-not">Hesapsız kullanımda verin bu tarayıcıda kalır. İstediğin zaman hesap açarsın; girdiklerin hesabına taşınır.</p>
+      </div>
+    </div>
+  );
+}
+
 /** Sıfırlama bağlantısından dönüş: yeni şifre. */
 export function SifreSifirlaEkrani() {
   const [sifre, setSifre] = useState('');

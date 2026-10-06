@@ -21,10 +21,10 @@ import { DavetKarsilama } from './ritos/Danismanlik';
 import { SenkronIsareti } from './ritos/Paylasim';
 import { GelenlerEkrani, useGelenlerOzeti } from './ritos/Sohbet';
 import { HomeEkrani, homeEkraniAc } from './ritos/HomeEkrani';
-import { CikisOnayi, GirisEkrani, HesapEkrani, KullaniciRozeti, MisafirSeridi, type HesapEkran, SifreSifirlaEkrani } from './ritos/Hesap';
+import { CikisOnayi, GirisEkrani, KARSILAMA_ANAHTAR, Karsilama, HesapEkrani, KullaniciRozeti, MisafirSeridi, type HesapEkran, SifreSifirlaEkrani } from './ritos/Hesap';
 import Cevrem from './ritos/Cevrem';
 import { useCevremBaslat } from '@/lib/cevrem';
-import { GIRIS_OLAY, girisAc, useHesapBaslat, useOturum } from '@/lib/hesap';
+import { GIRIS_OLAY, girisAc, misafirVerisiVar, useHesapBaslat, useOturum } from '@/lib/hesap';
 
 const NARROW_BREAKPOINT = 760;
 // Testte (NEXT_PUBLIC_RITOS_TEST=1 ile derlenmiş sürüm) giriş kapısı atlanır; gerçek sürümde yok.
@@ -55,10 +55,22 @@ export default function RitosLab() {
     return () => window.removeEventListener(GIRIS_OLAY, f);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  if (!o.hazir) return <div className="rt-kilit-bos" />;
+  // İlk açılış karşılaması: hesapsız, daha önce görülmemiş ve tarayıcıda veri yoksa.
+  const [karsilama, setKarsilama] = useState<'?' | 'goster' | 'gec'>('?');
+  useEffect(() => {
+    if (!o.hazir) return;
+    if (o.hesapli) { setKarsilama('gec'); return; }
+    let gorulmus = false;
+    try { gorulmus = localStorage.getItem(KARSILAMA_ANAHTAR) === '1'; } catch { /* yoksay */ }
+    if (gorulmus) { setKarsilama('gec'); return; }
+    misafirVerisiVar().then((v) => setKarsilama(v ? 'gec' : 'goster')).catch(() => setKarsilama('gec'));
+  }, [o.hazir, o.hesapli]);
+  const karsilandi = () => { try { localStorage.setItem(KARSILAMA_ANAHTAR, '1'); } catch { /* yoksay */ } setKarsilama('gec'); };
+  if (!o.hazir || (!o.hesapli && karsilama === '?')) return <div className="rt-kilit-bos" />;
   if (sifirla) return o.session ? <SifreSifirlaEkrani /> : <GirisEkrani />;
   if (o.hesapli && !TEST && o.kilitli) return <GirisEkrani yeniden />;
-  if (girisAcik && !o.hesapli) return <GirisEkrani onVazgec={() => setGirisAcik(false)} />;
+  if (girisAcik && !o.hesapli) return <GirisEkrani onVazgec={() => { setGirisAcik(false); karsilandi(); }} />;
+  if (!o.hesapli && karsilama === 'goster') return <Karsilama onBasla={karsilandi} onGiris={() => setGirisAcik(true)} />;
   return <RitosUygulama />;
 }
 
