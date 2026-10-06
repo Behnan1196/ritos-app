@@ -1288,3 +1288,73 @@ button,a,[role="button"],label,select{touch-action:manipulation;-webkit-tap-high
 .mobile-app{overscroll-behavior:contain;}
 html.klavye .mobile-nav{display:none;}
 html.klavye .mobile-main{padding-bottom:16px;}
+
+/* ———————————————— Çevrem v1 (7 ekim): Ailem ve arkadaş grupları ———————————————— */
+.rt-cv{display:flex;flex-direction:column;gap:16px;padding-bottom:84px;position:relative;}
+.rt-cv-bolum{display:flex;flex-direction:column;gap:8px;}
+.rt-cv-h{margin:0;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:800;}
+.rt-cv-alt-h{margin:4px 2px 0;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:800;}
+.rt-cv-satir-bas{display:flex;align-items:center;justify-content:space-between;}
+.rt-cv-not{font-size:12px;margin:0;}
+.rt-cv-bas{display:flex;align-items:center;gap:10px;}
+.rt-cv-grup-kok{position:relative;min-width:0;}
+.rt-cv-grup{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;border-radius:12px;padding:8px 12px;font:inherit;cursor:pointer;color:var(--ink);max-width:100%;}
+.rt-cv-grup b{font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rt-cv-grup small{color:var(--muted);font-size:12px;white-space:nowrap;}
+.rt-cv-grup .ok{color:var(--muted);font-size:11px;}
+.rt-cv-grup-menu{left:0;right:auto;}
+.rt-cv-grup-menu button.on{font-weight:800;background:var(--green2);}
+.rt-cv-uyeler{margin-left:auto;display:flex;align-items:center;flex:0 0 auto;}
+.rt-cv-uyeler > span{margin-left:-7px;border-radius:50%;box-shadow:0 0 0 2px var(--bg);display:inline-flex;}
+.rt-cv-uyeler > span:first-child{margin-left:0;}
+.rt-cv-fazla{font-size:11px;color:var(--muted);font-weight:700;padding-left:9px;box-shadow:none!important;}
+.rt-cv-davet{margin-left:6px;width:28px;height:28px;border-radius:50%;border:1px dashed var(--muted);background:none;color:var(--muted);font-weight:700;cursor:pointer;}
+.rt-cv-kutu{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+.rt-cv-sat{display:flex;align-items:center;gap:10px;padding:10px 12px;border-top:1px solid var(--line);}
+.rt-cv-sat:first-child{border-top:0;}
+.rt-cv-sat .ic{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;background:none;border:0;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer;}
+div.rt-cv-sat .ic{cursor:default;}
+.rt-cv-sat .ic b{font-size:14px;font-weight:650;overflow-wrap:anywhere;}
+.rt-cv-sat .ic b.bitti{text-decoration:line-through;color:var(--muted);font-weight:500;}
+.rt-cv-sat .ic span{font-size:11.5px;color:var(--muted);}
+.rt-cv-sat .ic span.ac{color:var(--ink);font-size:12.5px;}
+.rt-cv-sat.rica{flex-wrap:wrap;}
+.rt-cv-dugmeler{display:flex;gap:6px;margin-left:auto;}
+.rt-cv-av{display:inline-flex;}
+.rt-cv-al{border:1px solid var(--green);color:var(--green);background:var(--green2);border-radius:999px;padding:5px 11px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;flex:0 0 auto;}
+.rt-cv-saat{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;flex:0 0 auto;}
+.rt-cv-x{border:0;background:none;color:var(--muted);font-size:18px;line-height:1;width:28px;height:28px;border-radius:8px;cursor:pointer;flex:0 0 auto;}
+.rt-cv-x:hover{background:var(--bg);}
+.rt-cv-durum{font-size:11px;font-weight:700;border-radius:999px;padding:3px 8px;background:#efe8da;color:var(--muted);flex:0 0 auto;}
+.rt-cv-durum.kabul{background:#e6eef6;color:#4f7fa8;}
+.rt-cv-durum.yapildi{background:var(--green2);color:var(--green);}
+.rt-cv-durum.ret{background:#f6e4df;color:var(--red);}
+.rt-cv-bos-sat{border:1px dashed var(--line);background:none;border-radius:12px;padding:12px;font:inherit;font-size:13px;color:var(--muted);cursor:pointer;text-align:left;}
+.rt-cv-listeler{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.rt-cv-lk{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;text-align:left;display:flex;flex-direction:column;gap:8px;min-width:0;font:inherit;color:var(--ink);cursor:pointer;}
+.rt-cv-lk .ust{font-weight:750;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rt-cv-lk .ilerleme{height:5px;border-radius:3px;background:#efe8da;overflow:hidden;display:block;}
+.rt-cv-lk .ilerleme i{display:block;height:100%;background:var(--green);}
+.rt-cv-lk small{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums;}
+.rt-cv-lk.yeni{border-style:dashed;background:transparent;color:var(--muted);align-items:center;justify-content:center;font-weight:700;min-height:86px;}
+.rt-cv-akis{display:flex;flex-direction:column;gap:8px;}
+.rt-cv-ak{display:flex;gap:9px;align-items:center;font-size:12.5px;}
+.rt-cv-ak p{margin:0;flex:1;min-width:0;line-height:1.35;}
+.rt-cv-ak time{color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums;}
+.rt-cv-fab{position:sticky;bottom:12px;align-self:flex-end;width:52px;height:52px;border-radius:16px;border:0;background:var(--green);color:#fff;font-size:26px;box-shadow:0 6px 16px rgba(0,0,0,.18);cursor:pointer;margin-top:-40px;}
+.rt-cv-secenekler{display:flex;flex-direction:column;gap:8px;}
+.rt-cv-secenek{display:flex;gap:12px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:#fff;text-align:left;width:100%;font:inherit;color:var(--ink);cursor:pointer;}
+.rt-cv-secenek .ik{width:36px;height:36px;border-radius:10px;background:#efe8da;display:flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 auto;}
+.rt-cv-secenek b{display:block;font-size:14px;}
+.rt-cv-secenek small{color:var(--muted);font-size:12px;line-height:1.35;}
+.rt-cv-cipler{display:flex;flex-wrap:wrap;gap:6px;}
+.rt-cv-giris{display:flex;gap:8px;}
+.rt-cv-giris .rt-inp{flex:1;min-width:0;}
+.rt-cv-liste,.rt-cv-ayar{display:flex;flex-direction:column;gap:12px;}
+.rt-cv-sag{margin-left:auto;}
+.rt-cv-bos{display:flex;flex-direction:column;gap:14px;padding-top:12px;max-width:440px;margin:0 auto;width:100%;}
+.rt-cv-bos .resim{font-size:44px;text-align:center;}
+.rt-cv-bos h3{margin:0;text-align:center;font-size:18px;}
+.rt-cv-bos > p{margin:0;text-align:center;line-height:1.5;}
+.rt-cv-kod{font-size:30px;font-weight:800;letter-spacing:.2em;text-align:center;background:#efe8da;border-radius:12px;padding:14px;font-variant-numeric:tabular-nums;user-select:all;}
+.rt-cv-kod-inp{text-transform:uppercase;letter-spacing:.15em;font-weight:700;}

@@ -18,7 +18,8 @@ import { gorevler, type BDugum } from '@/lib/belge';
 import { KlasorSecModal } from './Kutuphane';
 import { ajandadanKaydet } from '@/lib/kutuphane';
 import { db, type ProgramRow } from '@/lib/db';
-import { benAile, ortakGonder } from '@/lib/danismanlik';
+import { ortakGonder } from '@/lib/danismanlik';
+import { isUstlen } from '@/lib/cevrem';
 import { KAYNAK_TUR, filtreVar, filtreOku, filtreYaz, kaynakBilgi, uyar, type Filtre, type KaynakTur } from '@/lib/kaynakFiltre';
 
 // A1–A9 (ilk dilim). Ajanda yalnızca kart satırlarını bilir; kaynağın içini bilmez.
@@ -486,7 +487,7 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
   const tasinir = kart.izinler.gun_degistir && (!bagli || kart.geri_bildirim === 'uzak');
   const silinir = !bagli && kart.izinler.sil;
   const paylasilir = !bagli;
-  const ortakSilinir = !!kart.ortak;
+  const ortakSilinir = !!kart.ortak && !kart.id.startsWith('c-'); // Çevrem kartı (7 ekim) Çevrem'den yönetilir
   const menuVar = tasinir || silinir || paylasilir || kaydedilir || ortakSilinir;
   const ust = (
     <span className="rt-detay-ust">
@@ -679,20 +680,17 @@ function OlcekSec({ deger, ruh, onSec }: { deger: string; ruh: boolean; onSec: (
   );
 }
 
-// Aile ortak kartı (3 ekim): kim ekledi, kim üstlendi; üstlen / bırak.
+// Çevrem kartı (7 ekim): üstlendiğim ortak iş ya da kabul ettiğim rica. Kim ekledi / kim istedi; işi bırak.
 function OrtakKartBilgi({ kart, yapildi }: { kart: import('@/lib/db').AjandaKartRow; yapildi: boolean }) {
   const o = kart.ortak!;
-  const ben = benAile();
-  const id = kart.id.replace(/^o-/, '');
-  const benUstlendim = o.ustlenen === ben.kim;
+  const rica = kart.id.startsWith('c-rc-');
+  const isId = kart.id.replace(/^c-is-/, '');
   return (
     <div className="rt-ortak-bilgi">
-      <p className="rt-muted">👪 Ortak kart · {o.olusturan === ben.kim ? <><b>Sen</b> ekledin.</> : <><b>{o.olusturan_ad}</b> ekledi.</>} {yapildi && o.yapan_ad ? <>✓ <b>{o.yapan_ad}</b> yaptı.</> : o.ustlenen ? <><b>{benUstlendim ? 'Sen' : o.ustlenen_ad}</b> üstlendi.</> : 'Henüz kimse üstlenmedi.'}</p>
-      {!yapildi && (
+      <p className="rt-muted">{kart.kaynak_etiket} · {rica ? <><b>{o.olusturan_ad}</b> senden rica etti.</> : <><b>{o.olusturan_ad || 'Biri'}</b> ekledi, <b>sen</b> üstlendin.</>} İşaretin evdekilerde de görünür.</p>
+      {!yapildi && !rica && (
         <div className="rt-satir">
-          {!benUstlendim
-            ? <button type="button" className="rt-btn" onClick={() => ortakGonder({ o: 'ustlen', id, kim: ben.kim, kim_ad: ben.kim_ad, zaman: Date.now() })}>🙋 Ben üstleniyorum</button>
-            : <button type="button" className="rt-btn" onClick={() => ortakGonder({ o: 'ustlen', id, kim: null, kim_ad: null, zaman: Date.now() })}>Bırak</button>}
+          <button type="button" className="rt-btn" onClick={() => { void isUstlen(isId, null).catch(() => {}); }}>Bırak</button>
         </div>
       )}
     </div>

@@ -13,14 +13,14 @@
 
 import React, { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useCanli } from '@/lib/canli';
-import { db, type AileRow, type BaglantiRow, type NotRow } from '@/lib/db';
+import { type BaglantiRow, type NotRow } from '@/lib/db';
 import { notlar } from '@/lib/notlar';
 import { baglantilar, urlDoldur } from '@/lib/baglanti';
-import { aileAktifMi, disiplinAdi, useDanismanlik } from '@/lib/danismanlik';
-import { grupIkon } from '@/lib/grup';
+import { disiplinAdi, useDanismanlik } from '@/lib/danismanlik';
 import { sayiMetin } from '@/lib/olcum';
 import { NotlarWidget } from './Notlar';
-import { OrtakListeWidget } from './OrtakListe';
+import { CevremListeleriWidget } from './Cevrem';
+import { grupIkonu, useCevrem } from '@/lib/cevrem';
 import { GelenlerEkrani, useGelenlerOzeti } from './Sohbet';
 import { Cizgi, OlcumlerListesi, useOlcumler } from './Olcum';
 import { BaglantiFormu, BaglantiTam } from './Baglanti';
@@ -55,13 +55,9 @@ function useWidgetler(): Widget[] {
   const dn = useDanismanlik();
   const gelen = useGelenlerOzeti();
   const notList = useCanli(notlar, [], [] as NotRow[]);
-  const ortak = useCanli(async () => {
-    const gruplar = (await db.aile.toArray()).filter(aileAktifMi);
-    if (!gruplar.length) return null;
-    const listeler = (await db.ortak_liste.toArray()).filter((l) => !l.silindi && gruplar.some((g) => g.id === l.aile));
-    const acikSay = (await db.ortak_madde.toArray()).filter((m) => !m.silindi && !m.isaretli && listeler.some((l) => l.id === m.liste)).length;
-    return { gruplar, listeler, acikSay };
-  }, [dn.uid], null as null | { gruplar: AileRow[]; listeler: { ad: string }[]; acikSay: number });
+  // 7 ekim: ortak listeler Çevrem'den (sunucu + Realtime)
+  const cv = useCevrem();
+  const ortak = cv.gruplar.length ? { gruplar: cv.gruplar, listeler: cv.listeler, acikSay: cv.maddeler.filter((m) => !m.isaretli).length } : null;
   const koclar = useIliskiler().filter((x) => x.danisan === dn.uid && x.durum === 'aktif' && x.disiplin !== 'aile');
   const olcum = useOlcumler();
   const bag = useCanli(baglantilar, [], [] as BaglantiRow[]);
@@ -84,9 +80,9 @@ function useWidgetler(): Widget[] {
     const ilk = ortak.listeler[0];
     w.push({ k: 'ortak', ic: '🛒', ad: 'Ortak listeler', mod: 'ekran',
       durum: ilk
-        ? <>{ortak.listeler.length > 1 ? `${ortak.listeler.length} liste` : ilk.ad} · <b>{ortak.acikSay ? `${ortak.acikSay} alınacak` : 'hepsi alındı'}</b>{ortak.gruplar.length === 1 ? ` · ${grupIkon(g)} ${g.ad}` : ''}</>
-        : <>Henüz liste yok · {grupIkon(g)} {ortak.gruplar.length > 1 ? `${ortak.gruplar.length} grup` : g.ad}</>,
-      imza: `${ortak.listeler.length}|${ortak.acikSay}`, govde: () => <OrtakListeWidget gomulu /> });
+        ? <>{ortak.listeler.length > 1 ? `${ortak.listeler.length} liste` : ilk.ad} · <b>{ortak.acikSay ? `${ortak.acikSay} alınacak` : 'hepsi alındı'}</b>{ortak.gruplar.length === 1 ? ` · ${grupIkonu(g)} ${g.ad}` : ''}</>
+        : <>Henüz liste yok · {grupIkonu(g)} {ortak.gruplar.length > 1 ? `${ortak.gruplar.length} grup` : g.ad}</>,
+      imza: `${ortak.listeler.length}|${ortak.acikSay}`, govde: () => <CevremListeleriWidget /> });
   }
 
   if (koclar.length) {

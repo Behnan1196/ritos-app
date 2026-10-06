@@ -981,10 +981,7 @@ senkronKancalari.basla = (k, a) => danismanlikBaslat(k, a);
 senkronKancalari.tur = danismanlikTur;
 senkronKancalari.dur = danismanlikDurdur;
 ajandaKancalari.uzakGeriBildirim = geriBildirimKuyrugu;
-ajandaKancalari.ortakOlay = (kart, tarih, yapildi) => {
-  if (!kart.ortak) return;
-  void ortakGonder({ o: 'yapildi', id: kart.id.replace(/^o-/, ''), tarih, yapildi, ...benAile(), zaman: Date.now() }).catch(() => {});
-};
+// 7 ekim: ortak kart işaretleri artık lib/cevrem.ts'de (ajandaKancalari.ortakOlay).
 programKancalari.degisti = kocDegisti;
 programKancalari.durduruldu = kocDurdurdu;
 

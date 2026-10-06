@@ -22,6 +22,8 @@ import { SenkronIsareti, useGelenSenkron } from './ritos/Paylasim';
 import { GelenlerEkrani, useGelenlerOzeti } from './ritos/Sohbet';
 import { HomeEkrani } from './ritos/HomeEkrani';
 import { CikisOnayi, GirisEkrani, HesapEkrani, KullaniciRozeti, type HesapEkran, SifreSifirlaEkrani } from './ritos/Hesap';
+import Cevrem from './ritos/Cevrem';
+import { useCevremBaslat } from '@/lib/cevrem';
 import { useHesapBaslat, useOturum } from '@/lib/hesap';
 
 const NARROW_BREAKPOINT = 760;
@@ -52,6 +54,7 @@ function RitosUygulama() {
   useDisKartlar(); // dış uygulamaların kartları (cat_dis_kart)
   useBildirimPlani(); // 🔔 ayarlı kartların bildirimlerini kuyruğa yazar
   useGelenSenkron();
+  useCevremBaslat(); // Çevrem (7 ekim): gruplar, listeler, ortak işler — Realtime
   const [isNarrow, setIsNarrow] = useState(false);
   const [ratio, setRatio] = useState(58);
   const [sekme, setSekme] = useState<Sekme>('gunum');
@@ -67,6 +70,7 @@ function RitosUygulama() {
     window.addEventListener('ritos-ajandaya-git', f);
     window.addEventListener('ritos-atolyeye-git', a);
     window.addEventListener('ritos-rutinlere-git', r);
+    try { if (new URL(location.href).searchParams.has('katil')) a(); } catch { /* yoksay */ } // davet bağlantısı → Çevrem
     return () => { window.removeEventListener('ritos-ajandaya-git', f); window.removeEventListener('ritos-atolyeye-git', a); window.removeEventListener('ritos-rutinlere-git', r); };
   }, []);
 
@@ -97,7 +101,7 @@ function RitosUygulama() {
   const hesapEkrani = hesap && <HesapEkrani ekran={hesap} onGeri={() => setHesap(null)} />;
   const sagSekme = (s: Sekme) => (
     s === 'gelenler' ? <GelenlerEkrani onGeri={homeyaDon} />
-      : s === 'atolye' ? <Atolye key="cevre" genis={false} kapsam="cevre" />
+      : s === 'atolye' ? <Cevrem />
       : s === 'rutin' ? <Atolye key="kendim" genis={false} kapsam="kendim" />
       : home
   );
