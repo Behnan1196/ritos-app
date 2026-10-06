@@ -508,7 +508,7 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
   if (kutKaydet) return <KlasorSecModal baslik="📚 Kütüphaneye kaydet" onKapat={onKapat} onSec={async (kl) => { await ajandadanKaydet(kart, kl); }} />;
 
   return (
-    <Modal baslik={kart.ad} onKapat={onKapat} ust={ust}>
+    <Modal baslik={kart.ad} onKapat={onKapat} ust={ust} anlik>
       {kayitCanli?.yapildi && kayitCanli.zaman && <YapildiSaati zaman={kayitCanli.zaman} kilitli={kilitliDetay} bekle={kart.bekle ?? null} onDegis={(z) => yapildiZamani(kart.id, tarih, z)} />}
       <BlokGoster
         bloklar={kart.bloklar}
@@ -609,7 +609,7 @@ function Uygula({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string; on
   const sk = sayacAnahtari(kart.id, tarih);
   const sayac = useSayac(sk);
   return (
-    <Modal baslik={kart.ad} onKapat={onKapat}>
+    <Modal baslik={kart.ad} onKapat={onKapat} anlik>
       <BlokGoster bloklar={kart.bloklar} kayit={null} />
       {sayac ? (
         <SayacKontrol sayac={sayac} sk={sk} buyuk onBitir={async () => { const dk = sayacBitir(sk); await degerKaydet(kart.id, tarih, { ...(satir.kayit?.degerler ?? {}), sure_dk: dk }); onKapat(); }} />

@@ -21,14 +21,16 @@ export function useArkaPlan(kapat: () => void) {
 
 // 5 ekim: modalın içinde bir şey yazıldıysa (herhangi bir input olayı) dışarı dokunmak ya da × formu
 // kaybettirmez; önce "Kaydedilmemiş değişiklikler" sorulur. Hiç yazılmadıysa eskisi gibi hemen kapanır.
-export function Modal({ baslik, onKapat, children, ust }: { baslik: string; onKapat: () => void; children: ReactNode; ust?: ReactNode }) {
+// anlik: içindeki değişiklikler anında kaydedilir (kart detayı: checklist, değer, yapıldı) —
+// "kaydedilmemiş değişiklikler" sorusu sorulmaz.
+export function Modal({ baslik, onKapat, children, ust, anlik }: { baslik: string; onKapat: () => void; children: ReactNode; ust?: ReactNode; anlik?: boolean }) {
   const [kirli, setKirli] = useState(false);
   const [sor, setSor] = useState(false);
   const kapatIste = () => { if (kirli) setSor(true); else onKapat(); };
   const arka = useArkaPlan(kapatIste);
   return (
     <div className="rt-modal-bg" {...arka}>
-      <div className="rt-modal" onClick={(e) => e.stopPropagation()} onInput={() => { if (!kirli) setKirli(true); }} role="dialog" aria-label={baslik}>
+      <div className="rt-modal" onClick={(e) => e.stopPropagation()} onInput={() => { if (!kirli && !anlik) setKirli(true); }} role="dialog" aria-label={baslik}>
         <div className="rt-modal-hd">
           <b>{baslik}</b>
           {ust}
