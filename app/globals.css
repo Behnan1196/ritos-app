@@ -1273,3 +1273,18 @@ textarea.rt-inp{font-family:inherit;}
 .rt-kut-konular{display:flex;flex-direction:column;gap:6px;margin:8px 0;}
 .rt-konu-inp{width:120px;flex:0 0 auto;padding:4px 8px;font-size:13px;}
 .rt-aliskanlik.ajanda{background:var(--soft,#efe8da);}
+
+/* ———— Telefon uyumu (6 ekim) ————
+   • iOS, yazı boyutu 16px'ten küçük alana dokununca sayfayı büyütüyordu → dokunmatikte yazı alanları en az 16px.
+   • Yana kayma ve aşağı çekince "lastik" hareketi kapalı; çift dokunuşla yakınlaşma düğmelerde yok.
+   • Klavye açıkken sabit alt menü gizlenir (MobilUyum.tsx). */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
+html,body{overflow-x:clip;overscroll-behavior:none;}
+button,a,[role="button"],label,select{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+@media (pointer:coarse){
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),textarea,select,.tiptap,.ProseMirror{font-size:16px !important;}
+  .rt-konu-inp{font-size:16px !important;}
+}
+.mobile-app{overscroll-behavior:contain;}
+html.klavye .mobile-nav{display:none;}
+html.klavye .mobile-main{padding-bottom:16px;}

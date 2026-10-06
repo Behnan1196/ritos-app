@@ -2,6 +2,7 @@ import './globals.css';
 import type { ReactNode } from 'react';
 import type { Metadata, Viewport } from 'next';
 import SwKayit from './SwKayit';
+import MobilUyum from './MobilUyum';
 
 export const metadata: Metadata = {
   title: 'Ritos',
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         {children}
         <SwKayit />
+        <MobilUyum />
       </body>
     </html>
   );
