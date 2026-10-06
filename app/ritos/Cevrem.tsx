@@ -16,6 +16,7 @@ import {
 import { GUN_KISA, bugun, tarihEkle, tarihEtiket } from '@/lib/paket';
 import { Modal, OnayKutusu } from './ortak';
 import { Avatar } from './Hesap';
+import { danismanlikDavetiAc } from './Danismanlik';
 
 const SECILI = 'ritos-cevrem-grup';
 const LISTE_IKON = ['🛒', '📝', '🧳', '🔧', '🎁', '🍳', '🏥', '📚'];
@@ -539,6 +540,7 @@ function KatilModal({ kod0, onKapat, onKatildi }: { kod0: string; onKapat: () =>
   const [bekle, setBekle] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
   const temiz = kod.replace(/\s/g, '').toUpperCase();
+  const danismanlik = temiz.length > 8; // koç davet kodu (14 harf) — danışmanlık penceresi açılır
   useEffect(() => {
     setBilgi(null);
     if (temiz.length !== 6) return;
@@ -548,16 +550,19 @@ function KatilModal({ kod0, onKapat, onKatildi }: { kod0: string; onKapat: () =>
   }, [temiz]);
   return (
     <Modal baslik="Gruba katıl" onKapat={onKapat}>
-      <label className="rt-alan">Davet kodu<input className="rt-inp rt-cv-kod-inp" value={kod} maxLength={8} onChange={(e) => setKod(e.target.value)} placeholder="ör. K7M2PX" autoFocus /></label>
+      <label className="rt-alan">Davet kodu<input className="rt-inp rt-cv-kod-inp" value={kod} maxLength={20} onChange={(e) => setKod(e.target.value)} placeholder="ör. K7M2PX" autoFocus /></label>
+      {danismanlik && <p className="rt-muted">Bu bir danışmanlık daveti kodu; koçunun davetini açar.</p>}
       {bilgi === 'yok' && <p className="rt-hata">Bu kod geçersiz ya da süresi dolmuş.</p>}
       {bilgi && bilgi !== 'yok' && <p className="rt-metin">{GRUP_TUR[bilgi.tur]?.ikon} <b>{bilgi.ad}</b> · {bilgi.uye_sayisi} kişi</p>}
       {hata && <p className="rt-hata">{hata}</p>}
       <div className="rt-satir">
         <button type="button" className="rt-btn" onClick={onKapat}>Vazgeç</button>
-        <button type="button" className="rt-btn primary" disabled={!bilgi || bilgi === 'yok' || bekle} onClick={async () => {
-          setBekle(true); setHata(null);
-          try { onKatildi(await grupKatil(temiz)); } catch (e) { setHata(hataMetni(e)); setBekle(false); }
-        }}>Katıl</button>
+        {danismanlik
+          ? <button type="button" className="rt-btn primary" onClick={() => { danismanlikDavetiAc(temiz); onKapat(); }}>Daveti aç</button>
+          : <button type="button" className="rt-btn primary" disabled={!bilgi || bilgi === 'yok' || bekle} onClick={async () => {
+              setBekle(true); setHata(null);
+              try { onKatildi(await grupKatil(temiz)); } catch (e) { setHata(hataMetni(e)); setBekle(false); }
+            }}>Katıl</button>}
       </div>
     </Modal>
   );

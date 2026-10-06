@@ -221,7 +221,7 @@ export function DanisanSatiri({ il, onAc, secili }: { il: IliskiRow; onAc: () =>
 export function DavetModal({ onKapat, sabitDisiplin }: { onKapat: () => void; sabitDisiplin?: string }) {
   const d = useDanismanlik();
   const [disiplin, setDisiplin] = useState(sabitDisiplin ?? d.profil?.disiplinler[0] ?? 'sinav');
-  const [yol, setYol] = useState<'baglanti' | 'eposta'>('eposta');
+  const [yol, setYol] = useState<'baglanti' | 'eposta'>('baglanti'); // 7 ekim: e-postayla davet şimdilik yok
   const [eposta, setEposta] = useState('');
   const [sonuc, setSonuc] = useState<string | null>(null);
   const [gonderildi, setGonderildi] = useState<string | null>(null);
@@ -244,9 +244,9 @@ export function DavetModal({ onKapat, sabitDisiplin }: { onKapat: () => void; sa
             <Chips secenekler={secenekler} deger={disiplin} onSec={setDisiplin} />
           </>}
           {/* V1 (28 eylül): bağlantı/QR kapalı — telefonda PWA yerine tarayıcıda açılıp yeniden giriş istiyor; mobil uygulamada (V2) çözülecek. */}
-          {V2 && <div style={{ marginTop: sabitDisiplin ? 0 : 12 }}><Chips<'baglanti' | 'eposta'> secenekler={[['eposta', 'E-postayla'], ['baglanti', 'Bağlantı / QR']]} deger={yol} onSec={setYol} /></div>}
+          {V2 && false && <div style={{ marginTop: sabitDisiplin ? 0 : 12 }}><Chips<'baglanti' | 'eposta'> secenekler={[['eposta', 'E-postayla'], ['baglanti', 'Bağlantı / QR']]} deger={yol} onSec={setYol} /></div>}
           {yol === 'baglanti'
-            ? <p className="rt-muted" style={{ marginTop: 10 }}>Bağlantı tek kullanımlık, 7 gün geçerli. Danışanın açınca hesabına giriş yapar (yoksa ücretsiz oluşturur) ve kabul eder. Yüz yüzeysen QR kodu okutabilir.</p>
+            ? <p className="rt-muted" style={{ marginTop: 10 }}>Bağlantı tek kullanımlık, 7 gün geçerli. Danışanın bağlantıyı açar, Ritos hesabıyla girer (yoksa oluşturur) ve kabul eder. Bağlantı açılmazsa kodu Çevrem › Davet kodum var&apos;a yazabilir. Yüz yüzeysen QR kodu okutabilir.</p>
             : (
               <>
                 <p className="rt-muted" style={{ marginTop: 10 }}>Danışanın Ritos hesabı varsa davet Home › Gelenler&apos;e düşer; oradan kabul eder.</p>
@@ -269,7 +269,7 @@ export function DavetModal({ onKapat, sabitDisiplin }: { onKapat: () => void; sa
       ) : (
         <>
           <QrKod metin={sonuc} />
-          <p className="rt-metin">QR kodu okut ya da bağlantıyı gönder:</p>
+          <p className="rt-metin">QR kodu okut ya da bağlantıyı gönder. Kod: <b className="rt-dan-kod">{new URL(sonuc).searchParams.get('davet')}</b></p>
           <input className="rt-inp" readOnly value={sonuc} onFocus={(e) => e.target.select()} />
           <div className="rt-satir" style={{ marginTop: 10 }}>
             <button type="button" className="rt-btn primary" onClick={async () => { try { await navigator.clipboard.writeText(sonuc); setKopyalandi(true); } catch { /* yoksay */ } }}>{kopyalandi ? 'Kopyalandı ✓' : 'Kopyala'}</button>
@@ -631,6 +631,12 @@ function ProgrameGorevModal({ programlar, ilk, onKapat }: { programlar: ProgramR
 
 const DAVET = 'ritos-davet';
 
+/** Kod elle girildi (Çevrem › Davet kodum var): danışmanlık davet penceresini aç. */
+export function danismanlikDavetiAc(kod: string) {
+  try { localStorage.setItem(DAVET, kod.trim().toLowerCase()); } catch { /* yoksay */ }
+  window.dispatchEvent(new Event('ritos-davet-kodu'));
+}
+
 /** Uygulama davet bağlantısıyla açıldıysa: kodu sakla, adres çubuğundan temizle. */
 export function davetYakala() {
   if (typeof window === 'undefined') return;
@@ -649,7 +655,12 @@ export function DavetKarsilama() {
   const [bilgi, setBilgi] = useState<{ koc_ad: string; disiplin: string; gecerli: boolean; kendi: boolean } | null | 'yok'>(null);
   const [sonuc, setSonuc] = useState<string | null>(null);
   const [hata, setHata] = useState<string | null>(null);
-  useEffect(() => { davetYakala(); try { setKod(localStorage.getItem(DAVET)); } catch { /* yoksay */ } }, []);
+  useEffect(() => {
+    const oku = () => { try { setBilgi(null); setSonuc(null); setKod(localStorage.getItem(DAVET)); } catch { /* yoksay */ } };
+    davetYakala(); oku();
+    window.addEventListener('ritos-davet-kodu', oku);
+    return () => window.removeEventListener('ritos-davet-kodu', oku);
+  }, []);
   useEffect(() => {
     if (!kod || !d.etkin) return;
     davetBak(kod).then((b) => setBilgi(b ?? 'yok')).catch((e) => setHata(e instanceof Error ? e.message : String(e)));

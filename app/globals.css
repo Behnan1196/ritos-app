@@ -1358,3 +1358,4 @@ div.rt-cv-sat .ic{cursor:default;}
 .rt-cv-bos > p{margin:0;text-align:center;line-height:1.5;}
 .rt-cv-kod{font-size:30px;font-weight:800;letter-spacing:.2em;text-align:center;background:#efe8da;border-radius:12px;padding:14px;font-variant-numeric:tabular-nums;user-select:all;}
 .rt-cv-kod-inp{text-transform:uppercase;letter-spacing:.15em;font-weight:700;}
+.rt-dan-kod{font-variant-numeric:tabular-nums;letter-spacing:.06em;user-select:all;}
