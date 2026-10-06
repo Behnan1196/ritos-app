@@ -67,7 +67,6 @@ export function SohbetEkrani() {
   return (
     <div>
       <h4>💬 Sohbet</h4>
-      <EpostaDavetleri />
       <BekleyenDavetler />
       <AileDavetleri />
       {aktifler.length === 0 && (
@@ -136,6 +135,7 @@ export function GelenlerEkrani({ onGeri, gomulu }: { onGeri?: () => void; gomulu
           <b>📥 Gelenler</b>
         </div>
       )}
+      <EpostaDavetleri />
       <BekleyenDavetler />
       <AileDavetleri />
       {yeni.map(satir)}
