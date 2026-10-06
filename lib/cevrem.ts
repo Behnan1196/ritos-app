@@ -39,6 +39,14 @@ export interface IsKayit { is_id: string; tarih: string; grup_id: string; yapild
 export type RicaDurum = 'bekliyor' | 'kabul' | 'ret' | 'yapildi' | 'iptal';
 export interface Rica { id: string; grup_id: string; isteyen: string; istenen: string; ad: string; aciklama: string | null; tarih: string; saat: string | null; durum: RicaDurum; olusturuldu: string; guncellendi: string }
 
+/** Birlikte rutin: "haftada N kez" ortak hedef (supabase/v1/08-birlikte.sql). */
+export interface BirlikteRutin { id: string; grup_id: string; ad: string; ikon: string | null; aciklama: string | null; hedef: number; olusturan: string | null; silindi: boolean; olusturuldu: string }
+export interface BirlikteKatilim { rutin_id: string; grup_id: string; uye_id: string; durum: 'aktif' | 'ayrildi'; katildi: string }
+export interface BirlikteKayit { rutin_id: string; grup_id: string; uye_id: string; tarih: string; zaman: string }
+export type Yanit = 'geliyorum' | 'belki' | 'gelemem';
+export interface Bulusma { id: string; grup_id: string; ad: string; aciklama: string | null; tarih: string; saat: string | null; yer: string | null; olusturan: string | null; iptal: boolean; olusturuldu: string; guncellendi: string }
+export interface BulusmaYanit { bulusma_id: string; grup_id: string; uye_id: string; yanit: Yanit; zaman: string }
+
 /** Çevrem'deki birinin bana gönderdiği kart/program tanımı (supabase/v1/07-paylasim.sql). */
 export interface GelenPaylasim { id: string; gonderen: string; gonderen_ad: string; paket: unknown; alindi: string | null; olusturuldu: string }
 
@@ -46,9 +54,11 @@ export interface CevremDurum {
   hazir: boolean; uid: string | null; hata: string | null;
   gruplar: Grup[]; uyeler: Uye[]; listeler: Liste[]; maddeler: Madde[]; isler: OrtakIs[]; kayitlar: IsKayit[]; ricalar: Rica[];
   gelenler: GelenPaylasim[];
+  rutinler: BirlikteRutin[]; katilimlar: BirlikteKatilim[]; bkayitlar: BirlikteKayit[];
+  bulusmalar: Bulusma[]; yanitlar: BulusmaYanit[];
 }
 
-const BOS: CevremDurum = { hazir: false, uid: null, hata: null, gruplar: [], uyeler: [], listeler: [], maddeler: [], isler: [], kayitlar: [], ricalar: [], gelenler: [] };
+const BOS: CevremDurum = { hazir: false, uid: null, hata: null, gruplar: [], uyeler: [], listeler: [], maddeler: [], isler: [], kayitlar: [], ricalar: [], gelenler: [], rutinler: [], katilimlar: [], bkayitlar: [], bulusmalar: [], yanitlar: [] };
 let durum: CevremDurum = BOS;
 const dinleyiciler = new Set<(d: CevremDurum) => void>();
 function yay(p: Partial<CevremDurum>) {
@@ -90,7 +100,7 @@ async function yukle(): Promise<void> {
         .gte('olusturuldu', new Date(Date.now() - 60 * 86400000).toISOString()).order('olusturuldu', { ascending: false }).limit(100);
       const gelenler = (pg.error ? durum.gelenler : (pg.data ?? [])) as GelenPaylasim[];
       if (!ids.length) { yay({ ...BOS, hazir: true, uid, gelenler }); return; }
-      const [g, u, l, m, i, k, r] = await Promise.all([
+      const [g, u, l, m, i, k, r, br, bk, bkk, bl, by] = await Promise.all([
         sb.from('grup').select('id, ad, tur, ikon, kurucu').in('id', ids).order('olusturuldu'),
         sb.from('grup_uye').select('grup_id, uye_id, rol, durum, katildi').in('grup_id', ids),
         sb.from('liste').select('id, grup_id, ad, ikon, olusturan, silindi, olusturuldu').in('grup_id', ids).eq('silindi', false).order('olusturuldu'),
@@ -98,8 +108,15 @@ async function yukle(): Promise<void> {
         sb.from('ortak_is').select('id, grup_id, ad, aciklama, tarih, bitis, gunler, saat, ustlenen, ustlenme_zaman, olusturan, silindi, olusturuldu').in('grup_id', ids).eq('silindi', false).order('olusturuldu'),
         sb.from('ortak_is_kayit').select('is_id, tarih, grup_id, yapildi, yapan, zaman').in('grup_id', ids).gte('tarih', tarihEkleGun(bugun(), -30)),
         sb.from('rica').select('id, grup_id, isteyen, istenen, ad, aciklama, tarih, saat, durum, olusturuldu, guncellendi').in('grup_id', ids).neq('durum', 'iptal').order('olusturuldu', { ascending: false }).limit(200),
+        sb.from('birlikte_rutin').select('id, grup_id, ad, ikon, aciklama, hedef, olusturan, silindi, olusturuldu').in('grup_id', ids).eq('silindi', false).order('olusturuldu'),
+        sb.from('birlikte_katilim').select('rutin_id, grup_id, uye_id, durum, katildi').in('grup_id', ids),
+        sb.from('birlikte_kayit').select('rutin_id, grup_id, uye_id, tarih, zaman').in('grup_id', ids).gte('tarih', tarihEkleGun(bugun(), -42)),
+        sb.from('bulusma').select('id, grup_id, ad, aciklama, tarih, saat, yer, olusturan, iptal, olusturuldu, guncellendi').in('grup_id', ids).gte('tarih', tarihEkleGun(bugun(), -14)).order('tarih'),
+        sb.from('bulusma_yanit').select('bulusma_id, grup_id, uye_id, yanit, zaman').in('grup_id', ids),
       ]);
       for (const x of [g, u, l, m, i, k, r]) hata(x.error);
+      // 08-birlikte.sql henüz çalıştırılmadıysa bu tablolar yok: Çevrem'in geri kalanı yine çalışsın.
+      const ek = <T,>(x: { data: unknown; error: { message: string } | null }): T[] => (x.error ? [] : ((x.data ?? []) as T[]));
       const uyeSatir = (u.data ?? []) as Omit<Uye, 'ad' | 'avatar'>[];
       const kisiler = Array.from(new Set(uyeSatir.map((x) => x.uye_id)));
       const p = await sb.from('profil').select('id, gorunen_ad, eposta, avatar_url').in('id', kisiler);
@@ -114,6 +131,8 @@ async function yukle(): Promise<void> {
         listeler: (l.data ?? []) as Liste[], maddeler: (m.data ?? []) as Madde[],
         isler: (i.data ?? []) as OrtakIs[], kayitlar: (k.data ?? []) as IsKayit[], ricalar: (r.data ?? []) as Rica[],
         gelenler,
+        rutinler: ek<BirlikteRutin>(br), katilimlar: ek<BirlikteKatilim>(bk), bkayitlar: ek<BirlikteKayit>(bkk),
+        bulusmalar: ek<Bulusma>(bl), yanitlar: ek<BulusmaYanit>(by),
       });
     } catch (e) {
       yay({ hazir: true, hata: e instanceof Error ? e.message : String(e) });
@@ -139,7 +158,7 @@ export function useCevremBaslat() {
     void yukle();
     const ad = `cevrem-${Math.random().toString(36).slice(2, 8)}`;
     let c = sb.channel(ad);
-    for (const t of ['grup', 'grup_uye', 'liste', 'liste_madde', 'ortak_is', 'ortak_is_kayit', 'rica', 'paylasim']) {
+    for (const t of ['grup', 'grup_uye', 'liste', 'liste_madde', 'ortak_is', 'ortak_is_kayit', 'rica', 'paylasim', 'birlikte_rutin', 'birlikte_katilim', 'birlikte_kayit', 'bulusma', 'bulusma_yanit']) {
       c = c.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => zamanla());
     }
     kanal = c.subscribe();
@@ -303,6 +322,92 @@ export async function ricaDurum(id: string, d: RicaDurum) {
   hata((await (await sb()).from('rica').update({ durum: d, guncellendi: simdi() }).eq('id', id)).error);
 }
 
+// ———————————————— birlikte rutin ————————————————
+
+/** Haftanın pazartesisi (YYYY-MM-DD). */
+export function haftaBasi(t: string) {
+  const d = new Date(`${t}T12:00:00`);
+  return tarihEkleGun(t, -((d.getDay() + 6) % 7));
+}
+export const katiliyorMu = (d: CevremDurum, rutin: string, kim = d.uid) => d.katilimlar.some((k) => k.rutin_id === rutin && k.uye_id === kim && k.durum === 'aktif');
+export const rutinKatilimcilari = (d: CevremDurum, r: BirlikteRutin) =>
+  d.katilimlar.filter((k) => k.rutin_id === r.id && k.durum === 'aktif' && d.uyeler.some((u) => u.grup_id === r.grup_id && u.uye_id === k.uye_id && u.durum === 'aktif'))
+    .sort((a, b) => a.katildi.localeCompare(b.katildi));
+/** O haftada (pazartesiden) kişinin kaç kez yaptığı. */
+export function haftaSayisi(d: CevremDurum, rutin: string, kim: string | null, hafta = haftaBasi(bugun())) {
+  const son = tarihEkleGun(hafta, 6);
+  return d.bkayitlar.filter((k) => k.rutin_id === rutin && k.uye_id === kim && k.tarih >= hafta && k.tarih <= son).length;
+}
+export const bugunYaptiMi = (d: CevremDurum, rutin: string, kim = d.uid, t = bugun()) => d.bkayitlar.some((k) => k.rutin_id === rutin && k.uye_id === kim && k.tarih === t);
+/** Kişinin üst üste hedefi tuttuğu hafta sayısı (bu hafta tutulduysa o da sayılır). */
+export function seri(d: CevremDurum, r: BirlikteRutin, kim: string | null) {
+  let h = haftaBasi(bugun()), n = 0;
+  if (haftaSayisi(d, r.id, kim, h) >= r.hedef) n++;
+  for (let i = 0; i < 5; i++) { h = tarihEkleGun(h, -7); if (haftaSayisi(d, r.id, kim, h) >= r.hedef) n++; else break; }
+  return n;
+}
+
+export interface RutinGirdi { ad: string; ikon: string | null; aciklama: string | null; hedef: number }
+export async function rutinEkle(grup: string, g: RutinGirdi, katil = true): Promise<string> {
+  const id = crypto.randomUUID();
+  const s = await sb();
+  yerel('rutinler', (x) => [...x, { id, grup_id: grup, ...g, olusturan: durum.uid, silindi: false, olusturuldu: simdi() }]);
+  hata((await s.from('birlikte_rutin').insert({ id, grup_id: grup, ...g, olusturan: durum.uid })).error);
+  if (katil) await rutineKatil(grup, id, true);
+  return id;
+}
+export async function rutinGuncelle(id: string, g: Partial<RutinGirdi>) {
+  yerel('rutinler', (x) => x.map((r) => (r.id === id ? { ...r, ...g } : r)));
+  hata((await (await sb()).from('birlikte_rutin').update({ ...g, guncellendi: simdi() }).eq('id', id)).error);
+}
+export async function rutinSil(id: string) {
+  yerel('rutinler', (x) => x.filter((r) => r.id !== id));
+  hata((await (await sb()).from('birlikte_rutin').update({ silindi: true, guncellendi: simdi() }).eq('id', id)).error);
+}
+export async function rutineKatil(grup: string, rutin: string, katil: boolean) {
+  const k: BirlikteKatilim = { rutin_id: rutin, grup_id: grup, uye_id: durum.uid!, durum: katil ? 'aktif' : 'ayrildi', katildi: simdi() };
+  yerel('katilimlar', (x) => [...x.filter((y) => !(y.rutin_id === rutin && y.uye_id === durum.uid)), k]);
+  hata((await (await sb()).from('birlikte_katilim').upsert(k, { onConflict: 'rutin_id,uye_id' })).error);
+}
+export async function rutinYapildi(r: Pick<BirlikteRutin, 'id' | 'grup_id'>, tarih: string, yapildi: boolean) {
+  const s = await sb();
+  if (yapildi) {
+    const k: BirlikteKayit = { rutin_id: r.id, grup_id: r.grup_id, uye_id: durum.uid!, tarih, zaman: simdi() };
+    yerel('bkayitlar', (x) => [...x.filter((y) => !(y.rutin_id === r.id && y.uye_id === durum.uid && y.tarih === tarih)), k]);
+    hata((await s.from('birlikte_kayit').upsert(k, { onConflict: 'rutin_id,uye_id,tarih' })).error);
+  } else {
+    yerel('bkayitlar', (x) => x.filter((y) => !(y.rutin_id === r.id && y.uye_id === durum.uid && y.tarih === tarih)));
+    hata((await s.from('birlikte_kayit').delete().eq('rutin_id', r.id).eq('uye_id', durum.uid!).eq('tarih', tarih)).error);
+  }
+}
+
+// ———————————————— buluşma ————————————————
+
+export interface BulusmaGirdi { ad: string; aciklama: string | null; tarih: string; saat: string | null; yer: string | null }
+export const yanitim = (d: CevremDurum, b: string, kim = d.uid) => d.yanitlar.find((y) => y.bulusma_id === b && y.uye_id === kim)?.yanit ?? null;
+export function yanitSayilari(d: CevremDurum, b: Bulusma) {
+  const aktif = new Set(aktifUyeler(d, b.grup_id).map((u) => u.uye_id));
+  const ys = d.yanitlar.filter((y) => y.bulusma_id === b.id && aktif.has(y.uye_id));
+  return { geliyorum: ys.filter((y) => y.yanit === 'geliyorum'), belki: ys.filter((y) => y.yanit === 'belki'), gelemem: ys.filter((y) => y.yanit === 'gelemem'), bekleyen: aktif.size - ys.length };
+}
+export async function bulusmaEkle(grup: string, g: BulusmaGirdi): Promise<string> {
+  const id = crypto.randomUUID();
+  const s = await sb();
+  yerel('bulusmalar', (x) => [...x, { id, grup_id: grup, ...g, olusturan: durum.uid, iptal: false, olusturuldu: simdi(), guncellendi: simdi() }]);
+  hata((await s.from('bulusma').insert({ id, grup_id: grup, ...g, olusturan: durum.uid })).error);
+  await bulusmaYanitla({ id, grup_id: grup }, 'geliyorum');
+  return id;
+}
+export async function bulusmaGuncelle(id: string, g: Partial<BulusmaGirdi> & { iptal?: boolean }) {
+  yerel('bulusmalar', (x) => x.map((b) => (b.id === id ? { ...b, ...g, guncellendi: simdi() } : b)));
+  hata((await (await sb()).from('bulusma').update({ ...g, guncellendi: simdi() }).eq('id', id)).error);
+}
+export async function bulusmaYanitla(b: Pick<Bulusma, 'id' | 'grup_id'>, yanit: Yanit) {
+  const y: BulusmaYanit = { bulusma_id: b.id, grup_id: b.grup_id, uye_id: durum.uid!, yanit, zaman: simdi() };
+  yerel('yanitlar', (x) => [...x.filter((z) => !(z.bulusma_id === b.id && z.uye_id === durum.uid)), y]);
+  hata((await (await sb()).from('bulusma_yanit').upsert(y, { onConflict: 'bulusma_id,uye_id' })).error);
+}
+
 // ———————————————— paylaş (kart / program tanımı) ————————————————
 
 /** Çevrem'deki kişiler (benden başka, grupları birleşik): Paylaş'ta alıcı listesi. */
@@ -337,6 +442,8 @@ export async function paylasimSil(id: string) {
 const IZIN: Izinler = { ac: true, duzenle: false, sil: false, gun_degistir: false, sirala: true, duzeltme_gun: null };
 export const isKartId = (id: string) => `c-is-${id}`;
 export const ricaKartId = (id: string) => `c-rc-${id}`;
+export const rutinKartId = (id: string) => `c-br-${id}`;
+export const bulusmaKartId = (id: string) => `c-bl-${id}`;
 const bloklar = (aciklama: string | null): Blok[] => (aciklama?.trim() ? [{ tur: 'belge', belge: metindenBelge(aciklama) }] : []);
 
 let ajandaZm: ReturnType<typeof setTimeout> | null = null;
@@ -364,17 +471,46 @@ async function ajandayaYansit() {
   for (const i of d.isler) if (i.ustlenen === d.uid) istenen.set(isKartId(i.id), kart(isKartId(i.id), i.ad, i.aciklama, i.tarih, i.bitis, i.gunler, i.saat, i.grup_id, i.olusturan));
   for (const r of d.ricalar) if (r.istenen === d.uid && (r.durum === 'kabul' || r.durum === 'yapildi')) istenen.set(ricaKartId(r.id), kart(ricaKartId(r.id), r.ad, r.aciklama, r.tarih, r.tarih, null, r.saat, r.grup_id, r.isteyen));
 
+  // Birlikte rutin (katıldıklarım): her gün görünen kart; bu haftanın hedefi tutunca haftanın kalanı kalkar,
+  // geçmişte yapılmayan günler de "kaçırıldı" gibi durmasın diye atlanır.
+  const t = bugun();
+  for (const r of d.rutinler) {
+    const k = d.katilimlar.find((x) => x.rutin_id === r.id && x.uye_id === d.uid && x.durum === 'aktif');
+    if (!k) continue;
+    const id = rutinKartId(r.id);
+    const kd = new Date(k.katildi);
+    const bas = `${kd.getFullYear()}-${String(kd.getMonth() + 1).padStart(2, '0')}-${String(kd.getDate()).padStart(2, '0')}`;
+    const yapilan = new Set(d.bkayitlar.filter((x) => x.rutin_id === r.id && x.uye_id === d.uid).map((x) => x.tarih));
+    const atla: string[] = [];
+    for (let g = tarihEkleGun(t, -42); g < t; g = tarihEkleGun(g, 1)) if (g >= bas && !yapilan.has(g)) atla.push(g);
+    const hb = haftaBasi(t);
+    const sayi = haftaSayisi(d, r.id, d.uid, hb);
+    if (sayi >= r.hedef) for (let g = t; g <= tarihEkleGun(hb, 6); g = tarihEkleGun(g, 1)) if (!yapilan.has(g)) atla.push(g);
+    const c = kart(id, `${r.ikon ? `${r.ikon} ` : ''}${r.ad}`, r.aciklama, bas, null, null, null, r.grup_id, r.olusturan);
+    c.kaynak_etiket = `${grupAd.get(r.grup_id) ?? 'Çevrem'} · bu hafta ${Math.min(sayi, r.hedef)}/${r.hedef}`;
+    c.atla = atla;
+    istenen.set(id, c);
+  }
+  // Buluşma ("geliyorum" dediklerim, iptal olmayan): o günün kartı.
+  for (const b of d.bulusmalar) {
+    if (b.iptal || yanitim(d, b.id) !== 'geliyorum') continue;
+    const not = [b.yer ? `📍 ${b.yer}` : '', b.aciklama ?? ''].filter(Boolean).join('\n') || null;
+    const c = kart(bulusmaKartId(b.id), `📅 ${b.ad}`, not, b.tarih, b.tarih, null, b.saat, b.grup_id, b.olusturan);
+    istenen.set(c.id, c);
+  }
+
   // Sunucudaki "yapıldı" bilgisini ajanda kayıtlarına yansıt (başkası işaretlediyse de görünsün).
   const kayitlar: { id: string; kart_id: string; tarih: string; yapildi: boolean; zaman: number }[] = [];
   for (const k of d.kayitlar) if (istenen.has(isKartId(k.is_id)) && k.yapildi) kayitlar.push({ id: `${isKartId(k.is_id)}|${k.tarih}`, kart_id: isKartId(k.is_id), tarih: k.tarih, yapildi: true, zaman: Date.parse(k.zaman) });
   for (const r of d.ricalar) if (r.durum === 'yapildi' && istenen.has(ricaKartId(r.id))) kayitlar.push({ id: `${ricaKartId(r.id)}|${r.tarih}`, kart_id: ricaKartId(r.id), tarih: r.tarih, yapildi: true, zaman: Date.parse(r.guncellendi) });
+  for (const k of d.bkayitlar) if (k.uye_id === d.uid && istenen.has(rutinKartId(k.rutin_id))) kayitlar.push({ id: `${rutinKartId(k.rutin_id)}|${k.tarih}`, kart_id: rutinKartId(k.rutin_id), tarih: k.tarih, yapildi: true, zaman: Date.parse(k.zaman) });
 
   db.uzaktan = true; // türetilmiş satırlar: eşitlenmez
   try {
     await db.transaction('rw', db.ajanda_kart, db.ajanda_kayit, async () => {
       for (const [id, k] of Array.from(istenen.entries())) {
         const e = eski.get(id);
-        const imza = (x: AjandaKartRow) => JSON.stringify([x.ad, x.bloklar, x.baslangic, x.bitis, x.gunler, x.saatler, x.kaynak_etiket]);
+        const imza = (x: AjandaKartRow) => JSON.stringify([x.ad, x.bloklar, x.baslangic, x.bitis, x.gunler, x.saatler, x.kaynak_etiket, x.atla ?? []]);
         if (!e || imza(e) !== imza(k)) await db.ajanda_kart.put(k);
       }
       for (const e of mevcutlar) if (!istenen.has(e.id)) { await db.ajanda_kart.delete(e.id); await db.ajanda_kayit.where('kart_id').equals(e.id).delete(); }
@@ -384,7 +520,8 @@ async function ajandayaYansit() {
         const y = yerelKayit.find((x) => x.id === r.id);
         if (!y?.yapildi) await db.ajanda_kayit.put({ id: r.id, kart_id: r.kart_id, tarih: r.tarih, yapildi: true, degerler: y?.degerler ?? null, zaman: r.zaman, guncellendi: Date.now() });
       }
-      for (const y of yerelKayit) if (y.yapildi && istenen.has(y.kart_id) && !sunucu.has(y.id) && !bekleyenIsaret.has(y.id)) {
+      // Buluşma kartının işareti yalnız yerel (sunucuya gitmez) — geri alınmasın.
+      for (const y of yerelKayit) if (y.yapildi && istenen.has(y.kart_id) && !y.kart_id.startsWith('c-bl-') && !sunucu.has(y.id) && !bekleyenIsaret.has(y.id)) {
         await db.ajanda_kayit.put({ ...y, yapildi: false, zaman: null, guncellendi: Date.now() });
       }
     });
@@ -399,7 +536,11 @@ ajandaKancalari.ortakOlay = (kart, tarih, yapildi) => {
   bekleyenIsaret.add(anahtar);
   (async () => {
     try {
-      if (kart.id.startsWith('c-is-')) {
+      if (kart.id.startsWith('c-bl-')) return;
+      if (kart.id.startsWith('c-br-')) {
+        const r = durum.rutinler.find((x) => rutinKartId(x.id) === kart.id);
+        if (r) await rutinYapildi(r, tarih, yapildi);
+      } else if (kart.id.startsWith('c-is-')) {
         const i = durum.isler.find((x) => isKartId(x.id) === kart.id);
         if (i) await isYapildi(i, tarih, yapildi);
       } else {

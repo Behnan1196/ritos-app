@@ -11,9 +11,11 @@ import {
   GRUP_SINIR, GRUP_TUR, aktifUyeler, benYoneticiyim, davetBak, davetKodu, grupAyril, grupGuncelle, grupIkonu, grupKatil, grupKur,
   isEkle, isGuncelle, isGunu, isKaydi, isSil, isUstlen, isYapildi, isaretlileriTemizle, listeEkle, listeGuncelle, listeSil,
   maddeEkle, maddeIsaretle, maddeSil, ricaDurum, ricaGonder, useCevrem, uyeAdi,
-  type CevremDurum, type Grup, type GrupTur, type IsGirdi, type Liste, type OrtakIs, type Rica,
+  bugunYaptiMi, bulusmaEkle, bulusmaGuncelle, bulusmaYanitla, haftaBasi, haftaSayisi, katiliyorMu, rutinEkle, rutinGuncelle, rutinKatilimcilari,
+  rutinSil, rutinYapildi, rutineKatil, seri, yanitSayilari, yanitim,
+  type BirlikteRutin, type Bulusma, type CevremDurum, type Grup, type GrupTur, type IsGirdi, type Liste, type OrtakIs, type Rica, type Yanit,
 } from '@/lib/cevrem';
-import { GUN_KISA, bugun, tarihEkle, tarihEtiket } from '@/lib/paket';
+import { GUN_KISA, bugun, tarihEkle, tarihEtiket, tarihParse } from '@/lib/paket';
 import { Modal, OnayKutusu } from './ortak';
 import { Avatar, HesapGerekli } from './Hesap';
 import { danismanlikDavetiAc } from './Danismanlik';
@@ -44,7 +46,7 @@ const sureMetni = (iso: string) => {
 // ———————————————— ana ————————————————
 
 type Ekran = { t: 'ana' } | { t: 'liste'; id: string } | { t: 'ayar' };
-type Sayfa = null | 'ekle' | 'is' | 'rica' | 'liste' | 'davet' | 'katil' | 'kur' | { is: OrtakIs };
+type Sayfa = null | 'ekle' | 'is' | 'rica' | 'liste' | 'davet' | 'katil' | 'kur' | 'rutin' | 'bulusma' | { is: OrtakIs } | { rutin: BirlikteRutin } | { bulusma: Bulusma };
 
 export default function Cevrem() {
   const d = useCevrem();
@@ -91,8 +93,21 @@ export default function Cevrem() {
           <>
             <GrupBasligi d={d} grup={grup} onSec={sec} onKur={() => setSayfa('kur')} onKatil={() => setSayfa('katil')} onDavet={() => setSayfa('davet')} onAyar={() => setEkran({ t: 'ayar' })} />
             <GelenRicalar d={d} grup={grup} />
-            <BugunEvde d={d} grup={grup} onAc={(i) => setSayfa({ is: i })} onEkle={() => setSayfa('is')} />
-            <Listeler d={d} grup={grup} onAc={(id) => setEkran({ t: 'liste', id })} onYeni={() => setSayfa('liste')} />
+            {grup.tur === 'arkadas' ? (
+              <>
+                <Bulusmalar d={d} grup={grup} bosGoster onAc={(b) => setSayfa({ bulusma: b })} onYeni={() => setSayfa('bulusma')} />
+                <BirlikteRutinler d={d} grup={grup} bosGoster onAc={(r) => setSayfa({ rutin: r })} onYeni={() => setSayfa('rutin')} />
+                {d.isler.some((i) => i.grup_id === grup.id) && <BugunEvde d={d} grup={grup} onAc={(i) => setSayfa({ is: i })} onEkle={() => setSayfa('is')} />}
+                <Listeler d={d} grup={grup} onAc={(id) => setEkran({ t: 'liste', id })} onYeni={() => setSayfa('liste')} />
+              </>
+            ) : (
+              <>
+                <BugunEvde d={d} grup={grup} onAc={(i) => setSayfa({ is: i })} onEkle={() => setSayfa('is')} />
+                <Bulusmalar d={d} grup={grup} onAc={(b) => setSayfa({ bulusma: b })} onYeni={() => setSayfa('bulusma')} />
+                <BirlikteRutinler d={d} grup={grup} onAc={(r) => setSayfa({ rutin: r })} onYeni={() => setSayfa('rutin')} />
+                <Listeler d={d} grup={grup} onAc={(id) => setEkran({ t: 'liste', id })} onYeni={() => setSayfa('liste')} />
+              </>
+            )}
             <GonderilenRicalar d={d} grup={grup} />
             <SonOlanlar d={d} grup={grup} />
             <button type="button" className="rt-cv-fab" aria-label="Ekle" onClick={() => setSayfa('ekle')}>＋</button>
@@ -100,7 +115,11 @@ export default function Cevrem() {
         )}
       {sayfa === 'ekle' && <EkleSayfasi grup={grup} onKapat={() => setSayfa(null)} onSec={(s) => setSayfa(s)} />}
       {sayfa === 'is' && <IsFormu d={d} grup={grup} onKapat={() => setSayfa(null)} />}
-      {sayfa && typeof sayfa === 'object' && <IsFormu d={d} grup={grup} is={sayfa.is} onKapat={() => setSayfa(null)} />}
+      {sayfa && typeof sayfa === 'object' && 'is' in sayfa && <IsFormu d={d} grup={grup} is={sayfa.is} onKapat={() => setSayfa(null)} />}
+      {sayfa === 'rutin' && <RutinFormu grup={grup} onKapat={() => setSayfa(null)} />}
+      {sayfa && typeof sayfa === 'object' && 'rutin' in sayfa && <RutinDetay d={d} grup={grup} rutin={sayfa.rutin} onKapat={() => setSayfa(null)} />}
+      {sayfa === 'bulusma' && <BulusmaFormu grup={grup} onKapat={() => setSayfa(null)} />}
+      {sayfa && typeof sayfa === 'object' && 'bulusma' in sayfa && <BulusmaDetay d={d} grup={grup} bulusma={sayfa.bulusma} onKapat={() => setSayfa(null)} />}
       {sayfa === 'rica' && <RicaFormu d={d} grup={grup} onKapat={() => setSayfa(null)} />}
       {sayfa === 'liste' && <ListeFormu grup={grup} onKapat={() => setSayfa(null)} onOldu={(id) => { setSayfa(null); setEkran({ t: 'liste', id }); }} />}
       {sayfa === 'davet' && <DavetModal grup={grup} d={d} onKapat={() => setSayfa(null)} />}
@@ -335,6 +354,13 @@ function SonOlanlar({ d, grup }: { d: CevremDurum; grup: Grup }) {
     }
     for (const k of d.kayitlar) if (k.grup_id === grup.id && isAd.has(k.is_id)) o.push({ z: k.zaman, kim: k.yapan, metin: <>&quot;{isAd.get(k.is_id)}&quot; yaptı</> });
     for (const r of d.ricalar) if (r.grup_id === grup.id && r.durum !== 'bekliyor') o.push({ z: r.guncellendi, kim: r.istenen, metin: <>&quot;{r.ad}&quot; ricasını {r.durum === 'ret' ? 'geri çevirdi' : r.durum === 'yapildi' ? 'yaptı' : 'kabul etti'}</> });
+    const rutinAd = new Map(d.rutinler.map((r) => [r.id, r.ad]));
+    for (const r of d.rutinler) if (r.grup_id === grup.id) o.push({ z: r.olusturuldu, kim: r.olusturan, metin: <>&quot;{r.ad}&quot; birlikte rutinini başlattı</> });
+    for (const k of d.katilimlar) if (k.grup_id === grup.id && k.durum === 'aktif' && rutinAd.has(k.rutin_id) && !d.rutinler.some((r) => r.id === k.rutin_id && r.olusturan === k.uye_id)) o.push({ z: k.katildi, kim: k.uye_id, metin: <>&quot;{rutinAd.get(k.rutin_id)}&quot; rutinine katıldı</> });
+    for (const k of d.bkayitlar) if (k.grup_id === grup.id && rutinAd.has(k.rutin_id)) o.push({ z: k.zaman, kim: k.uye_id, metin: <>&quot;{rutinAd.get(k.rutin_id)}&quot; yaptı</> });
+    const bAd = new Map(d.bulusmalar.map((b) => [b.id, b.ad]));
+    for (const b of d.bulusmalar) if (b.grup_id === grup.id) o.push({ z: b.olusturuldu, kim: b.olusturan, metin: <>&quot;{b.ad}&quot; buluşmasını önerdi</> });
+    for (const y of d.yanitlar) if (y.grup_id === grup.id && bAd.has(y.bulusma_id) && !d.bulusmalar.some((b) => b.id === y.bulusma_id && b.olusturan === y.uye_id)) o.push({ z: y.zaman, kim: y.uye_id, metin: <>&quot;{bAd.get(y.bulusma_id)}&quot; için {y.yanit === 'geliyorum' ? 'geliyorum' : y.yanit === 'belki' ? 'belki' : 'gelemem'} dedi</> });
     return o.sort((a, b) => b.z.localeCompare(a.z)).slice(0, 6);
   }, [d, grup.id]);
   if (!olaylar.length) return null;
@@ -354,16 +380,274 @@ function SonOlanlar({ d, grup }: { d: CevremDurum; grup: Grup }) {
   );
 }
 
+// ———————————————— birlikte rutin ————————————————
+
+const RUTIN_IKON = ['🚶', '🏃', '🧘', '🚴', '🏊', '📖', '💧', '🥗', '😴', '✍️'];
+const HAFTA_GUN = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+
+function HaftaNoktalari({ d, r, kim }: { d: CevremDurum; r: BirlikteRutin; kim: string }) {
+  const hb = haftaBasi(bugun());
+  const t = bugun();
+  return (
+    <span className="rt-cv-hafta" aria-label="Bu hafta">
+      {HAFTA_GUN.map((g, n) => {
+        const tarih = tarihEkle(hb, n);
+        const yapti = d.bkayitlar.some((k) => k.rutin_id === r.id && k.uye_id === kim && k.tarih === tarih);
+        return <i key={g} className={`${yapti ? 'on' : ''}${tarih === t ? ' bugun' : ''}${tarih > t ? ' ileri' : ''}`} title={g} />;
+      })}
+    </span>
+  );
+}
+
+function BirlikteRutinler({ d, grup, bosGoster, onAc, onYeni }: { d: CevremDurum; grup: Grup; bosGoster?: boolean; onAc: (r: BirlikteRutin) => void; onYeni: () => void }) {
+  const [hata, setHata] = useState<string | null>(null);
+  const t = bugun();
+  const rs = d.rutinler.filter((r) => r.grup_id === grup.id);
+  if (!rs.length && !bosGoster) return null;
+  return (
+    <section className="rt-cv-bolum">
+      <h2 className="rt-cv-h">Birlikte rutinler</h2>
+      {rs.length ? (
+        <div className="rt-cv-kutu">
+          {rs.map((r) => {
+            const ben = katiliyorMu(d, r.id);
+            const kat = rutinKatilimcilari(d, r);
+            const benSayi = haftaSayisi(d, r.id, d.uid);
+            const yapti = bugunYaptiMi(d, r.id);
+            const digerleri = kat.filter((k) => k.uye_id !== d.uid).map((k) => {
+              const n = haftaSayisi(d, r.id, k.uye_id);
+              return `${uyeAdi(d, k.uye_id)} ${Math.min(n, r.hedef)}/${r.hedef}${n >= r.hedef ? ' ✓' : ''}`;
+            });
+            return (
+              <div key={r.id} className="rt-cv-sat">
+                {ben
+                  ? <button type="button" className={`rt-chk${yapti ? ' on' : ''}`} aria-label="Bugün yaptım" onClick={() => rutinYapildi(r, t, !yapti).catch((e) => setHata(hataMetni(e)))}>{yapti ? '✓' : ''}</button>
+                  : <span className="rt-cv-rutin-ik" aria-hidden>{r.ikon ?? '🤝'}</span>}
+                <button type="button" className="ic" onClick={() => onAc(r)}>
+                  <b>{ben && r.ikon ? `${r.ikon} ` : ''}{r.ad}</b>
+                  <span>Haftada {r.hedef}{ben ? ` · ben ${Math.min(benSayi, r.hedef)}/${r.hedef}${benSayi >= r.hedef ? ' ✓' : ''}` : ''}{digerleri.length ? ` · ${digerleri.join(' · ')}` : ''}</span>
+                  {ben && <HaftaNoktalari d={d} r={r} kim={d.uid!} />}
+                </button>
+                {!ben && <button type="button" className="rt-cv-al" onClick={() => rutineKatil(r.grup_id, r.id, true).catch((e) => setHata(hataMetni(e)))}>Ben de varım</button>}
+              </div>
+            );
+          })}
+        </div>
+      ) : <button type="button" className="rt-cv-bos-sat" onClick={onYeni}>&quot;Haftada 3 yürüyüş&quot; gibi ortak bir hedef koy · ＋ Başlat</button>}
+      {hata && <p className="rt-hata">{hata}</p>}
+    </section>
+  );
+}
+
+function RutinFormu({ grup, rutin, onKapat }: { grup: Grup; rutin?: BirlikteRutin; onKapat: () => void }) {
+  const [ad, setAd] = useState(rutin?.ad ?? '');
+  const [ikon, setIkon] = useState<string | null>(rutin?.ikon ?? '🚶');
+  const [hedef, setHedef] = useState(rutin?.hedef ?? 3);
+  const [aciklama, setAciklama] = useState(rutin?.aciklama ?? '');
+  const [bekle, setBekle] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  return (
+    <Modal baslik={rutin ? 'Birlikte rutini düzenle' : 'Birlikte rutin'} onKapat={onKapat}>
+      <label className="rt-alan">Ne yapacağız<input className="rt-inp" value={ad} onChange={(e) => setAd(e.target.value)} placeholder="ör. 30 dk yürüyüş" autoFocus={!rutin} /></label>
+      <div className="rt-alan">Simge<div className="rt-cv-cipler">{RUTIN_IKON.map((i) => <button key={i} type="button" className={`rt-chip${ikon === i ? ' on' : ''}`} onClick={() => setIkon(i)}>{i}</button>)}</div></div>
+      <div className="rt-alan">Haftada kaç kez
+        <div className="rt-cv-cipler">{[1, 2, 3, 4, 5, 6, 7].map((n) => <button key={n} type="button" className={`rt-chip${hedef === n ? ' on' : ''}`} onClick={() => setHedef(n)}>{n}</button>)}</div>
+        <small className="rt-muted">Herkes kendi gününde yapar. Hedefi tutunca haftanın kalanında kart ajandandan kalkar.</small>
+      </div>
+      <label className="rt-alan">Not (isteğe bağlı)<input className="rt-inp" value={aciklama} onChange={(e) => setAciklama(e.target.value)} placeholder="ör. Akşam yemeğinden sonra" /></label>
+      {!rutin && <p className="rt-uyari">Sen katılmış olarak başlar; gruptakiler &quot;Ben de varım&quot; diyerek katılır.</p>}
+      {hata && <p className="rt-hata">{hata}</p>}
+      <div className="rt-satir">
+        <button type="button" className="rt-btn" onClick={onKapat}>Vazgeç</button>
+        <button type="button" className="rt-btn primary" disabled={!ad.trim() || bekle} onClick={async () => {
+          setBekle(true); setHata(null);
+          const g = { ad: ad.trim(), ikon, hedef, aciklama: aciklama.trim() || null };
+          try { if (rutin) await rutinGuncelle(rutin.id, g); else await rutinEkle(grup.id, g); onKapat(); }
+          catch (e) { setHata(hataMetni(e)); setBekle(false); }
+        }}>{rutin ? 'Kaydet' : 'Başlat'}</button>
+      </div>
+    </Modal>
+  );
+}
+
+function RutinDetay({ d, grup, rutin, onKapat }: { d: CevremDurum; grup: Grup; rutin: BirlikteRutin; onKapat: () => void }) {
+  const r = d.rutinler.find((x) => x.id === rutin.id) ?? rutin;
+  const [duzenle, setDuzenle] = useState(false);
+  const [sil, setSil] = useState(false);
+  const [ayril, setAyril] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  const ben = katiliyorMu(d, r.id);
+  const kat = rutinKatilimcilari(d, r);
+  const katilmayan = aktifUyeler(d, grup.id).filter((u) => !kat.some((k) => k.uye_id === u.uye_id));
+  const yonetir = r.olusturan === d.uid || benYoneticiyim(d, grup.id);
+  if (duzenle) return <RutinFormu grup={grup} rutin={r} onKapat={() => setDuzenle(false)} />;
+  return (
+    <Modal baslik={`${r.ikon ?? '🤝'} ${r.ad}`} onKapat={onKapat}>
+      <p className="rt-muted">Haftada {r.hedef} kez · {uyeAdi(d, r.olusturan) || 'Biri'} başlattı{r.aciklama ? ` · ${r.aciklama}` : ''}</p>
+      <div className="rt-cv-kutu">
+        {kat.length ? kat.map((k) => {
+          const n = haftaSayisi(d, r.id, k.uye_id);
+          const sr = seri(d, r, k.uye_id);
+          return (
+            <div key={k.uye_id} className="rt-cv-sat">
+              <Avatar ad={uyeAdi(d, k.uye_id)} boyut={26} />
+              <div className="ic">
+                <b>{uyeAdi(d, k.uye_id)}</b>
+                <span>Bu hafta {Math.min(n, r.hedef)}/{r.hedef}{n >= r.hedef ? ' ✓' : ''}{sr > 1 ? ` · 🔥 ${sr} hafta üst üste` : ''}</span>
+                <HaftaNoktalari d={d} r={r} kim={k.uye_id} />
+              </div>
+            </div>
+          );
+        }) : <p className="rt-muted rt-cv-not">Henüz katılan yok.</p>}
+      </div>
+      {katilmayan.length > 0 && <p className="rt-muted">Katılmayan: {katilmayan.map((u) => (u.uye_id === d.uid ? 'sen' : u.ad)).join(', ')}</p>}
+      {hata && <p className="rt-hata">{hata}</p>}
+      <div className="rt-satir">
+        {yonetir && <button type="button" className="rt-btn tehlike" onClick={() => setSil(true)}>Sil</button>}
+        {yonetir && <button type="button" className="rt-btn" onClick={() => setDuzenle(true)}>Düzenle</button>}
+        <span style={{ flex: 1 }} />
+        {ben
+          ? <button type="button" className="rt-btn" onClick={() => setAyril(true)}>Ayrıl</button>
+          : <button type="button" className="rt-btn primary" onClick={() => rutineKatil(r.grup_id, r.id, true).catch((e) => setHata(hataMetni(e)))}>Ben de varım</button>}
+      </div>
+      {ayril && <OnayKutusu metin="Bu rutinden ayrılırsan kart ajandandan kalkar. Yaptıkların grupta görünmeye devam eder." evet="Ayrıl" onVazgec={() => setAyril(false)} onEvet={() => { setAyril(false); rutineKatil(r.grup_id, r.id, false).catch((e) => setHata(hataMetni(e))); }} />}
+      {sil && <OnayKutusu metin={`"${r.ad}" herkes için silinsin mi?`} evet="Sil" onVazgec={() => setSil(false)} onEvet={() => { void rutinSil(r.id).catch(() => {}); onKapat(); }} />}
+    </Modal>
+  );
+}
+
+// ———————————————— buluşma ————————————————
+
+const YANIT: [Yanit, string][] = [['geliyorum', 'Geliyorum'], ['belki', 'Belki'], ['gelemem', 'Gelemem']];
+
+function TarihKutusu({ tarih }: { tarih: string }) {
+  const d = tarihParse(tarih);
+  const ay = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'][d.getMonth()];
+  return <span className="rt-cv-tarih" aria-hidden><b>{d.getDate()}</b><small>{ay}</small></span>;
+}
+
+function YanitDugmeleri({ d, b, onHata }: { d: CevremDurum; b: Bulusma; onHata: (m: string) => void }) {
+  const y = yanitim(d, b.id);
+  return (
+    <div className="rt-cv-yanit">
+      {YANIT.map(([k, e]) => <button key={k} type="button" className={`${k}${y === k ? ' on' : ''}`} onClick={() => bulusmaYanitla(b, k).catch((er) => onHata(hataMetni(er)))}>{e}</button>)}
+    </div>
+  );
+}
+
+function Bulusmalar({ d, grup, bosGoster, onAc, onYeni }: { d: CevremDurum; grup: Grup; bosGoster?: boolean; onAc: (b: Bulusma) => void; onYeni: () => void }) {
+  const [hata, setHata] = useState<string | null>(null);
+  const t = bugun();
+  const bs = d.bulusmalar.filter((b) => b.grup_id === grup.id && !b.iptal && b.tarih >= t).sort((a, b) => a.tarih.localeCompare(b.tarih) || (a.saat ?? '').localeCompare(b.saat ?? ''));
+  if (!bs.length && !bosGoster) return null;
+  return (
+    <section className="rt-cv-bolum">
+      <h2 className="rt-cv-h">Buluşmalar</h2>
+      {bs.length ? (
+        <div className="rt-cv-kutu">
+          {bs.map((b) => {
+            const s = yanitSayilari(d, b);
+            const ozet = [s.geliyorum.length ? `${s.geliyorum.length} geliyor` : '', s.belki.length ? `${s.belki.length} belki` : '', s.gelemem.length ? `${s.gelemem.length} gelemiyor` : ''].filter(Boolean).join(' · ');
+            return (
+              <div key={b.id} className="rt-cv-sat rt-cv-bl">
+                <TarihKutusu tarih={b.tarih} />
+                <button type="button" className="ic" onClick={() => onAc(b)}>
+                  <b>{b.ad}</b>
+                  <span>{tarihEtiket(b.tarih).split(', ')[1]}{b.saat ? ` ${b.saat}` : ''}{b.yer ? ` · 📍 ${b.yer}` : ''}</span>
+                  {ozet && <span>{ozet}</span>}
+                </button>
+                <YanitDugmeleri d={d} b={b} onHata={setHata} />
+              </div>
+            );
+          })}
+        </div>
+      ) : <button type="button" className="rt-cv-bos-sat" onClick={onYeni}>Yaklaşan buluşma yok · ＋ Öner</button>}
+      {hata && <p className="rt-hata">{hata}</p>}
+    </section>
+  );
+}
+
+function BulusmaFormu({ grup, bulusma, onKapat }: { grup: Grup; bulusma?: Bulusma; onKapat: () => void }) {
+  const t = bugun();
+  const [ad, setAd] = useState(bulusma?.ad ?? '');
+  const [tarih, setTarih] = useState(bulusma?.tarih ?? tarihEkle(t, 1));
+  const [saat, setSaat] = useState(bulusma?.saat ?? '');
+  const [yer, setYer] = useState(bulusma?.yer ?? '');
+  const [aciklama, setAciklama] = useState(bulusma?.aciklama ?? '');
+  const [bekle, setBekle] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  return (
+    <Modal baslik={bulusma ? 'Buluşmayı düzenle' : 'Buluşma öner'} onKapat={onKapat}>
+      <label className="rt-alan">Ne<input className="rt-inp" value={ad} onChange={(e) => setAd(e.target.value)} placeholder="ör. Pazar kahvaltısı" autoFocus={!bulusma} /></label>
+      <div className="rt-satir rt-cv-iki">
+        <label className="rt-alan">Gün<input className="rt-inp" type="date" value={tarih} min={t} onChange={(e) => setTarih(e.target.value)} /></label>
+        <label className="rt-alan">Saat<input className="rt-inp" type="time" value={saat} onChange={(e) => setSaat(e.target.value)} /></label>
+      </div>
+      <label className="rt-alan">Yer (isteğe bağlı)<input className="rt-inp" value={yer} onChange={(e) => setYer(e.target.value)} placeholder="ör. Moda sahili" /></label>
+      <label className="rt-alan">Not (isteğe bağlı)<input className="rt-inp" value={aciklama} onChange={(e) => setAciklama(e.target.value)} /></label>
+      {!bulusma && <p className="rt-uyari">Gruptakilere bildirim gider. &quot;Geliyorum&quot; diyenlerin ajandasına düşer; sen geliyorum olarak başlarsın.</p>}
+      {hata && <p className="rt-hata">{hata}</p>}
+      <div className="rt-satir">
+        <button type="button" className="rt-btn" onClick={onKapat}>Vazgeç</button>
+        <button type="button" className="rt-btn primary" disabled={!ad.trim() || !tarih || bekle} onClick={async () => {
+          setBekle(true); setHata(null);
+          const g = { ad: ad.trim(), tarih, saat: saat || null, yer: yer.trim() || null, aciklama: aciklama.trim() || null };
+          try { if (bulusma) await bulusmaGuncelle(bulusma.id, g); else await bulusmaEkle(grup.id, g); onKapat(); }
+          catch (e) { setHata(hataMetni(e)); setBekle(false); }
+        }}>{bulusma ? 'Kaydet' : 'Öner'}</button>
+      </div>
+    </Modal>
+  );
+}
+
+function BulusmaDetay({ d, grup, bulusma, onKapat }: { d: CevremDurum; grup: Grup; bulusma: Bulusma; onKapat: () => void }) {
+  const b = d.bulusmalar.find((x) => x.id === bulusma.id) ?? bulusma;
+  const [duzenle, setDuzenle] = useState(false);
+  const [iptal, setIptal] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  const s = yanitSayilari(d, b);
+  const yanitlayan = new Set(d.yanitlar.filter((y) => y.bulusma_id === b.id).map((y) => y.uye_id));
+  const bekleyen = aktifUyeler(d, grup.id).filter((u) => !yanitlayan.has(u.uye_id));
+  const yonetir = b.olusturan === d.uid || benYoneticiyim(d, grup.id);
+  if (duzenle) return <BulusmaFormu grup={grup} bulusma={b} onKapat={() => setDuzenle(false)} />;
+  const grupSatir = (baslik: string, kisiler: string[]) => kisiler.length ? <p className="rt-metin"><b>{baslik}:</b> {kisiler.join(', ')}</p> : null;
+  return (
+    <Modal baslik={`📅 ${b.ad}`} onKapat={onKapat}>
+      <p className="rt-metin">{tarihEtiket(b.tarih)}{b.saat ? ` · ${b.saat}` : ''}{b.yer ? <><br />📍 {b.yer}</> : null}</p>
+      {b.aciklama && <p className="rt-muted">{b.aciklama}</p>}
+      <p className="rt-muted">{uyeAdi(d, b.olusturan) || 'Biri'} önerdi.</p>
+      {b.iptal && <p className="rt-hata">İptal edildi.</p>}
+      {!b.iptal && <YanitDugmeleri d={d} b={b} onHata={setHata} />}
+      {grupSatir('Geliyor', s.geliyorum.map((y) => uyeAdi(d, y.uye_id)))}
+      {grupSatir('Belki', s.belki.map((y) => uyeAdi(d, y.uye_id)))}
+      {grupSatir('Gelemiyor', s.gelemem.map((y) => uyeAdi(d, y.uye_id)))}
+      {grupSatir('Yanıt vermedi', bekleyen.map((u) => (u.uye_id === d.uid ? 'Ben' : u.ad)))}
+      {hata && <p className="rt-hata">{hata}</p>}
+      <div className="rt-satir">
+        {yonetir && !b.iptal && <button type="button" className="rt-btn tehlike" onClick={() => setIptal(true)}>İptal et</button>}
+        {yonetir && !b.iptal && <button type="button" className="rt-btn" onClick={() => setDuzenle(true)}>Düzenle</button>}
+        <span style={{ flex: 1 }} />
+        <button type="button" className="rt-btn" onClick={onKapat}>Kapat</button>
+      </div>
+      {iptal && <OnayKutusu metin="Buluşma iptal edilsin mi? Gelenlerin ajandasından kalkar." evet="İptal et" onVazgec={() => setIptal(false)} onEvet={() => { setIptal(false); bulusmaGuncelle(b.id, { iptal: true }).then(onKapat).catch((e) => setHata(hataMetni(e))); }} />}
+    </Modal>
+  );
+}
+
 // ———————————————— ekle sayfası + formlar ————————————————
 
-function EkleSayfasi({ grup, onKapat, onSec }: { grup: Grup; onKapat: () => void; onSec: (s: 'is' | 'rica' | 'liste') => void }) {
+function EkleSayfasi({ grup, onKapat, onSec }: { grup: Grup; onKapat: () => void; onSec: (s: 'is' | 'rica' | 'liste' | 'rutin' | 'bulusma') => void }) {
+  const secenekler = {
+    is: <button key="is" type="button" className="rt-cv-secenek" onClick={() => onSec('is')}><span className="ik">🧹</span><span><b>Ortak iş</b><small>Herkes görür; isteyen &quot;Ben alırım&quot; der.</small></span></button>,
+    rica: <button key="rica" type="button" className="rt-cv-secenek" onClick={() => onSec('rica')}><span className="ik">🙋</span><span><b>Birinden iste</b><small>Tek bir kişiye iş gönder; kabul ederse onun ajandasına düşer.</small></span></button>,
+    liste: <button key="liste" type="button" className="rt-cv-secenek" onClick={() => onSec('liste')}><span className="ik">📝</span><span><b>Liste</b><small>Market, yapılacaklar, hazırlık listesi.</small></span></button>,
+    bulusma: <button key="bulusma" type="button" className="rt-cv-secenek" onClick={() => onSec('bulusma')}><span className="ik">📅</span><span><b>Buluşma</b><small>Gün, saat, yer öner; herkes geliyorum / belki / gelemem der.</small></span></button>,
+    rutin: <button key="rutin" type="button" className="rt-cv-secenek" onClick={() => onSec('rutin')}><span className="ik">🤝</span><span><b>Birlikte rutin</b><small>&quot;Haftada 3 yürüyüş&quot; gibi ortak hedef; isteyen katılır, kim kaç kez yaptı görünür.</small></span></button>,
+  };
+  const sira: (keyof typeof secenekler)[] = grup.tur === 'arkadas' ? ['bulusma', 'rutin', 'liste', 'is', 'rica'] : ['is', 'rica', 'liste', 'bulusma', 'rutin'];
   return (
     <Modal baslik={`${grupIkonu(grup)} ${grup.ad} · ekle`} onKapat={onKapat}>
-      <div className="rt-cv-secenekler">
-        <button type="button" className="rt-cv-secenek" onClick={() => onSec('is')}><span className="ik">🧹</span><span><b>Ortak iş</b><small>Herkes görür; isteyen &quot;Ben alırım&quot; der.</small></span></button>
-        <button type="button" className="rt-cv-secenek" onClick={() => onSec('rica')}><span className="ik">🙋</span><span><b>Birinden iste</b><small>Tek bir kişiye iş gönder; kabul ederse onun ajandasına düşer.</small></span></button>
-        <button type="button" className="rt-cv-secenek" onClick={() => onSec('liste')}><span className="ik">📝</span><span><b>Liste</b><small>Market, yapılacaklar, hazırlık listesi.</small></span></button>
-      </div>
+      <div className="rt-cv-secenekler">{sira.map((k) => secenekler[k])}</div>
     </Modal>
   );
 }

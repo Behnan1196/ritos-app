@@ -692,6 +692,8 @@ function OlcekSec({ deger, ruh, onSec }: { deger: string; ruh: boolean; onSec: (
 // Çevrem kartı (7 ekim): üstlendiğim ortak iş ya da kabul ettiğim rica. Kim ekledi / kim istedi; işi bırak.
 function OrtakKartBilgi({ kart, yapildi }: { kart: import('@/lib/db').AjandaKartRow; yapildi: boolean }) {
   const o = kart.ortak!;
+  if (kart.id.startsWith('c-br-')) return <p className="rt-muted">🤝 Birlikte rutin · {kart.kaynak_etiket}. İşaretin gruptakilere görünür; hedefi tutunca haftanın kalanında kart kalkar. Ayrılmak için Çevrem'deki rutine dokun.</p>;
+  if (kart.id.startsWith('c-bl-')) return <p className="rt-muted">📅 Buluşma · {kart.kaynak_etiket}. <b>{o.olusturan_ad || 'Biri'}</b> önerdi; sen &quot;Geliyorum&quot; dedin. Yanıtını Çevrem'den değiştirebilirsin.</p>;
   const rica = kart.id.startsWith('c-rc-');
   const isId = kart.id.replace(/^c-is-/, '');
   return (
