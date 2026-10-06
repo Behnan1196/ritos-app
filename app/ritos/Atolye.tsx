@@ -1162,15 +1162,17 @@ function BeslenmeBaslangic({ h, haftaBas, onBilgiler }: { h: Hedef; haftaBas: st
 function KiloTakip({ h }: { h: Hedef }) {
   const il = (h.h as { il: IliskiRow }).il;
   const ayar = useCanli(async () => (await db.iliski_ayar.get(il.id)) ?? null, [il.id], undefined as IliskiAyarRow | null | undefined);
-  const t0 = bugun();
-  const gunler = Array.from({ length: 84 }, (_, i) => tarihEkle(t0, i - 83));
-  const veri = useCanli(() => danisanGunleri(h.h, gunler), [h.id, t0], {} as Record<string, KocKarti[]>);
+  const bugunT = bugun();
+  // 7 ekim: önümüzdeki 14 gün de okunur — erken girilmiş ölçüm (ör. pazartesinin tartısı) kaybolmasın.
+  const gunler = Array.from({ length: 98 }, (_, i) => tarihEkle(bugunT, i - 83));
+  const veri = useCanli(() => danisanGunleri(h.h, gunler), [h.id, bugunT], {} as Record<string, KocKarti[]>);
   const b = ayar?.bilgiler ?? {};
   const { hesap } = beslenmeHesap(b);
   const noktalar = gunler.flatMap((t) => (veri[t] ?? []).map((k) => ({ t, v: Number((k.degerler as Record<string, unknown> | null)?.[`${OLC_ONEK}kilo`]) })))
     .filter((p) => Number.isFinite(p.v) && p.v > 0);
   if (!hesap) return <div className="rt-arac"><h4>Kilo takibi</h4><p className="rt-muted">Bilgiler sekmesinde boy, kilo, aktivite ve hedefi gir; beklenen çizgi buradan izlenir.</p></div>;
   const son = noktalar[noktalar.length - 1];
+  const t0 = son && son.t > bugunT ? son.t : bugunT; // grafiğin sağ ucu
   // İlk 2 hafta su kaybı ve dalgalanma olağandır; değerlendirme sonrasına bırakılır.
   const gecenGun = b.baslangic_tarihi && son ? Math.round((new Date(son.t).getTime() - new Date(b.baslangic_tarihi).getTime()) / 86400000) : 0;
   const erken = !!son && gecenGun < 14;

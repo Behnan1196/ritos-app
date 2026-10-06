@@ -329,6 +329,7 @@ function KartSatiri({ satir, tarih, onAc, tutamac }: { satir: GunSatiri; tarih: 
     if (yapildi) { yapildiAyarla(kart.id, tarih, false); setDegerAcik(false); return; }
     if (sayac) { sayacBitti(); return; }
     if (kart.bekle) sesAc(); // bekleme dolunca bip için ses bağlamı bu dokunuşla açılır
+    if (sorulan.length && !zamanli && kart.izinler.ac) { onAc(); return; } // 7 ekim: ölçü kartın içinde girilir
     if (kayitBl.length) setDegerAcik((v) => !v);
     else yapildiAyarla(kart.id, tarih, true);
   }
@@ -478,12 +479,19 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
           </div>
         );
       })}
-      {olcular.some((o) => o.bicim !== 'adet') && detaySure === null && <p className="rt-muted">📏 İşaretlerken sorulur: {olcular.filter((o) => o.bicim !== 'adet').map((o) => o.etiket + (o.birim && o.bicim !== 'olcek' ? ` (${o.birim})` : '')).join(', ')}</p>}
+      {/* 7 ekim: ölçü isteyen kartta değerler doğrudan burada girilir; kaydedince kart yapıldı olur. */}
+      {olcular.some((o) => o.bicim !== 'adet') && !sureli && !kilitliDetay && (
+        <DegerGir key={kayitCanli?.guncellendi ?? 0} bloklar={kart.bloklar} ilk={kayitCanli?.degerler ?? null}
+          onKaydet={async (d) => { await degerKaydet(kart.id, tarih, d); }}
+          onSadeceIsaretle={kayitCanli?.yapildi ? undefined : async () => { await yapildiAyarla(kart.id, tarih, true); }} />
+      )}
+      {olcular.some((o) => o.bicim !== 'adet') && sureli && detaySure === null && <p className="rt-muted">📏 Bitince sorulur: {olcular.filter((o) => o.bicim !== 'adet').map((o) => o.etiket + (o.birim && o.bicim !== 'olcek' ? ` (${o.birim})` : '')).join(', ')}</p>}
     </div>
   ) : null;
 
   // Ana düğme: yapılmamış "yap" kartında ✓ Yapıldı (değer soruluyorsa form). Sayaç çalışırken sayaç kendi düğmesiyle biter.
-  const anaDugme = kart.tip === 'yap' && !kayitCanli?.yapildi && !kilitliDetay && !dSayac && detaySure === null;
+  const olcuFormu = olcular.some((o) => o.bicim !== 'adet') && !sureli; // değer formu kartın içinde; ayrıca "Yapıldı" yok
+  const anaDugme = kart.tip === 'yap' && !kayitCanli?.yapildi && !kilitliDetay && !dSayac && detaySure === null && !olcuFormu;
   // ⋯ menüsü: Düzenle dışındaki işler (taşı, kütüphane, paylaş, kaldır).
   const tasinir = kart.izinler.gun_degistir && (!bagli || kart.geri_bildirim === 'uzak');
   const silinir = !bagli && kart.izinler.sil;
