@@ -175,7 +175,60 @@ type MesajIcerik =
 export interface KocPaketi { tur: 'koc_program'; iliski_id: string; koc_id: string; koc_ad: string; disiplin: string; program: ProgramOzeti }
 
 async function kuyruk(iliskiId: string, alici: string, icerik: MesajIcerik, aileId: string | null = null) {
+  if (benMi(iliskiId)) { benTeslim(iliskiId, icerik); return; } // "Ben": ağa çıkmaz, cihazda öbür role teslim
   await db.giden.put({ id: crypto.randomUUID(), iliski_id: iliskiId, aile_id: aileId, alici, icerik, zaman: Date.now() });
+}
+
+// ———————————————— "Ben" — koçun kendisi ilk danışan (7 ekim) ————————————————
+// Koç, kendi araçlarını (beslenme paketleri, ölçüm, haftalık not) kendi üzerinde kullanır ve danışanın
+// gözünden görür. İlişki yalnız bu cihazda (db.iliski, kimlik 'ben-<disiplin>'); sunucuya hiçbir şey
+// gitmez. Aynı cihazda iki rol: koçun programı P, danışan kopyası 'ben~P' (adımlar da 'ben~A') —
+// kimlikler çakışmasın diye. Mesaj, türüne göre öbür role teslim edilir ve kimlikler çevrilir.
+export const BEN_ONEK = 'ben-';
+export const benMi = (iliskiId: string | null | undefined) => !!iliskiId && iliskiId.startsWith(BEN_ONEK);
+const benId = (id: string) => (id.startsWith('ben~') ? id : `ben~${id}`);
+const benCoz = (id: string) => id.replace(/^ben~/, '');
+const KOCTAN: MesajIcerik['tur'][] = ['program', 'durdur', 'hafta_notu'];
+
+function benTeslim(iliskiId: string, m: MesajIcerik) {
+  setTimeout(() => {
+    (async () => {
+      const il = await db.iliski.get(iliskiId);
+      if (!il || il.durum !== 'aktif') return;
+      if (KOCTAN.includes(m.tur)) {
+        const c: MesajIcerik =
+          m.tur === 'program' ? { ...m, program: { ...m.program, id: benId(m.program.id), adimlar: m.program.adimlar.map((a) => ({ ...a, id: benId(a.id) })) } }
+          : m.tur === 'durdur' ? { ...m, program_id: benId(m.program_id) }
+          : m.tur === 'hafta_notu' ? { ...m, program_id: benId(m.program_id) } : m;
+        await mesajIsle(il, c, 'danisan');
+      } else {
+        const c: MesajIcerik =
+          m.tur === 'kabul' || m.tur === 'ret' ? { ...m, program_id: benCoz(m.program_id) }
+          : m.tur === 'gb' ? { ...m, olaylar: m.olaylar.map((o) => ({ ...o, id: `ko~${o.id}`, kaynak_ref: o.kaynak_ref ? o.kaynak_ref.split('/').map(benCoz).join('/') : o.kaynak_ref })) }
+          : m;
+        await mesajIsle(il, c, 'koc');
+      }
+    })().catch((e) => console.warn('[ritos] Ben teslimi', e));
+  }, 0);
+}
+
+/** Koç alanlarının her biri için bir "Ben" ilişkisi (yalnız bu cihazda); kapanan alanınki sonlanır. */
+async function benIliskileriGaranti() {
+  if (!uid) return;
+  const alanlar = durum.profil?.koc ? durum.profil.disiplinler : [];
+  const mevcut = (await db.iliski.toArray()).filter((x) => benMi(x.id));
+  for (const d of alanlar) {
+    const id = `${BEN_ONEK}${d}`;
+    const e = mevcut.find((x) => x.id === id);
+    if (!e || e.durum !== 'aktif' || e.koc !== uid) {
+      await db.iliski.put({ id, koc: uid, danisan: uid, disiplin: d, koc_ad: durum.profil?.ad ?? 'Ben', danisan_ad: 'Ben', durum: 'aktif', olusturuldu: e?.olusturuldu ?? new Date().toISOString(), sonlandi: null } as IliskiRow);
+    }
+  }
+  for (const e of mevcut) if (e.durum === 'aktif' && (!alanlar.includes(e.disiplin) || e.koc !== uid)) {
+    const son = { ...e, durum: 'sonlandi' as const, sonlandi: new Date().toISOString() };
+    await db.iliski.put(son);
+    await sonlandiIsle(son);
+  }
 }
 
 async function gidenleriGonder() {
@@ -221,9 +274,9 @@ async function sohbetMesajiKaydet(m: MesajRow, konusma: string) {
   await db.mesaj.put({ ...m, konusma, durum: 'gitti', alindi: null });
 }
 
-async function mesajIsle(il: IliskiRow, m: MesajIcerik) {
+async function mesajIsle(il: IliskiRow, m: MesajIcerik, rol?: 'koc' | 'danisan') {
   if (m.tur === 'sohbet') return sohbetMesajiKaydet(m.mesaj, `i:${il.id}`);
-  const benKocum = il.koc === uid;
+  const benKocum = rol ? rol === 'koc' : il.koc === uid;
   if (!benKocum) {
     if (m.tur === 'program') return programGeldi(il, m.program, m.etkin);
     if (m.tur === 'durdur') {
@@ -384,11 +437,13 @@ export async function kocOl(disiplinler: string[]) {
   const tt = tasimaVar();
   await tt.profilYaz({ koc: true, disiplinler, ...(durum.profil?.koc_baslangic ? {} : { koc_baslangic: new Date().toISOString() }) });
   await profilYenile();
+  await benIliskileriGaranti();
 }
 
 export async function kocKapat() {
   await tasimaVar().profilYaz({ koc: false });
   await profilYenile();
+  await benIliskileriGaranti();
 }
 
 function davetKodu(): string {
@@ -453,6 +508,7 @@ export async function davetYanit(kod: string, kabul: boolean): Promise<string | 
 }
 
 export async function sonlandir(iliskiId: string) {
+  if (benMi(iliskiId)) throw new Error('"Ben" kapatılamaz; danışmanlık alanını kapatınca kendiliğinden kalkar.');
   await tasimaVar().sonlandir(iliskiId);
   await iliskileriCek();
 }
@@ -620,7 +676,7 @@ async function iliskileriCek() {
   // 5 ekim: sunucuda artık olmayan ilişki (karşı taraf hesabını sildi) → sonlandı say.
   const var_ = new Set(liste.map((x) => x.id));
   for (const il of Array.from(onceki.values())) {
-    if (var_.has(il.id) || il.durum !== 'aktif') continue;
+    if (var_.has(il.id) || il.durum !== 'aktif' || benMi(il.id)) continue;
     const son = { ...il, durum: 'sonlandi' as const, sonlandi: new Date().toISOString() };
     await db.iliski.put(son);
     await sonlandiIsle(son);
@@ -660,6 +716,7 @@ export async function danismanlikTur(): Promise<void> {
   calisiyor = (async () => {
     try {
       await iliskileriCek();
+      await benIliskileriGaranti();
       await banaGelenDavetler().catch(() => {});
       const aktifVar = (await db.iliski.toArray()).some((x) => x.durum === 'aktif');
       if (aktifVar) { await gidenleriGonder(); await mesajlariCek(); }

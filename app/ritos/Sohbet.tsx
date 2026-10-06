@@ -11,7 +11,7 @@ import { db, type IliskiRow, type MesajRow } from '@/lib/db';
 import { useCanli } from '@/lib/canli';
 import { bugun } from '@/lib/paket';
 import { paketiAl, type PaylasimPaketi } from '@/lib/paylasim';
-import { disiplinAdi, konusmaIliski, sohbetGonder, useDanismanlik, useEpostaDavetleri } from '@/lib/danismanlik';
+import { benMi, disiplinAdi, konusmaIliski, sohbetGonder, useDanismanlik, useEpostaDavetleri } from '@/lib/danismanlik';
 import { paylasilacakKisiler, paylasimAlindi, paylasimGonder, paylasimSil, useCevrem, type GelenPaylasim } from '@/lib/cevrem';
 import { danismanlikDavetiAc } from './Danismanlik';
 import { Modal } from './ortak';
@@ -23,7 +23,7 @@ interface Konusma { id: string; ad: string; alt: string; aktif: boolean }
 function useKonusmalar(): Konusma[] {
   const d = useDanismanlik();
   const iliskiler = useCanli(() => db.iliski.toArray(), [], [] as IliskiRow[]);
-  return useMemo(() => iliskiler.filter((il) => il.disiplin !== 'aile').map((il) => {
+  return useMemo(() => iliskiler.filter((il) => il.disiplin !== 'aile' && !benMi(il.id)).map((il) => {
     const benKoc = il.koc === d.uid;
     return { id: konusmaIliski(il.id), ad: benKoc ? il.danisan_ad : il.koc_ad, alt: `${benKoc ? 'Danışanın' : 'Koçun'} · ${disiplinAdi(il.disiplin)}`, aktif: il.durum === 'aktif' };
   }), [iliskiler, d.uid]);

@@ -12,7 +12,7 @@ import React, { useEffect, useState } from 'react';
 import { useCanli } from '@/lib/canli';
 import { db, type AileRow, type IliskiAyarRow, type IliskiRow, type KlasorRow, type KutuphaneKartRow, type ProgramRow } from '@/lib/db';
 import { bugun, degerBloklari, iyelik, tarihEkle, tarihEtiket, tarihParse } from '@/lib/paket';
-import { kocOl, davetler, davetSil, haftaNotuGonder, iliskiBilgiYaz, type DavetSatir } from '@/lib/danismanlik';
+import { benMi, kocOl, davetler, davetSil, haftaNotuGonder, iliskiBilgiYaz, type DavetSatir } from '@/lib/danismanlik';
 import { danisanGunleri, gonderimAyarla, haftaUygula, kocKartEkle, planDurumu, sablonKartlari, type HaftaKarti, type KocKarti } from '@/lib/danisanAjanda';
 import { SURE_ANAHTAR } from './KartEditor';
 import { disiplinAdi, useDanismanlik } from '@/lib/danismanlik';
@@ -91,8 +91,10 @@ function useHedeflerHazir(gruplar: AileRow[] | null, kapsam: Kapsam): Hedef[] | 
     }
     return liste;
   }
-  for (const i of iliskiler.filter((x) => x.disiplin !== 'aile').sort((a, b) => a.disiplin.localeCompare(b.disiplin) || a.danisan_ad.localeCompare(b.danisan_ad, 'tr'))) {
-    liste.push({ id: i.id, grup: danismanlikBaslik(i.disiplin), grupIc: DISIPLIN_IKON[i.disiplin] ?? '🤝', ic: DISIPLIN_IKON[i.disiplin] ?? '🤝', ad: i.danisan_ad, alt: disiplinAdi(i.disiplin), h: { tur: 'danisan', il: i } });
+  // 7 ekim — "Ben" (koçun kendisi) her alanın en üstünde.
+  for (const i of iliskiler.filter((x) => x.disiplin !== 'aile').sort((a, b) => a.disiplin.localeCompare(b.disiplin) || Number(!benMi(a.id)) - Number(!benMi(b.id)) || a.danisan_ad.localeCompare(b.danisan_ad, 'tr'))) {
+    const ben = benMi(i.id);
+    liste.push({ id: i.id, grup: danismanlikBaslik(i.disiplin), grupIc: DISIPLIN_IKON[i.disiplin] ?? '🤝', ic: ben ? '🙋' : DISIPLIN_IKON[i.disiplin] ?? '🤝', ad: ben ? 'Ben' : i.danisan_ad, alt: ben ? 'kendi üzerinde dene' : disiplinAdi(i.disiplin), h: { tur: 'danisan', il: i } });
   }
   return liste;
 }
@@ -405,7 +407,8 @@ function DanisanBilgileri({ il }: { il: IliskiRow }) {
       <div className="rt-arac">
         <h4>Danışmanlık</h4>
         <p className="rt-metin">{new Date(il.olusturuldu).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}&apos;den beri · {il.durum === 'aktif' ? 'aktif' : 'sonlandı'}</p>
-        {il.durum === 'aktif' && <button type="button" className="rt-btn tehlike" onClick={() => setBitir(true)}>Danışmanlığı sonlandır</button>}
+        {il.durum === 'aktif' && !benMi(il.id) && <button type="button" className="rt-btn tehlike" onClick={() => setBitir(true)}>Danışmanlığı sonlandır</button>}
+        {benMi(il.id) && <p className="rt-muted">Bu sensin: gönderdiğin plan kendi Ajandam&apos;a düşer, işaretlerin Gelişim&apos;e yansır. Danışanın ne gördüğünü burada yaşarsın; danışan sayına girmez.</p>}
       </div>
       {bitir && <SonlandirModal il={il} onKapat={() => setBitir(false)} />}
     </div>
@@ -545,7 +548,7 @@ function AlanDosyasi({ alan }: { alan: string }) {
   const [sek, setSekS] = useState<AlanSek>(alanSekDurum.sek);
   const setSek = (s: AlanSek) => { alanSekDurum.sek = s; setSekS(s); };
   const etkin: AlanSek = sekler.some(([k]) => k === sek) ? sek : sekler[0][0];
-  const aktifSay = useCanli(async () => (await db.iliski.toArray()).filter((i) => i.koc === dn.uid && i.durum === 'aktif' && i.disiplin === alan).length, [dn.uid, alan], 0);
+  const aktifSay = useCanli(async () => (await db.iliski.toArray()).filter((i) => i.koc === dn.uid && i.durum === 'aktif' && i.disiplin === alan && !benMi(i.id)).length, [dn.uid, alan], 0);
   const [kapat, setKapat] = useState(false);
   const ic = kisisel ? '🌱' : DISIPLIN_IKON[alan] ?? '🤝';
   const ad = kisisel ? 'Rutinler' : danismanlikBaslik(alan);

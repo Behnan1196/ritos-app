@@ -11,7 +11,7 @@ import { useOturum } from '@/lib/hesap';
 import { bugun, gunFarki, tarihEkle, tarihEtiket } from '@/lib/paket';
 import { adimEkle, aktifMi, ilerleme } from '@/lib/program';
 import {
-  DISIPLINLER, KOC_DENEME_GUN, danisanIzinKaydet, danisanIzinleri, ePostaDaveti, davetBak, davetOlustur, davetSil, davetYanit, davetler, disiplinAdi, kendimeAl, kocDenemeKalan,
+  DISIPLINLER, KOC_DENEME_GUN, benMi, danisanIzinKaydet, danisanIzinleri, ePostaDaveti, davetBak, davetOlustur, davetSil, davetYanit, davetler, disiplinAdi, kendimeAl, kocDenemeKalan,
   kocKapat, kocOl, kocProgramiAl, kocProgramiReddet, programAta, programGonder, programiSil, sablonKaydet, sonlandir,
   useDanismanlik, type DavetSatir, type KocPaketi,
 } from '@/lib/danismanlik';
@@ -43,8 +43,8 @@ export function DanismanlikAyarlari() {
   const [kapat, setKapat] = useState(false);
   const [bitir, setBitir] = useState<IliskiRow | null>(null);
   if (!o.hazir) return null;
-  const koclarim = hepsi.filter((x) => x.danisan === d.uid);
-  const danisanlar = hepsi.filter((x) => x.koc === d.uid);
+  const koclarim = hepsi.filter((x) => x.danisan === d.uid && !benMi(x.id));
+  const danisanlar = hepsi.filter((x) => x.koc === d.uid && !benMi(x.id));
   const kalan = kocDenemeKalan(d.profil);
 
   return (
@@ -789,7 +789,7 @@ export function DavetGelenDetay({ g, onKapat }: { g: GelenRow; onKapat: () => vo
 /** Home — danışan: kimden hangi danışmanlığı alıyor (bilgi satırı; haftalık plan adı değil). */
 export function KoclarimSatiri() {
   const d = useDanismanlik();
-  const koclar = useIliskiler().filter((x) => x.danisan === d.uid && x.durum === 'aktif' && x.disiplin !== 'aile');
+  const koclar = useIliskiler().filter((x) => x.danisan === d.uid && x.durum === 'aktif' && x.disiplin !== 'aile' && !benMi(x.id));
   if (!koclar.length) return null;
   return (
     <>

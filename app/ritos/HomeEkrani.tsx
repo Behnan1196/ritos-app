@@ -16,7 +16,7 @@ import { useCanli } from '@/lib/canli';
 import { type BaglantiRow, type NotRow } from '@/lib/db';
 import { notlar } from '@/lib/notlar';
 import { baglantilar, urlDoldur } from '@/lib/baglanti';
-import { disiplinAdi, useDanismanlik } from '@/lib/danismanlik';
+import { benMi, disiplinAdi, useDanismanlik } from '@/lib/danismanlik';
 import { sayiMetin } from '@/lib/olcum';
 import { NotlarWidget } from './Notlar';
 import { CevremListeleriWidget } from './Cevrem';
@@ -62,7 +62,7 @@ function useWidgetler(): Widget[] {
   const cv = useCevrem();
   const ortak = cv.gruplar.length ? { gruplar: cv.gruplar, listeler: cv.listeler, acikSay: cv.maddeler.filter((m) => !m.isaretli).length } : null;
   const tumIliskiler = useIliskiler();
-  const koclar = tumIliskiler.filter((x) => x.danisan === dn.uid && x.durum === 'aktif' && x.disiplin !== 'aile');
+  const koclar = tumIliskiler.filter((x) => x.danisan === dn.uid && x.durum === 'aktif' && x.disiplin !== 'aile' && !benMi(x.id));
   const olcum = useOlcumler();
   const bag = useCanli(baglantilar, [], [] as BaglantiRow[]);
   const [bagAyar, setBagAyar] = useState<BaglantiRow | null>(null);
@@ -109,7 +109,7 @@ function useWidgetler(): Widget[] {
 
   // 7 ekim — danışmanlık Çevrem'den Home'a taşındı: koç tarafı tam ekran "Danışanlarım" (Atölye kapsam: çevre).
   if (dn.profil?.koc) {
-    const danisanlar = tumIliskiler.filter((x) => x.koc === dn.uid && x.durum === 'aktif' && x.disiplin !== 'aile');
+    const danisanlar = tumIliskiler.filter((x) => x.koc === dn.uid && x.durum === 'aktif' && x.disiplin !== 'aile' && !benMi(x.id));
     w.push({ k: 'danisanlar', ic: '🧑‍⚕️', ad: 'Danışanlarım', mod: 'ekran',
       durum: danisanlar.length ? <><b>{danisanlar.length}</b> danışan · {Array.from(new Set(danisanlar.map((x) => disiplinAdi(x.disiplin)))).join(', ')}</> : 'Henüz danışan yok · davet et',
       imza: danisanlar.map((x) => x.id).join(','),
