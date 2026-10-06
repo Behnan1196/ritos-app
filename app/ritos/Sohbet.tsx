@@ -48,6 +48,7 @@ export function GelenlerEkrani({ onGeri, gomulu }: { onGeri?: () => void; gomulu
   const cv = useCevrem();
   const iliskiden = useCanli(() => db.mesaj.filter((m) => m.tur === 'paylasim' && m.gonderen !== d.uid).toArray(), [d.uid], [] as MesajRow[]);
   const [al, setAl] = useState<GelenSatir | null>(null);
+  const davetSayisi = useEpostaDavetleri().length; // kanca koşulsuz, en üstte (React #310)
   const satirlar: GelenSatir[] = [
     ...cv.gelenler.map((g: GelenPaylasim) => ({
       id: g.id, kim: g.gonderen_ad, paket: g.paket as PaylasimPaketi, zaman: Date.parse(g.olusturuldu), alindi: !!g.alindi,
@@ -81,14 +82,12 @@ export function GelenlerEkrani({ onGeri, gomulu }: { onGeri?: () => void; gomulu
       )}
       <EpostaDavetleri />
       {yeni.map(satir)}
-      {!yeni.length && !useEpostaDavetleriSayi() && <p className="rt-muted">Yeni bir şey yok. Çevrendekiler ya da koçun sana kart veya program gönderince, davetler de burada görünür.</p>}
+      {!yeni.length && !davetSayisi && <p className="rt-muted">Yeni bir şey yok. Çevrendekiler ya da koçun sana kart veya program gönderince, davetler de burada görünür.</p>}
       {alinan.length > 0 && <details className="rt-belgeler"><summary>Alınanlar ({alinan.length})</summary>{alinan.map(satir)}</details>}
       {al && <AlModal p={al.paket} kim={al.kim} onAlindi={al.alindiYap} onKapat={() => setAl(null)} />}
     </div>
   );
 }
-
-function useEpostaDavetleriSayi() { return useEpostaDavetleri().length; }
 
 /** E-postama gelmiş danışmanlık davetleri: "Bak" davet penceresini açar (Kabul / Reddet). */
 function EpostaDavetleri() {
