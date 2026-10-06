@@ -15,7 +15,7 @@ import {
 } from '@/lib/cevrem';
 import { GUN_KISA, bugun, tarihEkle, tarihEtiket } from '@/lib/paket';
 import { Modal, OnayKutusu } from './ortak';
-import { Avatar } from './Hesap';
+import { Avatar, HesapGerekli } from './Hesap';
 import { danismanlikDavetiAc } from './Danismanlik';
 
 const SECILI = 'ritos-cevrem-grup';
@@ -66,6 +66,7 @@ export default function Cevrem() {
   const sec = (id: string) => { setSeciliId(id); setEkran({ t: 'ana' }); try { localStorage.setItem(SECILI, id); } catch { /* yoksay */ } };
 
   if (!d.hazir) return <div className="rt-cv"><p className="rt-muted">Yükleniyor…</p></div>;
+  if (!d.uid) return <div className="rt-cv"><HesapGerekli ikon="🏠" baslik="Evdekilerle işleri paylaş" metin="Market listesi, evin işleri, birinden küçük bir rica. Çevrem, ailen ve arkadaşlarınla canlı paylaşım için hesap ister." /></div>;
   const ortakSayfalar = (
     <>
       {sayfa === 'kur' && <GrupKurModal onKapat={() => setSayfa(null)} onKuruldu={(id) => { sec(id); setSayfa('davet'); }} />}

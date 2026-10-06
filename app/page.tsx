@@ -21,10 +21,10 @@ import { DavetKarsilama } from './ritos/Danismanlik';
 import { SenkronIsareti } from './ritos/Paylasim';
 import { GelenlerEkrani, useGelenlerOzeti } from './ritos/Sohbet';
 import { HomeEkrani, homeEkraniAc } from './ritos/HomeEkrani';
-import { CikisOnayi, GirisEkrani, HesapEkrani, KullaniciRozeti, type HesapEkran, SifreSifirlaEkrani } from './ritos/Hesap';
+import { CikisOnayi, GirisEkrani, HesapEkrani, KullaniciRozeti, MisafirSeridi, type HesapEkran, SifreSifirlaEkrani } from './ritos/Hesap';
 import Cevrem from './ritos/Cevrem';
 import { useCevremBaslat } from '@/lib/cevrem';
-import { useHesapBaslat, useOturum } from '@/lib/hesap';
+import { GIRIS_OLAY, girisAc, useHesapBaslat, useOturum } from '@/lib/hesap';
 
 const NARROW_BREAKPOINT = 760;
 // Testte (NEXT_PUBLIC_RITOS_TEST=1 ile derlenmiş sürüm) giriş kapısı atlanır; gerçek sürümde yok.
@@ -42,10 +42,23 @@ export default function RitosLab() {
   useBeklemeIzleyici(); // yaptıktan sonra bekleme dolunca uyarı
   useSayacIzleyici(); // kart sayaçları: hedef süre dolunca uyarı (hangi sekmede olunursa olunsun)
   const [sifirla, setSifirla] = useState(false);
-  useEffect(() => { try { setSifirla(new URL(location.href).searchParams.has('sifirla')); } catch { /* yoksay */ } }, []);
+  // 7 ekim: hesapsız kullanım — giriş ekranı ilk ekran değil; hesap isteyen yerden ya da davet bağlantısıyla açılır.
+  const [girisAcik, setGirisAcik] = useState(false);
+  useEffect(() => {
+    try {
+      const u = new URL(location.href);
+      setSifirla(u.searchParams.has('sifirla'));
+      if (!o.hesapli && (u.searchParams.has('katil') || u.searchParams.has('davet'))) setGirisAcik(true);
+    } catch { /* yoksay */ }
+    const f = () => setGirisAcik(true);
+    window.addEventListener(GIRIS_OLAY, f);
+    return () => window.removeEventListener(GIRIS_OLAY, f);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   if (!o.hazir) return <div className="rt-kilit-bos" />;
   if (sifirla) return o.session ? <SifreSifirlaEkrani /> : <GirisEkrani />;
-  if (!o.hesapli || (!TEST && o.kilitli)) return <GirisEkrani yeniden={o.hesapli} />;
+  if (o.hesapli && !TEST && o.kilitli) return <GirisEkrani yeniden />;
+  if (girisAcik && !o.hesapli) return <GirisEkrani onVazgec={() => setGirisAcik(false)} />;
   return <RitosUygulama />;
 }
 
@@ -98,7 +111,13 @@ function RitosUygulama() {
       : null
   );
   // Üst köşe (5 ekim): hangi hesapta olduğun her an görünür; dokununca hesap menüsü.
-  const ustSag = <div className="rt-ust-sag"><SenkronIsareti /><KullaniciRozeti onSec={menuSec} uyari={kurtarma} /></div>;
+  const o = useOturum();
+  const ustSag = (
+    <div className="rt-ust-sag">
+      <SenkronIsareti />
+      {o.hesapli ? <KullaniciRozeti onSec={menuSec} uyari={kurtarma} /> : <button type="button" className="rt-giris-dugme" onClick={girisAc}>Giriş · Hesap aç</button>}
+    </div>
+  );
   const hesapEkrani = hesap && <HesapEkrani ekran={hesap} onGeri={() => setHesap(null)} />;
   const sagSekme = (s: Sekme) => (
     s === 'gelenler' ? <GelenlerEkrani onGeri={homeyaDon} />
@@ -124,6 +143,7 @@ function RitosUygulama() {
       {isNarrow ? (
         <div className="mobile-app">
           <div className="mobile-hd"><b>Ritos</b>{ustSag}</div>
+          {!o.hesapli && <MisafirSeridi />}
           <div className="mobile-main">{hesapEkrani || (sekme === 'gunum' ? <AjandaPane /> : sagSekme(sekme))}</div>
           <div className="mobile-nav">
             {MOBIL_SEKMELER.map(([k, ic, ad]) => (
@@ -134,6 +154,7 @@ function RitosUygulama() {
       ) : (
         <>
           <div className="topbar"><b>Ritos</b>{ustSag}</div>
+          {!o.hesapli && <MisafirSeridi />}
           <SplitPane
               ratio={ratio}
               setRatio={setRatio}

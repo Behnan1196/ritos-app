@@ -4,7 +4,7 @@
 
 import { BildirimAyarlari } from './BildirimAyar';
 import React, { useEffect, useState } from 'react';
-import { SIFRE_EN_AZ, cikisYap, girisYap, gorunenAdDegistir, kayitOl, sifirlamaIste, sifirlamaTamamla, sifreDegistir, useOturum } from '@/lib/hesap';
+import { SIFRE_EN_AZ, cikisYap, girisAc, girisYap, gorunenAdDegistir, kayitOl, misafirVerisiVar, sifirlamaIste, sifirlamaTamamla, sifreDegistir, useOturum } from '@/lib/hesap';
 import { senkronla, useSenkronDurum } from '@/lib/senkron';
 import { Chips, Kap, Modal } from './ortak';
 import { PaketlerKap } from './Sinav';
@@ -17,7 +17,7 @@ import { hesabimiSil, verileriSifirla, type SifirlaSecim } from '@/lib/sifirla';
 const EPOSTA = /\S+@\S+\.\S+/;
 
 /** Hesap açık değilse uygulama yerine bu ekran görünür. */
-export function GirisEkrani({ yeniden }: { yeniden?: boolean }) {
+export function GirisEkrani({ yeniden, onVazgec }: { yeniden?: boolean; onVazgec?: () => void }) {
   const [kip, setKip] = useState<'giris' | 'kayit' | 'unuttum'>('giris');
   const [ad, setAd] = useState('');
   const [eposta, setEposta] = useState('');
@@ -26,6 +26,8 @@ export function GirisEkrani({ yeniden }: { yeniden?: boolean }) {
   const [hata, setHata] = useState<string | null>(null);
   const [bilgi, setBilgi] = useState<string | null>(null);
   const [bekle, setBekle] = useState(false);
+  const [tasinacak, setTasinacak] = useState(false);
+  useEffect(() => { misafirVerisiVar().then(setTasinacak).catch(() => {}); }, []);
   const gecerli = kip === 'unuttum'
     ? EPOSTA.test(eposta)
     : EPOSTA.test(eposta) && sifre.length >= SIFRE_EN_AZ && (kip === 'giris' || (ad.trim().length > 0 && sifre === sifre2));
@@ -67,6 +69,8 @@ export function GirisEkrani({ yeniden }: { yeniden?: boolean }) {
         </button>
         {kip === 'giris' && <button type="button" className="rt-linkbtn" onClick={() => { setKip('unuttum'); setHata(null); }}>Şifremi unuttum</button>}
         {kip === 'unuttum' && <button type="button" className="rt-linkbtn" onClick={() => { setKip('giris'); setHata(null); setBilgi(null); }}>Girişe dön</button>}
+        {tasinacak && kip !== 'unuttum' && <p className="rt-muted">Bu tarayıcıda hesapsız girdiğin her şey hesabına taşınır.</p>}
+        {onVazgec && <button type="button" className="rt-linkbtn" onClick={onVazgec}>‹ Hesapsız devam et</button>}
       </div>
     </div>
   );
@@ -305,6 +309,43 @@ function HesapSilModal({ onKapat }: { onKapat: () => void }) {
         }}>{bekle ? 'Siliniyor…' : 'Hesabımı sil'}</button>
       </div>
     </Modal>
+  );
+}
+
+// ———————————— 7 ekim: hesapsız kullanım ————————————
+
+const SERIT_GIZLI = 'ritos-misafir-serit';
+/** Tarayıcıda hesapsızken üstte ince şerit: veri yalnız bu tarayıcıda. Safari'de (ana ekrana eklenmemişse)
+ *  7 gün kullanılmayan sitenin verisi silinebilir — bunu da söyler. × ile bir günlüğüne gizlenir. */
+export function MisafirSeridi() {
+  const [gizli, setGizli] = useState(true);
+  const [safari, setSafari] = useState(false);
+  useEffect(() => {
+    try { setGizli(Number(localStorage.getItem(SERIT_GIZLI) ?? 0) > Date.now()); } catch { setGizli(false); }
+    const ua = navigator.userAgent;
+    const anaEkran = window.matchMedia?.('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
+    setSafari(/safari/i.test(ua) && !/chrome|crios|fxios|android|edg/i.test(ua) && !anaEkran);
+  }, []);
+  if (gizli) return null;
+  return (
+    <div className="rt-misafir-serit" role="status">
+      <span>{safari ? "Verin yalnız bu tarayıcıda; Safari, 7 gün açılmazsa silebilir." : 'Verin yalnız bu tarayıcıda.'}</span>
+      <button type="button" className="rt-linkbtn" onClick={girisAc}>Hesap aç, kaybolmasın</button>
+      <button type="button" className="rt-misafir-x" aria-label="Bugünlük gizle" onClick={() => { try { localStorage.setItem(SERIT_GIZLI, String(Date.now() + 86400000)); } catch { /* yoksay */ } setGizli(true); }}>×</button>
+    </div>
+  );
+}
+
+/** Hesap isteyen ekranlarda (Çevrem…) hesapsızken gösterilir. */
+export function HesapGerekli({ ikon, baslik, metin }: { ikon: string; baslik: string; metin: string }) {
+  return (
+    <div className="rt-cv-bos">
+      <div className="resim" aria-hidden>{ikon}</div>
+      <h3>{baslik}</h3>
+      <p className="rt-muted">{metin}</p>
+      <button type="button" className="rt-btn primary rt-genis" onClick={girisAc}>Hesap aç ya da giriş yap</button>
+      <p className="rt-muted kucuk">Ajandam ve Rutinlerim hesapsız da çalışır; hesap açınca bu tarayıcıdaki verin hesabına taşınır.</p>
+    </div>
   );
 }
 

@@ -3,7 +3,9 @@
 // ————————————————————————————————————————————————————————————————
 // Hesap + eşitleme (7 ekim — v1 şema: şifreleme kalktı).
 //
-// Ritos hesapla kullanılır: ilk ekran kayıt / giriş (e-posta + şifre). Bir cihazda bir hesap açık
+// 7 ekim: Ritos hesapsız da çalışır (misafir veritabanı, yalnız bu tarayıcıda); hesap Çevrem,
+// danışmanlık, paylaşım, bildirim ve eşitleme için. Hesap açınca / girince hesapsız veri hesaba taşınır.
+// Hesapla: kayıt / giriş (e-posta + şifre). Bir cihazda bir hesap açık
 // olur; verisi cihazda o hesabın veritabanında durur, sunucudaki `kayit` tablosuyla eşitlenir
 // (düz JSON, yalnız sahibi okur — RLS), internetsiz de çalışır. Çıkışta cihazdaki kopya silinir.
 // Veri şifresi, kurtarma kelimeleri ve Google girişi yok.
@@ -12,11 +14,15 @@
 import { useEffect, useState } from 'react';
 import Dexie from 'dexie';
 import type { Session, User } from '@supabase/supabase-js';
-import { aktifHesap, aktifHesapAyarla, db, dbAdi } from './db';
+import { MISAFIR_DB, RitosDB, SENKRON_TABLOLARI, aktifHesap, aktifHesapAyarla, db, dbAdi } from './db';
 import { supabase } from './supabase';
 import { senkronBaslat, senkronDurdur, senkronla } from './senkron';
 
 export const SIFRE_EN_AZ = 8;
+
+/** Hesapsızken giriş / kayıt ekranını aç (Çevrem, Paylaş gibi hesap isteyen yerlerden). */
+export const GIRIS_OLAY = 'ritos-giris-ac';
+export function girisAc() { if (typeof window !== 'undefined') window.dispatchEvent(new Event(GIRIS_OLAY)); }
 
 export interface Oturum {
   hazir: boolean;
@@ -85,11 +91,46 @@ export async function profilGaranti(uid: string, eposta: string, adOnerisi?: str
 
 export type Sonuc = { tamam: true } | { tamam: false; hata: string };
 
-/** Cihazda başka bir hesabın verisi kalmışsa (beklenmez; çıkış siler) önce onu sil, sonra bu hesabı aç. */
-async function hesabiAc(uid: string) {
+/** Cihazda başka bir hesabın verisi kalmışsa (beklenmez; çıkış siler) önce onu sil, sonra bu hesabı aç.
+ *  7 ekim — hesapsız kullanılmışsa bu tarayıcıdaki veri hesaba taşınır (sonra eşitlenir). */
+async function hesabiAc(uid: string, nasil: 'kayit' | 'giris' = 'giris') {
   const onceki = aktifHesap();
   if (onceki && onceki !== uid) { db.close(); await Dexie.delete(dbAdi(onceki)); }
+  if (!onceki) { try { await misafirVerisiniTasi(uid, nasil); } catch (e) { console.warn('[ritos] hesapsız veri taşınamadı', e); } }
   aktifHesapAyarla(uid);
+}
+
+/** Bu tarayıcıda hesapsız girilmiş bir şey var mı? (giriş ekranında "verin hesabına eklenir" demek için) */
+export async function misafirVerisiVar(): Promise<boolean> {
+  if (aktifHesap()) return false;
+  const m = new RitosDB(MISAFIR_DB);
+  try {
+    for (const t of ['ajanda_kart', 'program', 'not', 'kutuphane_kart', 'olcum'] as const) if ((await m.table(t).count()) > 0) return true;
+    return false;
+  } finally { m.close(); }
+}
+
+/** Hesapsız alanın (misafir veritabanı) tüm satırlarını hesabın veritabanına kopyala, hepsini gönderilecek
+ *  diye işaretle, misafir alanı boşalt. Girişte (var olan hesap) hazır yaşam alanları kopyalanmaz —
+ *  hesaptaki düzenlemelerin üstüne yazılmasın. */
+async function misafirVerisiniTasi(uid: string, nasil: 'kayit' | 'giris') {
+  const m = new RitosDB(MISAFIR_DB);
+  const hedef = new RitosDB(dbAdi(uid));
+  try {
+    let tasinan = 0;
+    for (const t of m.tables) {
+      if (t.name === 'bekleyen') continue;
+      let satirlar = await t.toArray();
+      if (t.name === 'ayar') satirlar = satirlar.filter((r) => !/^(senkron_|danismanlik_)/.test(String((r as { anahtar: string }).anahtar)));
+      if (t.name === 'yasam_alani' && nasil === 'giris') satirlar = satirlar.filter((r) => !String((r as { id: string }).id).startsWith('alan:'));
+      if (!satirlar.length) continue;
+      await hedef.table(t.name).bulkPut(satirlar);
+      if ((SENKRON_TABLOLARI as readonly string[]).includes(t.name)) tasinan += satirlar.length;
+    }
+    if (tasinan) await hedef.hepsiniIsaretle();
+  } finally { m.close(); hedef.close(); }
+  db.close();
+  await Dexie.delete(MISAFIR_DB);
 }
 
 // ———————————————— kayıt / giriş ————————————————
@@ -107,7 +148,7 @@ export async function kayitOl(gorunenAd: string, eposta: string, sifre: string):
   const uid = r.data.user?.id;
   if (!uid) return { tamam: false, hata: 'Kayıt tamamlanamadı.' };
   if (!r.data.session) return { tamam: false, hata: 'E-postana bir doğrulama bağlantısı gönderdik. Bağlantıyı açtıktan sonra giriş yap.' };
-  await hesabiAc(uid);
+  await hesabiAc(uid, 'kayit');
   location.reload();
   return { tamam: true };
 }
