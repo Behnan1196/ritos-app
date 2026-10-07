@@ -203,13 +203,21 @@ export function CikisOnayi({ onKapat }: { onKapat: () => void }) {
 
 function CikisModal({ onKapat, bekleyen }: { onKapat: () => void; bekleyen: number }) {
   const [bekle, setBekle] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  const cik = async (zorla = false) => {
+    setBekle(true); setHata(null);
+    const r = await cikisYap(zorla);
+    if (!r.tamam) { setHata(r.hata); setBekle(false); }
+  };
   return (
     <Modal baslik="Çıkış yap" onKapat={onKapat}>
       <p className="rt-metin">Ritos bu cihazda boş açılır. Her şeyin yedekte; e-postanla yeniden girince geri gelir.</p>
-      {bekleyen > 0 && <p className="rt-uyari">Son değişikliklerin henüz gönderilmedi. İnternete bağlıyken çıkarsan onlar da gider.</p>}
+      {bekle && !hata && bekleyen > 0 && <p className="rt-muted">Son değişikliklerin gönderiliyor…</p>}
+      {hata && <p className="rt-uyari">{hata}</p>}
       <div className="rt-satir">
         <button type="button" className="rt-btn" onClick={onKapat}>Vazgeç</button>
-        <button type="button" className="rt-btn primary" disabled={bekle} onClick={async () => { setBekle(true); await cikisYap(); }}>{bekle ? 'Çıkılıyor…' : 'Çıkış yap'}</button>
+        {hata && <button type="button" className="rt-btn tehlike" disabled={bekle} onClick={() => cik(true)}>Yine de çık</button>}
+        <button type="button" className="rt-btn primary" disabled={bekle} onClick={() => cik()}>{bekle ? 'Çıkılıyor…' : hata ? 'Yeniden dene' : 'Çıkış yap'}</button>
       </div>
     </Modal>
   );

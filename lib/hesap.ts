@@ -17,7 +17,7 @@ import Dexie from 'dexie';
 import type { Session, User } from '@supabase/supabase-js';
 import { MISAFIR_DB, RitosDB, SENKRON_TABLOLARI, aktifHesap, aktifHesapAyarla, db, dbAdi } from './db';
 import { supabase } from './supabase';
-import { senkronBaslat, senkronDurdur, senkronla } from './senkron';
+import { bekleyenleriGonder, senkronBaslat, senkronDurdur } from './senkron';
 
 /** Hesapsızken "e-postanla devam et" penceresini aç (Gruplar, Paylaş gibi kimlik isteyen yerlerden). */
 export const GIRIS_OLAY = 'ritos-giris-ac';
@@ -176,15 +176,19 @@ export async function kodDogrula(eposta: string, kod: string): Promise<Sonuc> {
 // ———————————————— çıkış ————————————————
 
 /** Çıkış: bekleyenler gönderilir, cihazdaki kopya silinir; veri hesapta durur. */
-export async function cikisYap() {
+export async function cikisYap(zorla = false): Promise<Sonuc> {
   const uid = aktifHesap();
-  try { await senkronla(); } catch { /* çevrimdışıysa bekleyenler kaybolur — ekranda uyarılır */ }
+  // Bekleyen değişiklikler gönderilmeden cihazdaki kopya silinmez (yoksa son eklenen kart kaybolur).
+  let kalan = 0;
+  try { kalan = await bekleyenleriGonder(); } catch { kalan = 1; }
+  if (kalan > 0 && !zorla) return { tamam: false, hata: 'Son değişikliklerin henüz gönderilemedi. İnternete bağlı olduğundan emin olup yeniden dene.' };
   senkronDurdur();
   await supabase()?.auth.signOut({ scope: 'local' });
   if (uid) { db.close(); await Dexie.delete(dbAdi(uid)); }
   aktifHesapAyarla(null);
   try { localStorage.removeItem('ritos-karsilandi'); } catch { /* yoksay */ } // karşılama yeniden: "Başla" ya da "Daha önce kullandım"
   location.reload();
+  return { tamam: true };
 }
 
 export async function gorunenAdDegistir(uid: string, ad: string) {

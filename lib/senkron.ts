@@ -137,6 +137,21 @@ export async function senkronla(): Promise<void> {
   return tur;
 }
 
+/** Çıkıştan önce: bekleyen her değişiklik gönderilene kadar tur at. O an süren bir tur varsa onu bekler,
+ *  ardından kendi turunu çalıştırır (süren tur yeni eklenen kartı almamış olabilir). Kalan sayıyı döner. */
+export async function bekleyenleriGonder(): Promise<number> {
+  await new Promise((r) => setTimeout(r, 50)); // db.isaretle'nin ertelenmiş yazması bitsin
+  for (let i = 0; i < 4; i++) {
+    if (tur) await tur.catch(() => {});
+    if (gecikme) { clearTimeout(gecikme); gecikme = null; }
+    tekrar = false;
+    if (!(await db.bekleyen.count())) return 0;
+    if (!uid || !navigator.onLine) break;
+    await senkronla();
+  }
+  return db.bekleyen.count();
+}
+
 async function gonder() {
   const sb = supabase()!;
   for (;;) {
