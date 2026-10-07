@@ -21,10 +21,10 @@ import { DavetKarsilama } from './ritos/Danismanlik';
 import { SenkronIsareti } from './ritos/Paylasim';
 import { GelenlerEkrani, useGelenlerOzeti } from './ritos/Sohbet';
 import { HomeEkrani, homeEkraniAc } from './ritos/HomeEkrani';
-import { CikisOnayi, GirisEkrani, KARSILAMA_ANAHTAR, Karsilama, HesapEkrani, KodGirisModal, KullaniciRozeti, type HesapEkran } from './ritos/Hesap';
+import { CikisOnayi, GirisEkrani, HesapEkrani, KullaniciRozeti, type HesapEkran } from './ritos/Hesap';
 import Cevrem from './ritos/Cevrem';
 import { useCevremBaslat } from '@/lib/cevrem';
-import { GIRIS_OLAY, misafirVerisiVar, useHesapBaslat, useOturum } from '@/lib/hesap';
+import { useHesapBaslat, useOturum } from '@/lib/hesap';
 
 const NARROW_BREAKPOINT = 760;
 // Testte (NEXT_PUBLIC_RITOS_TEST=1 ile derlenmiş sürüm) giriş kapısı atlanır; gerçek sürümde yok.
@@ -41,39 +41,15 @@ export default function RitosLab() {
   const o = useOturum();
   useBeklemeIzleyici(); // yaptıktan sonra bekleme dolunca uyarı
   useSayacIzleyici(); // kart sayaçları: hedef süre dolunca uyarı (hangi sekmede olunursa olunsun)
-  // 8 ekim: hesapsız açılır; "e-postanla devam et" penceresi kimlik isteyen yerden, davet bağlantısından
-  // ya da karşılamadaki "Daha önce kullandım"dan açılır. Şifre yok (kod).
-  const [girisAcik, setGirisAcik] = useState<null | 'giris' | 'davet'>(null);
+  // 8 ekim (akşam) — web = test ortamı: hesapla girilir (e-posta + kod); hesapsız kullanım, yerel veri ve
+  // karşılama mobilde. Davet bağlantısıyla gelen de önce girer; giriş sayfayı yeniler, bağlantı (?katil / ?davet) korunur.
+  const [davet, setDavet] = useState(false);
   useEffect(() => {
-    try {
-      const u = new URL(location.href);
-      if (!o.hesapli && (u.searchParams.has('katil') || u.searchParams.has('davet'))) setGirisAcik('davet');
-    } catch { /* yoksay */ }
-    const f = () => setGirisAcik('giris');
-    window.addEventListener(GIRIS_OLAY, f);
-    return () => window.removeEventListener(GIRIS_OLAY, f);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    try { const u = new URL(location.href); setDavet(u.searchParams.has('katil') || u.searchParams.has('davet')); } catch { /* yoksay */ }
   }, []);
-  // İlk açılış karşılaması: hesapsız, daha önce görülmemiş ve tarayıcıda veri yoksa. Değer: ilk başlama anı (ms).
-  const [karsilama, setKarsilama] = useState<'?' | 'goster' | 'gec'>('?');
-  useEffect(() => {
-    if (!o.hazir) return;
-    if (o.hesapli) { setKarsilama('gec'); return; }
-    let gorulmus = false;
-    try { gorulmus = !!localStorage.getItem(KARSILAMA_ANAHTAR); } catch { /* yoksay */ }
-    if (gorulmus) { setKarsilama('gec'); return; }
-    misafirVerisiVar().then((v) => setKarsilama(v ? 'gec' : 'goster')).catch(() => setKarsilama('gec'));
-  }, [o.hazir, o.hesapli]);
-  const karsilandi = () => { try { if (!localStorage.getItem(KARSILAMA_ANAHTAR)) localStorage.setItem(KARSILAMA_ANAHTAR, String(Date.now())); } catch { /* yoksay */ } setKarsilama('gec'); };
-  if (!o.hazir || (!o.hesapli && karsilama === '?')) return <div className="rt-kilit-bos" />;
-  if (o.hesapli && !TEST && o.kilitli) return <GirisEkrani />;
-  const pencere = girisAcik && !o.hesapli && (
-    <KodGirisModal onKapat={() => setGirisAcik(null)}
-      baslik={girisAcik === 'davet' ? 'Davete katıl' : 'E-postanla devam et'}
-      metin={girisAcik === 'davet' ? <p className="rt-metin">Davete katılmak için e-postanı yaz, sana bir kod gönderelim.</p> : undefined} />
-  );
-  if (!o.hesapli && karsilama === 'goster' && girisAcik !== 'davet') return <><Karsilama onBasla={karsilandi} onDaha={() => setGirisAcik('giris')} />{pencere}</>;
-  return <><RitosUygulama />{pencere}</>;
+  if (!o.hazir) return <div className="rt-kilit-bos" />;
+  if (!TEST && (!o.hesapli || o.kilitli)) return <GirisEkrani ilk={!o.hesapli} davet={davet} />;
+  return <RitosUygulama />;
 }
 
 function RitosUygulama() {

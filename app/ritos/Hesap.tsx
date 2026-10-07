@@ -70,12 +70,16 @@ export function KodGirisModal({ onKapat, baslik = 'E-postanla devam et', metin }
 }
 
 /** Bu cihaz birine bağlıyken oturum kapanmışsa (nadir): tam ekran, yeniden kod. */
-export function GirisEkrani() {
+export function GirisEkrani({ ilk, davet }: { ilk?: boolean; davet?: boolean }) {
+  const metin = davet ? 'Davete katılmak için e-postanı yaz, sana bir kod gönderelim.'
+    : ilk ? 'Günlük düzenin, rutinlerin ve sevdiklerinle paylaştıkların bir arada. E-postanı yaz, sana bir kod gönderelim.'
+    : 'Devam etmek için e-postanı yaz, sana bir kod gönderelim. Her şeyin yerinde.';
   return (
     <div className="rt-giris">
       <div className="rt-giris-kutu">
         <div className="rt-giris-logo">Ritos</div>
-        <KodAdimlari ilkMetin={<p className="rt-metin">Devam etmek için e-postanı yaz, sana bir kod gönderelim. Her şeyin yerinde.</p>} />
+        <KodAdimlari ilkMetin={<p className="rt-metin">{metin}</p>} />
+        {ilk && <p className="rt-muted kucuk rt-giris-not">Web sürümü deneme içindir. Ritos'un asıl evi telefon ve tablet uygulaması.</p>}
       </div>
     </div>
   );
