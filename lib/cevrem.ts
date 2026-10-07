@@ -50,15 +50,21 @@ export interface BulusmaYanit { bulusma_id: string; grup_id: string; uye_id: str
 /** Çevrem'deki birinin bana gönderdiği kart/program tanımı (supabase/v1/07-paylasim.sql). */
 export interface GelenPaylasim { id: string; gonderen: string; gonderen_ad: string; paket: unknown; alindi: string | null; olusturuldu: string }
 
+/** Kod paylaşmadan, kişiye/e-postaya grup daveti (supabase/v1/09-kisi-davet.sql). */
+export interface KisiDavet { id: string; grup_id: string; davet_eden: string; alici: string | null; alici_eposta: string | null; alici_ad: string | null; durum: string; olusturuldu: string }
+export interface GelenGrupDavet { id: string; grup_id: string; grup_ad: string; grup_tur: GrupTur; grup_ikon: string | null; davet_eden_ad: string; uye_sayisi: number; olusturuldu: string }
+export interface RehberKisi { eposta: string; ad: string | null }
+
 export interface CevremDurum {
   hazir: boolean; uid: string | null; hata: string | null;
   gruplar: Grup[]; uyeler: Uye[]; listeler: Liste[]; maddeler: Madde[]; isler: OrtakIs[]; kayitlar: IsKayit[]; ricalar: Rica[];
   gelenler: GelenPaylasim[];
   rutinler: BirlikteRutin[]; katilimlar: BirlikteKatilim[]; bkayitlar: BirlikteKayit[];
   bulusmalar: Bulusma[]; yanitlar: BulusmaYanit[];
+  gelenDavetler: GelenGrupDavet[]; gidenDavetler: KisiDavet[]; rehber: RehberKisi[];
 }
 
-const BOS: CevremDurum = { hazir: false, uid: null, hata: null, gruplar: [], uyeler: [], listeler: [], maddeler: [], isler: [], kayitlar: [], ricalar: [], gelenler: [], rutinler: [], katilimlar: [], bkayitlar: [], bulusmalar: [], yanitlar: [] };
+const BOS: CevremDurum = { hazir: false, uid: null, hata: null, gruplar: [], uyeler: [], listeler: [], maddeler: [], isler: [], kayitlar: [], ricalar: [], gelenler: [], rutinler: [], katilimlar: [], bkayitlar: [], bulusmalar: [], yanitlar: [], gelenDavetler: [], gidenDavetler: [], rehber: [] };
 let durum: CevremDurum = BOS;
 const dinleyiciler = new Set<(d: CevremDurum) => void>();
 function yay(p: Partial<CevremDurum>) {
@@ -99,8 +105,15 @@ async function yukle(): Promise<void> {
       const pg = await sb.from('paylasim').select('id, gonderen, gonderen_ad, paket, alindi, olusturuldu').eq('alici', uid)
         .gte('olusturuldu', new Date(Date.now() - 60 * 86400000).toISOString()).order('olusturuldu', { ascending: false }).limit(100);
       const gelenler = (pg.error ? durum.gelenler : (pg.data ?? [])) as GelenPaylasim[];
-      if (!ids.length) { yay({ ...BOS, hazir: true, uid, gelenler }); return; }
-      const [g, u, l, m, i, k, r, br, bk, bkk, bl, by] = await Promise.all([
+      // Bana gelen grup davetleri + e-posta listem (09-kisi-davet.sql yoksa boş).
+      const [gd, rh] = await Promise.all([
+        sb.rpc('bana_gelen_grup_davetleri'),
+        sb.from('rehber').select('eposta, ad').order('eposta'),
+      ]);
+      const gelenDavetler = (gd.error ? [] : (gd.data ?? [])) as GelenGrupDavet[];
+      const rehber = (rh.error ? [] : (rh.data ?? [])) as RehberKisi[];
+      if (!ids.length) { yay({ ...BOS, hazir: true, uid, gelenler, gelenDavetler, rehber }); return; }
+      const [g, u, l, m, i, k, r, br, bk, bkk, bl, by, kd] = await Promise.all([
         sb.from('grup').select('id, ad, tur, ikon, kurucu').in('id', ids).order('olusturuldu'),
         sb.from('grup_uye').select('grup_id, uye_id, rol, durum, katildi').in('grup_id', ids),
         sb.from('liste').select('id, grup_id, ad, ikon, olusturan, silindi, olusturuldu').in('grup_id', ids).eq('silindi', false).order('olusturuldu'),
@@ -113,6 +126,7 @@ async function yukle(): Promise<void> {
         sb.from('birlikte_kayit').select('rutin_id, grup_id, uye_id, tarih, zaman').in('grup_id', ids).gte('tarih', tarihEkleGun(bugun(), -42)),
         sb.from('bulusma').select('id, grup_id, ad, aciklama, tarih, saat, yer, olusturan, iptal, olusturuldu, guncellendi').in('grup_id', ids).gte('tarih', tarihEkleGun(bugun(), -14)).order('tarih'),
         sb.from('bulusma_yanit').select('bulusma_id, grup_id, uye_id, yanit, zaman').in('grup_id', ids),
+        sb.from('grup_kisi_davet').select('id, grup_id, davet_eden, alici, alici_eposta, alici_ad, durum, olusturuldu').in('grup_id', ids).eq('durum', 'bekliyor').order('olusturuldu'),
       ]);
       for (const x of [g, u, l, m, i, k, r]) hata(x.error);
       // 08-birlikte.sql henüz çalıştırılmadıysa bu tablolar yok: Çevrem'in geri kalanı yine çalışsın.
@@ -133,6 +147,7 @@ async function yukle(): Promise<void> {
         gelenler,
         rutinler: ek<BirlikteRutin>(br), katilimlar: ek<BirlikteKatilim>(bk), bkayitlar: ek<BirlikteKayit>(bkk),
         bulusmalar: ek<Bulusma>(bl), yanitlar: ek<BulusmaYanit>(by),
+        gelenDavetler, gidenDavetler: ek<KisiDavet>(kd), rehber,
       });
     } catch (e) {
       yay({ hazir: true, hata: e instanceof Error ? e.message : String(e) });
@@ -158,7 +173,7 @@ export function useCevremBaslat() {
     void yukle();
     const ad = `cevrem-${Math.random().toString(36).slice(2, 8)}`;
     let c = sb.channel(ad);
-    for (const t of ['grup', 'grup_uye', 'liste', 'liste_madde', 'ortak_is', 'ortak_is_kayit', 'rica', 'paylasim', 'birlikte_rutin', 'birlikte_katilim', 'birlikte_kayit', 'bulusma', 'bulusma_yanit']) {
+    for (const t of ['grup', 'grup_uye', 'liste', 'liste_madde', 'ortak_is', 'ortak_is_kayit', 'rica', 'paylasim', 'birlikte_rutin', 'birlikte_katilim', 'birlikte_kayit', 'bulusma', 'bulusma_yanit', 'grup_kisi_davet']) {
       c = c.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => zamanla());
     }
     kanal = c.subscribe();
@@ -222,6 +237,35 @@ export async function grupKatil(kod: string): Promise<string> {
   await yukle();
   return r.data as string;
 }
+// ——— kişiye davet (kodsuz) ———
+export async function kisiDavetGonder(grup: string, kime: { alici?: string; eposta?: string; ad?: string | null }) {
+  const r = await (await sb()).rpc('grup_kisi_davet_gonder', { p_grup: grup, p_alici: kime.alici ?? null, p_eposta: kime.eposta ?? null, p_ad: kime.ad ?? null });
+  hata(r.error);
+  await yukle();
+}
+export async function kisiDavetYanit(id: string, kabul: boolean): Promise<string> {
+  yerel('gelenDavetler', (x) => x.filter((d) => d.id !== id));
+  const r = await (await sb()).rpc('grup_kisi_davet_yanit', { p_id: id, p_kabul: kabul });
+  if (r.error) { await yukle(); hata(r.error); }
+  await yukle();
+  return r.data as string;
+}
+export async function kisiDavetIptal(id: string) {
+  yerel('gidenDavetler', (x) => x.filter((d) => d.id !== id));
+  const r = await (await sb()).rpc('grup_kisi_davet_iptal', { p_id: id });
+  hata(r.error);
+}
+export async function rehberSil(eposta: string) {
+  yerel('rehber', (x) => x.filter((k) => k.eposta !== eposta));
+  const r = await (await sb()).from('rehber').delete().eq('eposta', eposta);
+  hata(r.error);
+}
+/** Benimle bir grupta olan, bu grupta olmayan kişiler. */
+export function tanidiklar(d: CevremDurum, grup: string) {
+  const icerde = new Set(aktifUyeler(d, grup).map((u) => u.uye_id));
+  return paylasilacakKisiler(d).filter((k) => !icerde.has(k.id));
+}
+
 export async function grupAyril(grup: string, kisi: string | null = null) {
   const r = await (await sb()).rpc('grup_ayril', { p_grup: grup, p_kisi: kisi });
   hata(r.error);

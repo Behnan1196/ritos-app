@@ -1561,3 +1561,23 @@ div.rt-cv-sat .ic{cursor:default;}
 .rt-cv-ust-ic{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .rt-cv-ust-ic .ik{font-size:24px;}
 .rt-cv-ust-ic b{font-size:20px;flex:1;min-width:0;}
+
+/* Kişiye davet (8 ekim) */
+.rt-cv-gelen-davet{display:flex;flex-direction:column;gap:8px;}
+.rt-cv-gdv{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fff6ea;border:1.5px solid #e9c9a4;border-radius:16px;padding:12px 14px;}
+.rt-cv-gdv .ik{font-size:26px;}
+.rt-cv-gdv .ic{flex:1;min-width:150px;display:flex;flex-direction:column;}
+.rt-cv-gdv .ic b{font-size:15.5px;}
+.rt-cv-gdv .ic span{font-size:13px;color:var(--muted);}
+.rt-cv-gdv .dg{display:flex;gap:8px;margin-left:auto;}
+.rt-cv-dv-bolum{display:flex;flex-direction:column;gap:6px;margin:0 0 14px;}
+.rt-cv-dv-bas{display:flex;justify-content:space-between;align-items:center;}
+.rt-cv-dv-h{margin:0 0 2px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+.rt-cv-dv-sat{display:flex;align-items:center;gap:10px;min-height:48px;}
+.rt-cv-dv-sat .ic{flex:1;min-width:0;display:flex;flex-direction:column;}
+.rt-cv-dv-sat .ic b{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rt-cv-dv-sat .ic span{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rt-cv-davet-ok{font-size:13px;font-weight:700;color:#4b7340;white-space:nowrap;}
+.rt-cv-dv-yeni{display:flex;flex-direction:column;gap:8px;}
+.rt-cv-dv-yeni .rt-btn{align-self:flex-start;}
+.rt-cv-dv-ekle{min-height:46px;border:1.5px dashed #d8cfbd;background:none;border-radius:12px;font:inherit;font-weight:700;color:var(--ink);cursor:pointer;text-align:left;padding:0 14px;}

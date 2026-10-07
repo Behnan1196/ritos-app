@@ -13,6 +13,7 @@ import {
   maddeEkle, maddeIsaretle, maddeSil, ricaDurum, ricaGonder, useCevrem, uyeAdi,
   bugunYaptiMi, bulusmaEkle, bulusmaGuncelle, bulusmaYanitla, haftaBasi, haftaSayisi, katiliyorMu, rutinEkle, rutinGuncelle, rutinKatilimcilari,
   rutinSil, rutinYapildi, rutineKatil, seri, yanitSayilari, yanitim,
+  kisiDavetGonder, kisiDavetIptal, kisiDavetYanit, rehberSil, tanidiklar, type GelenGrupDavet,
   type BirlikteRutin, type Bulusma, type CevremDurum, type Grup, type GrupTur, type IsGirdi, type Liste, type OrtakIs, type Rica, type Yanit,
 } from '@/lib/cevrem';
 import { GUN_KISA, bugun, tarihEkle, tarihEtiket, tarihParse } from '@/lib/paket';
@@ -79,6 +80,7 @@ export default function Cevrem() {
   if (!d.gruplar.length) return (
     <div className="rt-cv">
       {d.hata && <p className="rt-hata">⚠ {d.hata}</p>}
+      <GelenDavetler d={d} onKatildi={sec} />
       <BosEkran onKur={() => setSayfa('kur')} onKatil={() => setSayfa('katil')} />
       {ortakSayfalar}
     </div>
@@ -86,6 +88,7 @@ export default function Cevrem() {
   if (!grup) return (
     <div className="rt-cv">
       {d.hata && <p className="rt-hata">⚠ {d.hata}</p>}
+      <GelenDavetler d={d} onKatildi={sec} />
       <GruplarListesi d={d} onSec={sec} onKur={() => setSayfa('kur')} onKatil={() => setSayfa('katil')} />
       {ortakSayfalar}
     </div>
@@ -143,9 +146,36 @@ function BosEkran({ onKur, onKatil }: { onKur: () => void; onKatil: () => void }
       <div className="resim" aria-hidden>🏠</div>
       <h3>Evdekilerle işleri paylaş</h3>
       <p className="rt-muted">Market listesi, evin işleri, birinden küçük bir rica. Herkes kendi telefonundan görür, anında güncellenir.</p>
-      <button type="button" className="rt-cv-secenek" onClick={onKur}><span className="ik">🏠</span><span><b>Grup kur</b><small>Ailen ya da arkadaşların için. Bir ad ver, sonra davet kodunu paylaş. En fazla {GRUP_SINIR} kişi.</small></span></button>
+      <button type="button" className="rt-cv-secenek" onClick={onKur}><span className="ik">🏠</span><span><b>Grup kur</b><small>Ailen ya da arkadaşların için. Bir ad ver, sonra kimleri istediğini seç. En fazla {GRUP_SINIR} kişi.</small></span></button>
       <button type="button" className="rt-cv-secenek" onClick={onKatil}><span className="ik">✉️</span><span><b>Davet kodum var</b><small>Biri seni davet ettiyse 6 harfli kodu gir.</small></span></button>
     </div>
+  );
+}
+
+// ———————————————— bana gelen davetler (kodsuz, 8 ekim) ————————————————
+
+function GelenDavetler({ d, onKatildi }: { d: CevremDurum; onKatildi: (id: string) => void }) {
+  const [hata, setHata] = useState<string | null>(null);
+  const [bekle, setBekle] = useState<string | null>(null);
+  if (!d.gelenDavetler.length) return null;
+  const yanit = async (v: GelenGrupDavet, kabul: boolean) => {
+    setBekle(v.id); setHata(null);
+    try { const g = await kisiDavetYanit(v.id, kabul); if (kabul && g) onKatildi(g); } catch (e) { setHata(hataMetni(e)); } finally { setBekle(null); }
+  };
+  return (
+    <section className="rt-cv-gelen-davet" aria-label="Sana gelen davetler">
+      {d.gelenDavetler.map((v) => (
+        <div key={v.id} className="rt-cv-gdv">
+          <span className="ik" aria-hidden>{v.grup_ikon || GRUP_TUR[v.grup_tur]?.ikon || '✉️'}</span>
+          <span className="ic"><b>{v.davet_eden_ad} seni çağırıyor</b><span>"{v.grup_ad}" · {v.uye_sayisi} kişi</span></span>
+          <span className="dg">
+            <button type="button" className="rt-btn" disabled={bekle === v.id} onClick={() => yanit(v, false)}>Hayır</button>
+            <button type="button" className="rt-btn primary" disabled={bekle === v.id} onClick={() => yanit(v, true)}>Katıl</button>
+          </span>
+        </div>
+      ))}
+      {hata && <p className="rt-hata">{hata}</p>}
+    </section>
   );
 }
 
@@ -936,6 +966,90 @@ function KatilModal({ kod0, onKapat, onKatildi }: { kod0: string; onKapat: () =>
 }
 
 function DavetModal({ grup, d, onKapat }: { grup: Grup; d: CevremDurum; onKapat: () => void }) {
+  const [hata, setHata] = useState<string | null>(null);
+  const [eposta, setEposta] = useState('');
+  const [ad, setAd] = useState('');
+  const [yeni, setYeni] = useState(false);
+  const [kodAcik, setKodAcik] = useState(false);
+  const [duzenle, setDuzenle] = useState(false);
+  const [bekle, setBekle] = useState<string | null>(null);
+  const tanidik = tanidiklar(d, grup.id);
+  const bekleyen = d.gidenDavetler.filter((v) => v.grup_id === grup.id);
+  const bekliyorMu = (k: { alici?: string; eposta?: string }) => bekleyen.some((v) => (k.alici && v.alici === k.alici) || (k.eposta && v.alici_eposta?.toLowerCase() === k.eposta.toLowerCase()));
+  const gonder = async (anahtar: string, kime: { alici?: string; eposta?: string; ad?: string | null }) => {
+    setBekle(anahtar); setHata(null);
+    try { await kisiDavetGonder(grup.id, kime); return true; } catch (e) { setHata(hataMetni(e)); return false; } finally { setBekle(null); }
+  };
+  const yeniGonder = async () => {
+    const e = eposta.trim();
+    if (await gonder('yeni', { eposta: e, ad: ad.trim() || null })) { setEposta(''); setAd(''); setYeni(false); }
+  };
+  const dugme = (anahtar: string, kime: { alici?: string; eposta?: string; ad?: string | null }) => bekliyorMu(kime)
+    ? <span className="rt-cv-davet-ok">Davet edildi ✓</span>
+    : <button type="button" className="rt-btn" disabled={bekle === anahtar} onClick={() => gonder(anahtar, kime)}>Davet et</button>;
+  return (
+    <Modal baslik={`${grupIkonu(grup)} ${grup.ad} · davet et`} onKapat={onKapat}>
+      {tanidik.length > 0 && (
+        <section className="rt-cv-dv-bolum">
+          <h3 className="rt-cv-dv-h">Tanıdıkların</h3>
+          {tanidik.map((k) => {
+            const u = d.uyeler.find((x) => x.uye_id === k.id);
+            return (
+              <div key={k.id} className="rt-cv-dv-sat">
+                <Avatar ad={k.ad} resim={u?.avatar ?? null} boyut={34} />
+                <span className="ic"><b>{k.ad}</b><span>{k.gruplar.join(', ')}</span></span>
+                {dugme(k.id, { alici: k.id, ad: k.ad })}
+              </div>
+            );
+          })}
+        </section>
+      )}
+      <section className="rt-cv-dv-bolum">
+        <div className="rt-cv-dv-bas">
+          <h3 className="rt-cv-dv-h">E-postayla</h3>
+          {d.rehber.length > 0 && <button type="button" className="rt-linkbtn" onClick={() => setDuzenle(!duzenle)}>{duzenle ? 'Bitti' : 'Düzenle'}</button>}
+        </div>
+        {d.rehber.map((k) => (
+          <div key={k.eposta} className="rt-cv-dv-sat">
+            <Avatar ad={k.ad || k.eposta} resim={null} boyut={34} />
+            <span className="ic"><b>{k.ad || k.eposta.split('@')[0]}</b><span>{k.eposta}</span></span>
+            {duzenle
+              ? <button type="button" className="rt-linkbtn" aria-label={`${k.eposta} listemden çıkar`} onClick={() => rehberSil(k.eposta).catch((e) => setHata(hataMetni(e)))}>Çıkar</button>
+              : dugme(k.eposta, { eposta: k.eposta, ad: k.ad })}
+          </div>
+        ))}
+        {yeni || !d.rehber.length ? (
+          <div className="rt-cv-dv-yeni">
+            <input className="rt-inp" type="email" inputMode="email" autoComplete="off" placeholder="E-posta adresi" aria-label="E-posta adresi" value={eposta} onChange={(e) => setEposta(e.target.value)} />
+            <input className="rt-inp" placeholder="Adı (isteğe bağlı)" aria-label="Adı" value={ad} onChange={(e) => setAd(e.target.value)} />
+            <button type="button" className="rt-btn primary" disabled={!/^\S+@\S+\.\S+$/.test(eposta.trim()) || bekle === 'yeni'} onClick={yeniGonder}>Davet et</button>
+            <p className="rt-muted">Ona bir e-posta gider. Bu adresle Ritos'a girince davet onu bekliyor olur. Adres listene de eklenir.</p>
+          </div>
+        ) : (
+          <button type="button" className="rt-cv-dv-ekle" onClick={() => setYeni(true)}>＋ Yeni e-posta</button>
+        )}
+      </section>
+      {bekleyen.length > 0 && (
+        <section className="rt-cv-dv-bolum">
+          <h3 className="rt-cv-dv-h">Yanıt bekleyenler</h3>
+          {bekleyen.map((v) => (
+            <div key={v.id} className="rt-cv-dv-sat">
+              <span className="ic"><b>{v.alici_ad || (v.alici_eposta ?? '').split('@')[0] || 'Biri'}</b><span>{v.alici_eposta ?? 'Tanıdık'}</span></span>
+              {(v.davet_eden === d.uid || benYoneticiyim(d, grup.id)) && <button type="button" className="rt-linkbtn" onClick={() => kisiDavetIptal(v.id).catch((e) => setHata(hataMetni(e)))}>Geri al</button>}
+            </div>
+          ))}
+        </section>
+      )}
+      {hata && <p className="rt-hata">{hata}</p>}
+      <section className="rt-cv-dv-bolum">
+        {kodAcik ? <DavetKodu grup={grup} d={d} /> : <button type="button" className="rt-cv-dv-ekle" onClick={() => setKodAcik(true)}>💬 WhatsApp'tan kodla davet et</button>}
+      </section>
+      <div className="rt-satir"><button type="button" className="rt-btn" onClick={onKapat}>Kapat</button></div>
+    </Modal>
+  );
+}
+
+function DavetKodu({ grup, d }: { grup: Grup; d: CevremDurum }) {
   const [kod, setKod] = useState<string | null>(null);
   const [hata, setHata] = useState<string | null>(null);
   const [kopya, setKopya] = useState<string | null>(null);
@@ -944,19 +1058,21 @@ function DavetModal({ grup, d, onKapat }: { grup: Grup; d: CevremDurum; onKapat:
   const ben = d.uyeler.find((u) => u.uye_id === d.uid)?.ad ?? '';
   const mesaj = kod ? `${ben} seni Ritos'ta "${grup.ad}" grubuna davet ediyor. Katılmak için: ${baglanti} (kod: ${kod})` : '';
   const kopyala = async (metin: string, ne: string) => { try { await navigator.clipboard.writeText(metin); setKopya(ne); } catch { setKopya(null); } };
+  const paylas = async () => { try { await navigator.share({ text: mesaj }); } catch { /* vazgeçti */ } };
   return (
-    <Modal baslik={`${grupIkonu(grup)} ${grup.ad} · davet`} onKapat={onKapat}>
-      <p className="rt-metin">Bu kodu evdekilerle paylaş. Ritos'ta hesap açıp <b>Gruplar › Davet kodum var</b> ile katılırlar. Kod 7 gün geçerli.</p>
+    <>
+      <p className="rt-metin">Bu mesajı WhatsApp'tan ya da istediğin yerden gönder. Kod 7 gün geçerli.</p>
       {hata && <p className="rt-hata">{hata}</p>}
       {kod ? <div className="rt-cv-kod" aria-label="Davet kodu">{kod}</div> : !hata && <p className="rt-muted">Kod hazırlanıyor…</p>}
       {kod && (
         <div className="rt-satir">
+          {typeof navigator !== 'undefined' && 'share' in navigator
+            ? <button type="button" className="rt-btn primary" onClick={paylas}>Paylaş</button>
+            : <button type="button" className="rt-btn primary" onClick={() => kopyala(mesaj, 'mesaj')}>{kopya === 'mesaj' ? 'Kopyalandı' : 'Davet mesajını kopyala'}</button>}
           <button type="button" className="rt-btn" onClick={() => kopyala(kod, 'kod')}>{kopya === 'kod' ? 'Kopyalandı' : 'Kodu kopyala'}</button>
-          <button type="button" className="rt-btn primary" onClick={() => kopyala(mesaj, 'mesaj')}>{kopya === 'mesaj' ? 'Kopyalandı' : 'Davet mesajını kopyala'}</button>
         </div>
       )}
-      <div className="rt-satir"><button type="button" className="rt-btn" onClick={onKapat}>Kapat</button></div>
-    </Modal>
+    </>
   );
 }
 

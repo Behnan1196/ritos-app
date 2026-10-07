@@ -10,5 +10,6 @@ Sırayla, her biri bir kez (yeniden çalıştırılabilir) SQL Editor'de:
 6. `06-bildirim.sql` — Web Push kuyruğu (push_abone, bildirim, bildirim_kaynak), rica/davet bildirimleri, dakikalık cron. Önce Vault'a iki sır (dosyanın başındaki açıklama). Edge Function: `functions/ritos-bildirim` (Verify JWT kapalı; secrets: RITOS_VAPID_*, RITOS_CRON_GIZLI).
 7. `07-paylasim.sql` — Paylaş: kart/program tanımını Çevrem'deki birine gönder (paylasim) + bildirim
 8. `08-birlikte.sql` — Birlikte rutin (haftada N, isteyen katılır) ve buluşma (geliyorum/belki/gelemem) + bildirim + Realtime
+9. `09-kisi-davet.sql` — Kod paylaşmadan davet: tanıdığa ya da e-postaya grup daveti (grup_kisi_davet), e-posta listem (rehber) + bildirim. Davet e-postası için Edge Function: `functions/ritos-eposta` (Verify JWT kapalı; secrets: RITOS_SMTP_KULLANICI, RITOS_SMTP_SIFRE, isteğe bağlı RITOS_SITE).
 
 Şifre yok; yetkiyi RLS belirler. Eski `cat-*.sql` dosyaları `supabase/eski/` altında; eski ortak projeye aittir, burada kullanılmaz.
