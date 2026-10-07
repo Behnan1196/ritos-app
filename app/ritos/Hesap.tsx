@@ -70,7 +70,7 @@ export function KodGirisModal({ onKapat, baslik = 'E-postanla devam et', metin }
 }
 
 /** Bu cihaz birine bağlıyken oturum kapanmışsa (nadir): tam ekran, yeniden kod. */
-export function GirisEkrani({ ilk, davet }: { ilk?: boolean; davet?: boolean }) {
+export function GirisEkrani({ ilk, davet, hata }: { ilk?: boolean; davet?: boolean; hata?: string | null }) {
   const metin = davet ? 'Davete katılmak için e-postanı yaz, sana bir kod gönderelim.'
     : ilk ? 'Günlük düzenin, rutinlerin ve sevdiklerinle paylaştıkların bir arada.'
     : 'Devam etmek için yeniden gir. Her şeyin yerinde.';
@@ -79,6 +79,7 @@ export function GirisEkrani({ ilk, davet }: { ilk?: boolean; davet?: boolean }) 
       <div className="rt-giris-kutu">
         <div className="rt-giris-logo">Ritos</div>
         <p className="rt-metin">{metin}</p>
+        {hata && <p className="rt-hata">Google ile giriş olmadı: {hata}</p>}
         <GoogleDugmesi />
         <div className="rt-giris-ya-da"><span>ya da e-postayla</span></div>
         <KodAdimlari ilkMetin={<></>} />

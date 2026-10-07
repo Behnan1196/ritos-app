@@ -103,7 +103,11 @@ async function hesabiAc(uid: string, nasil: 'kayit' | 'giris' = 'giris') {
 export async function googleIleGir(): Promise<Sonuc> {
   const sb = supabase();
   if (!sb) return { tamam: false, hata: 'Sunucu ayarı yok' };
-  const r = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${location.origin}${location.pathname}${location.search}` } });
+  // Dönüş adresinde yalnız davet bağlantısı korunur (önceki denemenin ?error=… parametreleri taşınmasın).
+  const u = new URL(location.href);
+  const q = new URLSearchParams();
+  for (const k of ['katil', 'davet']) { const v = u.searchParams.get(k); if (v) q.set(k, v); }
+  const r = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${location.origin}${location.pathname}${q.toString() ? `?${q}` : ''}` } });
   return r.error ? { tamam: false, hata: r.error.message } : { tamam: true };
 }
 

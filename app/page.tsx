@@ -44,14 +44,25 @@ export default function RitosLab() {
   // 8 ekim (akşam) — web = test ortamı: hesapla girilir (e-posta + kod); hesapsız kullanım, yerel veri ve
   // karşılama mobilde. Davet bağlantısıyla gelen de önce girer; giriş sayfayı yeniler, bağlantı (?katil / ?davet) korunur.
   const [davet, setDavet] = useState(false);
+  const [girisHata, setGirisHata] = useState<string | null>(null);
   useEffect(() => {
-    try { const u = new URL(location.href); setDavet(u.searchParams.has('katil') || u.searchParams.has('davet')); } catch { /* yoksay */ }
+    try {
+      const u = new URL(location.href);
+      setDavet(u.searchParams.has('katil') || u.searchParams.has('davet'));
+      // Google dönüşünde hata: göster, adresten temizle.
+      const h = u.searchParams.get('error_description');
+      if (h || u.searchParams.has('error')) {
+        setGirisHata(h ?? 'Google ile giriş tamamlanamadı.');
+        for (const k of ['error', 'error_code', 'error_description']) u.searchParams.delete(k);
+        history.replaceState(null, '', u.pathname + u.search + u.hash);
+      }
+    } catch { /* yoksay */ }
   }, []);
   // Google dönüşü: oturum açık ama cihaz bu hesaba bağlı değil → bağla (sayfa yenilenir).
   const baglaniyor = o.hazir && !!o.session && (!o.hesapli || o.kilitli);
   useEffect(() => { if (baglaniyor && o.session) void oturumuBagla(o.session.user); }, [baglaniyor]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!o.hazir || baglaniyor) return <div className="rt-kilit-bos" />;
-  if (!TEST && (!o.hesapli || o.kilitli)) return <GirisEkrani ilk={!o.hesapli} davet={davet} />;
+  if (!TEST && (!o.hesapli || o.kilitli)) return <GirisEkrani ilk={!o.hesapli} davet={davet} hata={girisHata} />;
   return <RitosUygulama />;
 }
 
