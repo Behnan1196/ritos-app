@@ -21,7 +21,7 @@ import { DavetKarsilama } from './ritos/Danismanlik';
 import { SenkronIsareti } from './ritos/Paylasim';
 import { GelenlerEkrani, useGelenlerOzeti } from './ritos/Sohbet';
 import { HomeEkrani, homeEkraniAc } from './ritos/HomeEkrani';
-import { GirisEkrani, KARSILAMA_ANAHTAR, Karsilama, HesapEkrani, KodGirisModal, KullaniciRozeti, type HesapEkran } from './ritos/Hesap';
+import { CikisOnayi, GirisEkrani, KARSILAMA_ANAHTAR, Karsilama, HesapEkrani, KodGirisModal, KullaniciRozeti, type HesapEkran } from './ritos/Hesap';
 import Cevrem from './ritos/Cevrem';
 import { useCevremBaslat } from '@/lib/cevrem';
 import { GIRIS_OLAY, misafirVerisiVar, useHesapBaslat, useOturum } from '@/lib/hesap';
@@ -113,7 +113,8 @@ function RitosUygulama() {
   // Avatar menüsünden açılan hesap ekranları (Profil · Bildirimler · Ayarlar): telefonda ana alanda,
   // geniş ekranda sağ bölmede; bir sekmeye dokununca kapanır.
   const [hesap, setHesap] = useState<HesapEkran | null>(null);
-  const menuSec = (e: HesapEkran) => setHesap(e);
+  const [cikis, setCikis] = useState(false);
+  const menuSec = (e: HesapEkran | 'cikis') => { if (e === 'cikis') setCikis(true); else setHesap(e); };
   // 4 ekim: Home'daki Danışmanlık ekranı kalktı — davet, sonlananlar, alan açma Atölye seçicisinde;
   // şablonlar ve sınav paketi Atölye › Kütüphane'de; sonlandırma kişinin Bilgiler sekmesinde.
   const home = <HomeEkrani />;
@@ -152,6 +153,7 @@ function RitosUygulama() {
   return (
     <div className="shell">
       <DavetKarsilama />
+      {cikis && <CikisOnayi onKapat={() => setCikis(false)} />}
       {isNarrow ? (
         <div className="mobile-app">
           <div className="mobile-hd"><b>Ritos</b>{ustSag}</div>

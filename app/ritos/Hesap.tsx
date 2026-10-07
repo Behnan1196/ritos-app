@@ -11,7 +11,7 @@ import { Kap, Modal } from './ortak';
 import { PaketlerKap } from './Sinav';
 import { DanismanlikAyarlari } from './Danismanlik';
 import { useDanismanlik } from '@/lib/danismanlik';
-import { hesabimiSil, verileriSifirla, type SifirlaSecim } from '@/lib/sifirla';
+import { hesabimiSil, verileriSifirla } from '@/lib/sifirla';
 
 // ———————————————— giriş kapısı ————————————————
 
@@ -169,6 +169,7 @@ function ProfilIcerik() {
             </>
           )}
       </Kap>
+      {o.hesapli && <DanismanlikAyarlari />}
       {baglan && <KodGirisModal onKapat={() => setBaglan(false)} />}
     </>
   );
@@ -177,28 +178,24 @@ function ProfilIcerik() {
 function AyarlarIcerik() {
   const o = useOturum();
   const dn = useDanismanlik();
-  const [veriModal, setVeriModal] = useState<null | 'cikis' | 'sifirla' | 'sil'>(null);
+  const [veriModal, setVeriModal] = useState<null | 'cikis' | 'sil'>(null);
   return (
     <>
       {dn.profil?.koc && <PaketlerKap />}
-      <DanismanlikAyarlari />
       {o.hesapli && (
-        <Kap baslik="Bu cihaz ve verilerim">
-          <div className="rt-satir">
-            <button type="button" className="rt-btn" onClick={() => setVeriModal('cikis')}>Bu cihazdan çık</button>
-            <button type="button" className="rt-btn" onClick={() => setVeriModal('sifirla')}>Verilerimi sıfırla</button>
-            <button type="button" className="rt-btn tehlike" onClick={() => setVeriModal('sil')}>Hesabımı sil</button>
-          </div>
+        <Kap baslik="Bu cihaz">
+          <div className="rt-satir"><button type="button" className="rt-btn" onClick={() => setVeriModal('cikis')}>Çıkış yap</button></div>
+          <p className="rt-muted">Telefonunu ya da bilgisayarını başkası kullanacaksa. Her şeyin yedekte kalır.</p>
+          <button type="button" className="rt-linkbtn rt-veri-sil-bag" onClick={() => setVeriModal('sil')}>Verilerimi silmek istiyorum ›</button>
         </Kap>
       )}
       {veriModal === 'cikis' && <CikisOnayi onKapat={() => setVeriModal(null)} />}
-      {veriModal === 'sifirla' && <SifirlaModal onKapat={() => setVeriModal(null)} />}
-      {veriModal === 'sil' && <HesapSilModal onKapat={() => setVeriModal(null)} />}
+      {veriModal === 'sil' && <VeriSilModal onKapat={() => setVeriModal(null)} />}
     </>
   );
 }
 
-/** Çıkış onayı (avatar menüsünden). */
+/** Çıkış onayı (avatar menüsünden ve Ayarlar'dan). */
 export function CikisOnayi({ onKapat }: { onKapat: () => void }) {
   const d = useSenkronDurum();
   return <CikisModal onKapat={onKapat} bekleyen={d.bekleyen} />;
@@ -207,12 +204,12 @@ export function CikisOnayi({ onKapat }: { onKapat: () => void }) {
 function CikisModal({ onKapat, bekleyen }: { onKapat: () => void; bekleyen: number }) {
   const [bekle, setBekle] = useState(false);
   return (
-    <Modal baslik="Bu cihazdan çık" onKapat={onKapat}>
+    <Modal baslik="Çıkış yap" onKapat={onKapat}>
       <p className="rt-metin">Ritos bu cihazda boş açılır. Her şeyin yedekte; e-postanla yeniden girince geri gelir.</p>
       {bekleyen > 0 && <p className="rt-uyari">Son değişikliklerin henüz gönderilmedi. İnternete bağlıyken çıkarsan onlar da gider.</p>}
       <div className="rt-satir">
         <button type="button" className="rt-btn" onClick={onKapat}>Vazgeç</button>
-        <button type="button" className="rt-btn primary" disabled={bekle} onClick={async () => { setBekle(true); await cikisYap(); }}>{bekle ? 'Çıkılıyor…' : 'Çık'}</button>
+        <button type="button" className="rt-btn primary" disabled={bekle} onClick={async () => { setBekle(true); await cikisYap(); }}>{bekle ? 'Çıkılıyor…' : 'Çıkış yap'}</button>
       </div>
     </Modal>
   );
@@ -220,63 +217,39 @@ function CikisModal({ onKapat, bekleyen }: { onKapat: () => void; bekleyen: numb
 
 // ———————————————— 5 ekim: verileri sıfırla, hesabı sil ————————————————
 
-function SifirlaModal({ onKapat }: { onKapat: () => void }) {
-  const [s, setS] = useState<SifirlaSecim>({ ajanda: true, programlar: false, kutuphane: false, baglar: false });
+/** Verilerimi silmek istiyorum: iki seçenek — baştan başla (kişisel içerik) ya da her şeyimi sil (hesap). */
+function VeriSilModal({ onKapat }: { onKapat: () => void }) {
+  const [secim, setSecim] = useState<null | 'bastan' | 'hepsi'>(null);
   const [onay, setOnay] = useState('');
   const [bekle, setBekle] = useState(false);
   const [sonuc, setSonuc] = useState<string | null>(null);
   const [hata, setHata] = useState<string | null>(null);
-  const secim = (k: keyof SifirlaSecim, ad: string, ac: string) => (
-    <label className="rt-sifirla-sec">
-      <input type="checkbox" checked={s[k]} onChange={(e) => setS({ ...s, [k]: e.target.checked })} />
-      <span><b>{ad}</b><small>{ac}</small></span>
-    </label>
-  );
-  const bos = !s.ajanda && !s.programlar && !s.kutuphane && !s.baglar;
-  if (sonuc) return <Modal baslik="Verilerimi sıfırla" onKapat={onKapat}><p className="rt-tamam">{sonuc}</p><div className="rt-satir"><button type="button" className="rt-btn" onClick={onKapat}>Kapat</button></div></Modal>;
-  return (
-    <Modal baslik="Verilerimi sıfırla" onKapat={onKapat}>
-      <p className="rt-metin">Seçtiklerin bu hesaptan, bütün cihazlarından silinir. Geri alınamaz.</p>
-      {secim('ajanda', 'Ajandam', 'kendi kartların, işaretlerin, ölçümlerin, dış uygulama kartları')}
-      {secim('programlar', 'Kişisel programlarım ve şablonlarım', 'kartlarıyla birlikte')}
-      {secim('kutuphane', 'Kütüphane ve notlar', 'kartlar, klasörler, notlar, bağlantı widget\'ları')}
-      {secim('baglar', 'Koçluk, danışmanlık ve aile bağları', 'bağlar bitirilir (karşı taraf "sonlandı" görür); onlardan gelen kartlar, planlar, paylaşımlar silinir')}
-      {!s.baglar && s.ajanda && <p className="rt-muted">Koçundan ya da ailenden gelen kartlar kalır; bağ sürdükçe yeniden gelirler.</p>}
-      <label className="rt-alan">Onay için <b>SIFIRLA</b> yaz<input className="rt-inp" value={onay} onChange={(e) => setOnay(e.target.value)} /></label>
-      {hata && <p className="rt-hata">{hata}</p>}
-      <div className="rt-satir">
-        <button type="button" className="rt-btn" onClick={onKapat}>Vazgeç</button>
-        <button type="button" className="rt-btn tehlike" disabled={bos || bekle || onay.trim().toLocaleUpperCase('tr') !== 'SIFIRLA'} onClick={async () => {
-          setBekle(true); setHata(null);
-          try { const n = await verileriSifirla(s); setSonuc(`${n} kayıt silindi.`); } catch (e) { setHata(e instanceof Error ? e.message : String(e)); }
-          setBekle(false);
-        }}>{bekle ? 'Siliniyor…' : 'Sıfırla'}</button>
+  if (sonuc) return <Modal baslik="Baştan başla" onKapat={onKapat}><p className="rt-tamam">{sonuc}</p><div className="rt-satir"><button type="button" className="rt-btn" onClick={onKapat}>Kapat</button></div></Modal>;
+  if (!secim) return (
+    <Modal baslik="Verilerimi sil" onKapat={onKapat}>
+      <div className="rt-cv-secenekler">
+        <button type="button" className="rt-cv-secenek" onClick={() => setSecim('bastan')}><span className="ik">🌱</span><span><b>Baştan başla</b><small>Ajandan, rutinlerin ve notların boşalır. Grupların ve koçun yerinde kalır.</small></span></button>
+        <button type="button" className="rt-cv-secenek" onClick={() => setSecim('hepsi')}><span className="ik">🗑</span><span><b>Her şeyimi sil</b><small>Ritos&apos;taki her şeyin kalıcı olarak silinir; gruplarından ve koçundan ayrılırsın.</small></span></button>
       </div>
     </Modal>
   );
-}
-
-function HesapSilModal({ onKapat }: { onKapat: () => void }) {
-  const [onay, setOnay] = useState('');
-  const [bekle, setBekle] = useState(false);
-  const [hata, setHata] = useState<string | null>(null);
+  const hepsi = secim === 'hepsi';
   return (
-    <Modal baslik="Hesabımı sil" onKapat={onKapat}>
-      <p className="rt-metin">Ritos'taki bütün verilerin sunucudan ve bu cihazdan silinir. Geri alınamaz.</p>
-      <p className="rt-muted">Hesabın tamamen kapanır; aynı e-postayla yeniden kayıt olursan Ritos boş başlar.</p>
-      <ul className="rt-maddeler rt-muted">
-        <li>Koçların, danışanların ve ailen seninle bağlarının sonlandığını görür.</li>
-        <li>Kurduğun aile grubu dağılır.</li>
-        <li>Diğer cihazlarındaki kopyalar bir sonraki açılışta erişilemez olur.</li>
-      </ul>
-      <label className="rt-alan">Onay için <b>SİL</b> yaz<input className="rt-inp" value={onay} onChange={(e) => setOnay(e.target.value)} /></label>
+    <Modal baslik={hepsi ? 'Her şeyimi sil' : 'Baştan başla'} onKapat={onKapat}>
+      <p className="rt-metin"><b>Emin misin?</b> Bu geri alınamaz.</p>
+      <p className="rt-muted">{hepsi ? 'Ritos\'taki her şeyin bütün cihazlarından silinir. Grupların ve koçun senin ayrıldığını görür.' : 'Kendi kartların, rutinlerin, notların ve kütüphanen bütün cihazlarından silinir.'}</p>
+      {hepsi && <label className="rt-alan">Onaylamak için <b>SİL</b> yaz<input className="rt-inp" value={onay} onChange={(e) => setOnay(e.target.value)} /></label>}
       {hata && <p className="rt-hata">{hata}</p>}
       <div className="rt-satir">
-        <button type="button" className="rt-btn" onClick={onKapat}>Vazgeç</button>
-        <button type="button" className="rt-btn tehlike" disabled={bekle || onay.trim().toLocaleUpperCase('tr') !== 'SİL'} onClick={async () => {
+        <button type="button" className="rt-btn" onClick={() => { setSecim(null); setOnay(''); setHata(null); }}>Vazgeç</button>
+        <button type="button" className="rt-btn tehlike" disabled={bekle || (hepsi && onay.trim().toLocaleUpperCase('tr') !== 'SİL')} onClick={async () => {
           setBekle(true); setHata(null);
-          try { await hesabimiSil(); } catch (e) { setHata(e instanceof Error ? e.message : String(e)); setBekle(false); }
-        }}>{bekle ? 'Siliniyor…' : 'Hesabımı sil'}</button>
+          try {
+            if (hepsi) await hesabimiSil();
+            else { await verileriSifirla({ ajanda: true, programlar: true, kutuphane: true, baglar: false }); setSonuc('Ritos\'un boşaldı; temiz bir sayfa.'); }
+          } catch (e) { setHata(e instanceof Error ? e.message : String(e)); }
+          setBekle(false);
+        }}>{bekle ? 'Siliniyor…' : 'Evet, sil'}</button>
       </div>
     </Modal>
   );
@@ -348,7 +321,7 @@ export function Avatar({ ad, resim, boyut = 28 }: { ad: string; resim?: string |
   return <span className="rt-avatar" style={{ ...st, background: renkSec(ad) }} aria-hidden>{basHarfler(ad)}</span>;
 }
 
-export function KullaniciRozeti({ onSec, uyari }: { onSec: (e: HesapEkran) => void; uyari?: boolean }) {
+export function KullaniciRozeti({ onSec, uyari }: { onSec: (e: HesapEkran | 'cikis') => void; uyari?: boolean }) {
   const o = useOturum();
   const d = useSenkronDurum();
   const [acik, setAcik] = useState(false);
@@ -366,7 +339,7 @@ export function KullaniciRozeti({ onSec, uyari }: { onSec: (e: HesapEkran) => vo
   const ad = (o.hesapli ? o.gorunenAd : yerelAd()) ?? (eposta ? eposta.split('@')[0] : 'Ben');
   const meta = (u?.user_metadata ?? {}) as Record<string, unknown>;
   const resim = (typeof meta.avatar_url === 'string' && meta.avatar_url) || (typeof meta.picture === 'string' && meta.picture) || null;
-  const sec = (e: HesapEkran) => { setAcik(false); onSec(e); };
+  const sec = (e: HesapEkran | 'cikis') => { setAcik(false); onSec(e); };
   return (
     <div className="rt-kullanici-kok" ref={kok}>
       <button type="button" className="rt-kullanici" onClick={() => setAcik(!acik)} aria-haspopup="menu" aria-expanded={acik} aria-label={`${ad} — hesap menüsü`}>
@@ -388,6 +361,7 @@ export function KullaniciRozeti({ onSec, uyari }: { onSec: (e: HesapEkran) => vo
           {o.hesapli && <button type="button" role="menuitem" onClick={() => sec('bildirim')}>🔔 Bildirimler</button>}
           <button type="button" role="menuitem" onClick={() => sec('ayarlar')}>⚙️ Ayarlar</button>
           {!o.hesapli && <button type="button" role="menuitem" onClick={() => { setAcik(false); girisAc(); }}>✉️ E-postamı bağla</button>}
+          {o.hesapli && <button type="button" role="menuitem" className="cikis" onClick={() => sec('cikis')}>Çıkış yap</button>}
         </div>
       )}
     </div>
