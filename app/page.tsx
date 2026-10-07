@@ -24,7 +24,7 @@ import { HomeEkrani, homeEkraniAc } from './ritos/HomeEkrani';
 import { CikisOnayi, GirisEkrani, HesapEkrani, KullaniciRozeti, type HesapEkran } from './ritos/Hesap';
 import Cevrem from './ritos/Cevrem';
 import { useCevremBaslat } from '@/lib/cevrem';
-import { useHesapBaslat, useOturum } from '@/lib/hesap';
+import { oturumuBagla, useHesapBaslat, useOturum } from '@/lib/hesap';
 
 const NARROW_BREAKPOINT = 760;
 // Testte (NEXT_PUBLIC_RITOS_TEST=1 ile derlenmiş sürüm) giriş kapısı atlanır; gerçek sürümde yok.
@@ -47,7 +47,10 @@ export default function RitosLab() {
   useEffect(() => {
     try { const u = new URL(location.href); setDavet(u.searchParams.has('katil') || u.searchParams.has('davet')); } catch { /* yoksay */ }
   }, []);
-  if (!o.hazir) return <div className="rt-kilit-bos" />;
+  // Google dönüşü: oturum açık ama cihaz bu hesaba bağlı değil → bağla (sayfa yenilenir).
+  const baglaniyor = o.hazir && !!o.session && (!o.hesapli || o.kilitli);
+  useEffect(() => { if (baglaniyor && o.session) void oturumuBagla(o.session.user); }, [baglaniyor]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!o.hazir || baglaniyor) return <div className="rt-kilit-bos" />;
   if (!TEST && (!o.hesapli || o.kilitli)) return <GirisEkrani ilk={!o.hesapli} davet={davet} />;
   return <RitosUygulama />;
 }

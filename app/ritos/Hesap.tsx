@@ -5,7 +5,7 @@
 
 import { BildirimAyarlari } from './BildirimAyar';
 import React, { useEffect, useState } from 'react';
-import { cikisYap, girisAc, gorunenAdDegistir, kodDogrula, kodGonder, useOturum, yerelAd, yerelAdKaydet } from '@/lib/hesap';
+import { cikisYap, girisAc, googleIleGir, gorunenAdDegistir, kodDogrula, kodGonder, useOturum, yerelAd, yerelAdKaydet } from '@/lib/hesap';
 import { senkronla, useSenkronDurum } from '@/lib/senkron';
 import { Kap, Modal } from './ortak';
 import { PaketlerKap } from './Sinav';
@@ -72,16 +72,33 @@ export function KodGirisModal({ onKapat, baslik = 'E-postanla devam et', metin }
 /** Bu cihaz birine bağlıyken oturum kapanmışsa (nadir): tam ekran, yeniden kod. */
 export function GirisEkrani({ ilk, davet }: { ilk?: boolean; davet?: boolean }) {
   const metin = davet ? 'Davete katılmak için e-postanı yaz, sana bir kod gönderelim.'
-    : ilk ? 'Günlük düzenin, rutinlerin ve sevdiklerinle paylaştıkların bir arada. E-postanı yaz, sana bir kod gönderelim.'
-    : 'Devam etmek için e-postanı yaz, sana bir kod gönderelim. Her şeyin yerinde.';
+    : ilk ? 'Günlük düzenin, rutinlerin ve sevdiklerinle paylaştıkların bir arada.'
+    : 'Devam etmek için yeniden gir. Her şeyin yerinde.';
   return (
     <div className="rt-giris">
       <div className="rt-giris-kutu">
         <div className="rt-giris-logo">Ritos</div>
-        <KodAdimlari ilkMetin={<p className="rt-metin">{metin}</p>} />
+        <p className="rt-metin">{metin}</p>
+        <GoogleDugmesi />
+        <div className="rt-giris-ya-da"><span>ya da e-postayla</span></div>
+        <KodAdimlari ilkMetin={<></>} />
         {ilk && <p className="rt-muted kucuk rt-giris-not">Web sürümü deneme içindir. Ritos'un asıl evi telefon ve tablet uygulaması.</p>}
       </div>
     </div>
+  );
+}
+
+function GoogleDugmesi() {
+  const [bekle, setBekle] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  return (
+    <>
+      <button type="button" className="rt-btn rt-genis rt-google" disabled={bekle} onClick={async () => { setBekle(true); setHata(null); const r = await googleIleGir(); if (!r.tamam) { setHata(r.hata); setBekle(false); } }}>
+        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.5 30.2 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.8 6C12.3 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.4 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.3.8-4.7l-7.8-6C1 16.5 0 20.1 0 24s1 7.5 2.6 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.7-4.1-13.6-9.8l-7.8 6C6.6 42.6 14.6 48 24 48z"/></svg>
+        {bekle ? 'Google açılıyor…' : 'Google ile devam et'}
+      </button>
+      {hata && <p className="rt-hata">{hata}</p>}
+    </>
   );
 }
 
@@ -180,23 +197,9 @@ function ProfilIcerik() {
 }
 
 function AyarlarIcerik() {
-  const o = useOturum();
+  // 8 ekim — web test ortamı: "Bu cihaz" (çıkış, verilerimi sil) kalktı; çıkış avatar menüsünde. Hesap silme mobilde.
   const dn = useDanismanlik();
-  const [veriModal, setVeriModal] = useState<null | 'cikis' | 'sil'>(null);
-  return (
-    <>
-      {dn.profil?.koc && <PaketlerKap />}
-      {o.hesapli && (
-        <Kap baslik="Bu cihaz">
-          <div className="rt-satir"><button type="button" className="rt-btn" onClick={() => setVeriModal('cikis')}>Çıkış yap</button></div>
-          <p className="rt-muted">Telefonunu ya da bilgisayarını başkası kullanacaksa. Her şeyin yedekte kalır.</p>
-          <button type="button" className="rt-linkbtn rt-veri-sil-bag" onClick={() => setVeriModal('sil')}>Verilerimi silmek istiyorum ›</button>
-        </Kap>
-      )}
-      {veriModal === 'cikis' && <CikisOnayi onKapat={() => setVeriModal(null)} />}
-      {veriModal === 'sil' && <VeriSilModal onKapat={() => setVeriModal(null)} />}
-    </>
-  );
+  return dn.profil?.koc ? <PaketlerKap /> : <p className="rt-muted">Şimdilik ayarlanacak bir şey yok.</p>;
 }
 
 /** Çıkış onayı (avatar menüsünden ve Ayarlar'dan). */
@@ -335,6 +338,7 @@ export function Avatar({ ad, resim, boyut = 28 }: { ad: string; resim?: string |
 
 export function KullaniciRozeti({ onSec, uyari }: { onSec: (e: HesapEkran | 'cikis') => void; uyari?: boolean }) {
   const o = useOturum();
+  const dn = useDanismanlik();
   const d = useSenkronDurum();
   const [acik, setAcik] = useState(false);
   const kok = React.useRef<HTMLDivElement>(null);
@@ -373,7 +377,7 @@ export function KullaniciRozeti({ onSec, uyari }: { onSec: (e: HesapEkran | 'cik
           </div>
           <button type="button" role="menuitem" onClick={() => sec('profil')}>👤 Profil{uyari && <i className="rt-kmenu-nokta" aria-label="Bakılması gereken bir şey var" />}</button>
           {o.hesapli && <button type="button" role="menuitem" onClick={() => sec('bildirim')}>🔔 Bildirimler</button>}
-          <button type="button" role="menuitem" onClick={() => sec('ayarlar')}>⚙️ Ayarlar</button>
+          {dn.profil?.koc && <button type="button" role="menuitem" onClick={() => sec('ayarlar')}>⚙️ Ayarlar</button>}
           {!o.hesapli && <button type="button" role="menuitem" onClick={() => { setAcik(false); girisAc(); }}>✉️ E-postamı bağla</button>}
           {o.hesapli && <button type="button" role="menuitem" className="cikis" onClick={() => sec('cikis')}>Çıkış yap</button>}
         </div>

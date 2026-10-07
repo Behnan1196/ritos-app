@@ -99,6 +99,25 @@ async function hesabiAc(uid: string, nasil: 'kayit' | 'giris' = 'giris') {
   aktifHesapAyarla(uid);
 }
 
+/** 8 ekim — web (test ortamı): Google ile giriş. Dönüşte oturum açık gelir; oturumuBagla cihazı bu hesaba bağlar. */
+export async function googleIleGir(): Promise<Sonuc> {
+  const sb = supabase();
+  if (!sb) return { tamam: false, hata: 'Sunucu ayarı yok' };
+  const r = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${location.origin}${location.pathname}${location.search}` } });
+  return r.error ? { tamam: false, hata: r.error.message } : { tamam: true };
+}
+
+/** Oturum açık ama bu cihaz henüz o hesaba bağlı değil (Google dönüşü): bağla, avatarı profile yaz (yoksa), yenile. */
+export async function oturumuBagla(u: User) {
+  const sb = supabase();
+  const m = (u.user_metadata ?? {}) as Record<string, unknown>;
+  const resim = (typeof m.avatar_url === 'string' && m.avatar_url) || (typeof m.picture === 'string' && m.picture) || null;
+  if (sb && resim) { try { await sb.from('profil').update({ avatar_url: resim }).eq('id', u.id).is('avatar_url', null); } catch { /* yoksay */ } }
+  const yeni = Date.now() - Date.parse(u.created_at) < 15 * 60000;
+  await hesabiAc(u.id, yeni ? 'kayit' : 'giris');
+  location.reload();
+}
+
 /** Bu tarayıcıda hesapsız girilmiş bir şey var mı? (giriş ekranında "verin hesabına eklenir" demek için) */
 export async function misafirVerisiVar(): Promise<boolean> {
   if (aktifHesap()) return false;
