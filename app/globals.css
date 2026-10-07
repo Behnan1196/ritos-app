@@ -1526,3 +1526,10 @@ div.rt-cv-sat .ic{cursor:default;}
 .rt-hb-bag .rt-muted{font-size:13px;line-height:1.45;}
 .rt-hb-bag-satir{font-size:13px;margin:0;}
 .rt-hb-bag-tamam{margin:0;font-size:14px;color:var(--green);font-weight:700;}
+
+.rt-hb-nedir{align-self:flex-start;font-size:14px;margin-top:-6px;min-height:36px;}
+.rt-hb-nedir-ic{display:flex;flex-direction:column;gap:8px;font-size:15.5px;line-height:1.5;}
+.rt-hb-nedir-ic p{margin:0;}
+.rt-hb-nedir-ic h4{margin:8px 0 0;font-size:15px;}
+.rt-hb-nedir-ic ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;}
+.rt-hb-nedir-ic .rt-hb-ana{margin-top:10px;}

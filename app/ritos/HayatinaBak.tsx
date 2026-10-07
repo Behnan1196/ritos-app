@@ -10,7 +10,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useCanli } from '@/lib/canli';
 import type { YasamAlaniRow } from '@/lib/db';
 import { alanAdi, alanlar as yAlanlar, alanlariGaranti } from '@/lib/yasamAlani';
-import { ALAN_SORUSU, ARDINDAN, HAFTA_SORUSU, HAZIR_RUTINLER, ISTEKLER, type HazirRutin } from '@/lib/hazirRutin';
+import { ALAN_ACIKLAMA, ALAN_SORUSU, ARDINDAN, HAFTA_SORUSU, HAZIR_RUTINLER, ISTEKLER, type HazirRutin } from '@/lib/hazirRutin';
 import { ODAK_HAFTA, ajandaKartiniBagla, alanOnerisi, bakisKaydet, bakisVarMi, haftalikBakisDurumu, haftalikKaydet, kartYasamDurumu, odak, odakRutinKur, odakSonu, rutinKur, type Cevap3 } from '@/lib/bakis';
 import { programGuncelle } from '@/lib/program';
 import { ikonOner } from '@/lib/programIkon';
@@ -109,6 +109,7 @@ export function HayatinaBak({ onKapat }: { onKapat: () => void }) {
   const [saat, setSaat] = useState('');
   const [bekle, setBekle] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
+  const [nedir, setNedir] = useState<YasamAlaniRow | null>(null);
   const mevcutOdak = useCanli(odak, [], null as Awaited<ReturnType<typeof odak>>);
   const [odakIlk] = useState(() => ({ v: undefined as undefined | null | string }));
   if (odakIlk.v === undefined && mevcutOdak !== null) odakIlk.v = mevcutOdak.bitti ? null : mevcutOdak.p.id;
@@ -173,6 +174,7 @@ export function HayatinaBak({ onKapat }: { onKapat: () => void }) {
         <div className="rt-hb-govde">
           <div className="rt-hb-alan"><span>{a.ikon}</span>{alanAdi(a)}</div>
           <h1>{(a.kod && ALAN_SORUSU[a.kod]) || `${alanAdi(a)} tarafında son zamanlarda nasılsın?`}</h1>
+          {(a.kod ? ALAN_ACIKLAMA[a.kod] : a.aciklama) && <button type="button" className="rt-linkbtn rt-hb-nedir" onClick={() => setNedir(a)}>{alanAdi(a)} ne demek? ›</button>}
           <div className="rt-hb-cevaplar">
             {CEVAPLAR.map(([c, e]) => (
               <button key={c} type="button" className={`c${c}${cevap[a.id] === c ? ' on' : ''}`} aria-pressed={cevap[a.id] === c}
@@ -303,7 +305,12 @@ export function HayatinaBak({ onKapat }: { onKapat: () => void }) {
       </>
     );
   }
-  return <div className="rt-hb" role="dialog" aria-modal="true" aria-label="Hayatına bakalım"><div className="rt-hb-ic">{govde}</div></div>;
+  return (
+    <div className="rt-hb" role="dialog" aria-modal="true" aria-label="Hayatına bakalım">
+      <div className="rt-hb-ic">{govde}</div>
+      {nedir && <AlanNedir a={nedir} onKapat={() => setNedir(null)} />}
+    </div>
+  );
 }
 
 // ———————————————— haftalık bakış (Home, pazar / pazartesi) ————————————————
@@ -450,5 +457,26 @@ export function YasamBag({ kart, onBitti }: { kart: AjandaKartRow; onBitti?: () 
         <button type="button" className="rt-btn primary" disabled={!secili.length || bekle} onClick={bagla}>Yaşam Tarzıma bağla</button>
       </div>
     </div>
+  );
+}
+
+/** "Bu ne demek?": alanın kişinin hayatında neye karşılık geldiği, neden önemli olduğu, örnekler. */
+export function AlanNedir({ a, onKapat }: { a: YasamAlaniRow; onKapat: () => void }) {
+  const x = a.kod ? ALAN_ACIKLAMA[a.kod] : null;
+  return (
+    <Modal baslik={`${a.ikon} ${alanAdi(a)} ne demek?`} onKapat={onKapat}>
+      <div className="rt-hb-nedir-ic">
+        {x ? (
+          <>
+            <p>{x.ne}</p>
+            <h4>Neden önemli?</h4>
+            <p>{x.neden}</p>
+            <h4>Örneğin</h4>
+            <ul>{x.ornek.map((o) => <li key={o}>{o}</li>)}</ul>
+          </>
+        ) : <p>{a.aciklama || 'Bu alanı sen ekledin; senin için ne ifade ediyorsa o.'}</p>}
+        <button type="button" className="rt-btn primary rt-hb-ana" onClick={onKapat}>Anladım</button>
+      </div>
+    </Modal>
   );
 }

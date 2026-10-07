@@ -90,3 +90,47 @@ export const HAFTA_SORUSU: Record<string, string> = {
   keyif: 'Bu hafta kendine keyif veren şeylere vakit ayırabildin mi?',
   anlam: 'Bu hafta yaptıkların sana anlamlı geldi mi?',
 };
+
+/** "Bu ne demek?" — her hazır alanın kişinin hayatında neye karşılık geldiği (Bak adımında açılan pencere). */
+export const ALAN_ACIKLAMA: Record<string, { ne: string; neden: string; ornek: string[] }> = {
+  hareket: {
+    ne: 'Gün içinde bedenini kullanman: yürümek, esnemek, ev ve bahçe işi, spor.',
+    neden: 'Düzenli hareket kalbi, kasları ve kemikleri korur; uykuyu ve ruh halini de iyileştirir. Az da olsa her hareket sayılır.',
+    ornek: ['Yemekten sonra kısa bir yürüyüş', 'Asansör yerine merdiven', 'Torunla oyun oynamak'],
+  },
+  beslenme: {
+    ne: 'Ne yediğin ve nasıl yediğin: öğünlerin düzeni, sebze ve meyve, su.',
+    neden: 'Enerjini ve uzun vadede sağlığını etkiler. Yasak listesi değil, küçük iyileştirmeler önemli.',
+    ornek: ['Her öğünle bir bardak su', 'Tabağın yarısı sebze', 'Atıştırmalık yerine meyve'],
+  },
+  uyku: {
+    ne: 'Ne kadar ve ne kadar dinlendirici uyuduğun.',
+    neden: 'İyi uyku hafızayı, ruh halini ve bedenin kendini onarmasını destekler. Düzenli saatler çoğu zaman uyku süresi kadar önemlidir.',
+    ornek: ['Her gün aynı saatte kalkmak', 'Yatmadan önce ekranı kapatmak'],
+  },
+  zihin: {
+    ne: 'İçinin nasıl olduğu: kaygı, stres, sakinlik, kendine iyi davranabilmek.',
+    neden: 'Stresi fark edip ara vermek bedeni de rahatlatır. Nefes, kısa sessiz anlar ve duygularını yazmak işe yarar. Uzun süredir kendini kötü hissediyorsan bir uzmanla konuşmak iyi gelir.',
+    ornek: ['Üç dakika yavaş nefes', 'Akşam iyi giden üç şeyi yazmak'],
+  },
+  sosyal: {
+    ne: 'Ailen, arkadaşların, komşuların: derdini anlatabildiğin, birlikte vakit geçirdiğin insanlar.',
+    neden: 'Güçlü bağlar sağlıklı ve uzun bir hayatla en çok ilişkilendirilen şeylerden biri. Yalnızlığın sağlığa etkisi küçümsenmeyecek kadar büyük.',
+    ornek: ['Eski bir dostu aramak', 'Komşuya çaya uğramak', 'Bir arkadaşla yürüyüş'],
+  },
+  ogrenme: {
+    ne: 'Merakını beslemek: okumak, yeni bir beceri, bir dil, bir kurs.',
+    neden: 'Öğrenmek zihni canlı tutar ve kendine güveni artırır. Yaşı yoktur.',
+    ornek: ['Her gün birkaç sayfa okumak', 'Yeni bir şey öğreten bir video'],
+  },
+  keyif: {
+    ne: 'Sırf hoşuna gittiği için yaptığın şeyler: hobi, müzik, oyun, gülmek.',
+    neden: 'Keyif vakti lüks değil; dinlenmeni ve hayattan tat almanı sağlar.',
+    ornek: ['Sevdiğin müziği açıp dinlemek', 'Bitkilerle ilgilenmek', 'Hobine bir saat ayırmak'],
+  },
+  anlam: {
+    ne: 'Yaptıklarının sana önemli gelmesi ve kendinden büyük bir şeye katkı: ailene destek olmak, gönüllülük, inancın, değerlerin, bir şey üretmek.',
+    neden: 'Hayatının bir amacı olduğunu hissetmek zor zamanlarda dayanak olur. Herkes için başka bir şey ifade eder; senin için neyin önemli olduğu belirleyicidir.',
+    ornek: ['Birine karşılıksız bir iyilik', 'Bildiğin bir şeyi birine öğretmek', 'Senin için önemli olanı birkaç satır yazmak'],
+  },
+};
