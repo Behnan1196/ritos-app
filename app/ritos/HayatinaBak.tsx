@@ -10,8 +10,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useCanli } from '@/lib/canli';
 import type { YasamAlaniRow } from '@/lib/db';
 import { alanAdi, alanlar as yAlanlar, alanlariGaranti } from '@/lib/yasamAlani';
-import { ALAN_SORUSU, ARDINDAN, HAZIR_RUTINLER, ISTEKLER, type HazirRutin } from '@/lib/hazirRutin';
-import { ODAK_HAFTA, alanOnerisi, bakisKaydet, bakisVarMi, odak, odakRutinKur, type Cevap3 } from '@/lib/bakis';
+import { ALAN_SORUSU, ARDINDAN, HAFTA_SORUSU, HAZIR_RUTINLER, ISTEKLER, type HazirRutin } from '@/lib/hazirRutin';
+import { ODAK_HAFTA, alanOnerisi, bakisKaydet, bakisVarMi, haftalikBakisDurumu, haftalikKaydet, odak, odakRutinKur, odakSonu, type Cevap3 } from '@/lib/bakis';
 import { GUN_KISA } from '@/lib/paket';
 
 const CEVAPLAR: [Cevap3, string][] = [[1, 'İyi değil'], [2, 'İdare eder'], [3, 'İyi']];
@@ -35,7 +35,23 @@ export function YasamKapisi() {
   if (bakis === null) return null;
   // Pencere her zaman aynı yerde durur: kayıt sonrası kart değişince (kapı → odak) akışın durumu sıfırlanmasın.
   let kart: React.ReactNode;
-  if (od) {
+  if (od?.bitti) {
+    const a = alanlar.find((x) => x.id === od.p.odak!.alan);
+    const sec = (s: 'oturdu' | 'devam' | 'birak') => { void odakSonu(od.p.id, s).catch(() => {}); };
+    kart = (
+      <div className="rt-hb-odak sonu">
+        <div className="ust"><span>{ODAK_HAFTA} HAFTA OLDU</span><small>{a ? `${a.ikon} ${alanAdi(a)}` : ''}</small></div>
+        <h3>{od.p.ikon ?? '🌱'} {od.p.ad}: {od.yapilan ? `${od.yapilan} kez yaptın.` : 'bu sefer olmadı, sorun değil.'}</h3>
+        <div className="haftalik" aria-label="Haftalık cevapların">
+          {od.haftalik.map((c, i) => <span key={i} className={c ? `c${c}` : 'bos'}>{c ? <Yuz c={c} boyut={26} /> : '–'}<small>{i + 1}. hf</small></span>)}
+        </div>
+        <b className="soru">Bu alışkanlık oturdu mu?</b>
+        <button type="button" className="rt-hb-secenek" onClick={() => sec('oturdu')}><span className="bas"><b>Evet, artık alışkanlığım</b></span><small>Ajandanda kalır; sıradaki alana birlikte bakarız.</small></button>
+        <button type="button" className="rt-hb-secenek" onClick={() => sec('devam')}><span className="bas"><b>Biraz daha deneyeyim</b></span><small>{ODAK_HAFTA} hafta daha; sonra yine sorarız.</small></button>
+        <button type="button" className="rt-hb-secenek" onClick={() => sec('birak')}><span className="bas"><b>Bana göre değil</b></span><small>Ajandandan kalkar; başka küçük bir adım seçeriz.</small></button>
+      </div>
+    );
+  } else if (od) {
     const a = alanlar.find((x) => x.id === od.p.odak!.alan);
     kart = (
       <div className="rt-hb-odak">
@@ -89,6 +105,9 @@ export function HayatinaBak({ onKapat }: { onKapat: () => void }) {
   const [saat, setSaat] = useState('');
   const [bekle, setBekle] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
+  const mevcutOdak = useCanli(odak, [], null as Awaited<ReturnType<typeof odak>>);
+  const [odakIlk] = useState(() => ({ v: undefined as undefined | null | string }));
+  if (odakIlk.v === undefined && mevcutOdak !== null) odakIlk.v = mevcutOdak.bitti ? null : mevcutOdak.p.id;
 
   useEffect(() => { document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = ''; }; }, []);
   const alan = alanlar.find((a) => a.id === alanId) ?? null;
@@ -202,7 +221,13 @@ export function HayatinaBak({ onKapat }: { onKapat: () => void }) {
               );
             })}
           </div>
-          <h2>Bu ay neye biraz yer açalım?</h2>
+          {mevcutOdak && !mevcutOdak.bitti && odakIlk.v === mevcutOdak.p.id && (
+            <div className="rt-hb-mevcut">
+              <span>Şu an odağın <b>{mevcutOdak.p.ikon ?? '🌱'} {mevcutOdak.p.ad}</b> ({mevcutOdak.hafta}. hafta).</span>
+              <button type="button" className="rt-btn primary" onClick={onKapat}>Böyle devam</button>
+            </div>
+          )}
+          <h2>{mevcutOdak && !mevcutOdak.bitti && odakIlk.v === mevcutOdak.p.id ? 'Ya da yeni bir odak seç' : 'Bu ay neye biraz yer açalım?'}</h2>
           {(baska ? alanlar : ilkIki).map((a, i) => (
             <button key={a.id} type="button" className={`rt-hb-secenek${alanId === a.id ? ' on' : ''}`} aria-pressed={alanId === a.id} onClick={() => setAlanId(a.id)}>
               <span className="bas"><b>{a.ikon} {alanAdi(a)}</b>{!baska && i === 0 && <em>Önerimiz</em>}</span>
@@ -275,4 +300,35 @@ export function HayatinaBak({ onKapat }: { onKapat: () => void }) {
     );
   }
   return <div className="rt-hb" role="dialog" aria-modal="true" aria-label="Hayatına bakalım"><div className="rt-hb-ic">{govde}</div></div>;
+}
+
+// ———————————————— haftalık bakış (Home, pazar / pazartesi) ————————————————
+
+export function HaftalikBakisKarti() {
+  const b = useCanli(haftalikBakisDurumu, [], null as Awaited<ReturnType<typeof haftalikBakisDurumu>>);
+  const alanlar = useCanli(yAlanlar, [], [] as YasamAlaniRow[]);
+  const [c, setC] = useState<Cevap3 | null>(null);
+  const [not, setNot] = useState('');
+  const [tamam, setTamam] = useState(false);
+  if (tamam) return <div className="rt-hb-hafta tamam"><b>Teşekkürler.</b> Haftaya yine soracağız.</div>;
+  if (!b) return null;
+  const a = alanlar.find((x) => x.id === b.alanId);
+  const soru = (a?.kod && HAFTA_SORUSU[a.kod]) || `Bu hafta ${a ? alanAdi(a).toLocaleLowerCase('tr') : ''} tarafında nasıldın?`;
+  return (
+    <div className="rt-hb-hafta">
+      <span className="ust">HAFTAYA BİR BAKIŞ</span>
+      <div className="rutin">
+        <span className={`isaret${b.yapilan ? ' on' : ''}`} aria-hidden>{b.yapilan ? '✓' : ''}</span>
+        <span><b>{b.yapilan ? `Bu hafta ${b.yapilan} kez yaptın` : 'Bu hafta olmadı'}</b><small>{b.p.ikon ?? '🌱'} {b.p.ad}</small></span>
+      </div>
+      <h3>{soru}</h3>
+      <div className="cevap">
+        {CEVAPLAR.map(([k, e]) => <button key={k} type="button" className={`c${k}${c === k ? ' on' : ''}`} aria-pressed={c === k} onClick={() => setC(k)}><Yuz c={k} boyut={32} />{e}</button>)}
+      </div>
+      <label className="rt-hb-etiket kucuk">Aklında kalan bir şey var mı? <span className="rt-muted">(istersen)</span>
+        <input className="rt-inp" value={not} onChange={(e) => setNot(e.target.value)} />
+      </label>
+      <button type="button" className="rt-btn primary" disabled={!c} onClick={async () => { if (!c) return; await haftalikKaydet(b, c, not); setTamam(true); }}>Tamam</button>
+    </div>
+  );
 }

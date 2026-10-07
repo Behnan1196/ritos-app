@@ -78,3 +78,15 @@ export const ALAN_SORUSU: Record<string, string> = {
   keyif: 'Sana keyif veren şeylere vakit ayırabiliyor musun?',
   anlam: 'Yaptıkların sana anlamlı geliyor mu?',
 };
+
+/** Haftalık bakışta odak alanı için soru (pazar akşamı Home kartı). */
+export const HAFTA_SORUSU: Record<string, string> = {
+  hareket: 'Bu hafta bedenin nasıldı, yeterince hareket edebildin mi?',
+  beslenme: 'Bu hafta beslenmen nasıldı?',
+  uyku: 'Bu hafta uykun nasıldı?',
+  zihin: 'Bu hafta içinden nasıl geçti, kafan rahat mıydı?',
+  sosyal: 'Bu hafta sevdiklerinle bağın nasıldı?',
+  ogrenme: 'Bu hafta yeni bir şeyler öğrenebildin mi?',
+  keyif: 'Bu hafta kendine keyif veren şeylere vakit ayırabildin mi?',
+  anlam: 'Bu hafta yaptıkların sana anlamlı geldi mi?',
+};

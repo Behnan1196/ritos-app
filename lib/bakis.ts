@@ -10,7 +10,8 @@
 // ————————————————————————————————————————————————————————————————
 
 import { db, type AlanDegerlendirmeRow, type ProgramRow, type YasamAlaniRow } from './db';
-import { ayKodu } from './denge';
+import { ayKodu, haftaBasi } from './denge';
+import { arsivle } from './rutinDongu';
 import { bugun, gunFarki, tarihEkle, tarihParse } from './paket';
 import { programGuncelle, programOlustur } from './program';
 import { kocKartlariEkle } from './danisanAjanda';
@@ -76,13 +77,56 @@ export async function odakRutinKur(r: YeniRutin): Promise<string> {
   return pid;
 }
 
-/** Bu ayın odağı (kuruluyor durumundaki odak rutini) ve kaçıncı haftada olduğu. */
-export async function odak(): Promise<{ p: ProgramRow; hafta: number; yapilan: number } | null> {
+/** Bu ayın odağı (kuruluyor durumundaki odak rutini): kaçıncı haftada, kaç kez yapıldı, haftalık cevaplar; 4 hafta dolduysa bitti. */
+export async function odak(): Promise<{ p: ProgramRow; hafta: number; yapilan: number; bitti: boolean; haftalik: (Cevap3 | null)[] } | null> {
   const p = (await db.program.filter((x) => !!x.odak && (x.durum ?? 'kuruluyor') === 'kuruluyor').toArray())[0];
   if (!p?.odak) return null;
-  const hafta = Math.min(ODAK_HAFTA, Math.floor(gunFarki(p.odak.baslangic, bugun()) / 7) + 1);
+  const gun = gunFarki(p.odak.baslangic, bugun());
+  const hafta = Math.min(ODAK_HAFTA, Math.floor(gun / 7) + 1);
   const kartlar = await db.ajanda_kart.where('kaynak_ref').startsWith(`${p.id}/`).toArray();
   const idler = new Set(kartlar.map((k) => k.id));
-  const yapilan = (await db.ajanda_kayit.where('tarih').aboveOrEqual(p.odak.baslangic).toArray()).filter((r) => r.yapildi && idler.has(r.kart_id)).length;
-  return { p, hafta, yapilan };
+  const yapilan = (await db.ajanda_kayit.where('tarih').aboveOrEqual(p.odak.baslangic).toArray()).filter((r) => r.yapildi && idler.has(r.kart_id) && r.tarih <= bugun()).length;
+  const satirlar = (await db.alan_degerlendirme.where('alan_id').equals(p.odak.alan).toArray()).filter((d) => d.program_id === p.id && d.hafta);
+  const ilkHafta = haftaBasi(p.odak.baslangic);
+  const haftalik = Array.from({ length: ODAK_HAFTA }, (_, i) => {
+    const d = satirlar.find((x) => x.hafta === tarihEkle(ilkHafta, 7 * i));
+    return d ? BESTEN_UCE(d.deger) : null;
+  });
+  return { p, hafta, yapilan, bitti: gun >= ODAK_HAFTA * 7, haftalik };
+}
+
+/** Dört hafta sonunda: oturdu (odak kapanır, rutin ajandada sürer) · devam (4 hafta daha) · bırak (rutin arşive, kartlar yarından kalkar). */
+export async function odakSonu(pid: string, sonuc: 'oturdu' | 'devam' | 'birak') {
+  const p = await db.program.get(pid);
+  if (!p?.odak) return;
+  if (sonuc === 'devam') { await programGuncelle(pid, { odak: { ...p.odak, baslangic: bugun() } }); return; }
+  await programGuncelle(pid, { odak: null });
+  if (sonuc === 'birak') await arsivle(pid);
+}
+
+// ———————————————— haftalık bakış (pazar akşamı / pazartesi, Home) ————————————————
+
+export interface HaftalikBakis { p: ProgramRow; alanId: string; hafta: string; yapilan: number }
+
+/** Pazar günü bu haftanın, pazartesi geçen haftanın bakışı (cevaplanmadıysa ve odak o hafta varsa). */
+export async function haftalikBakisDurumu(): Promise<HaftalikBakis | null> {
+  const t = bugun();
+  const g = tarihParse(t).getDay();
+  if (g !== 0 && g !== 1) return null;
+  const hb = g === 0 ? haftaBasi(t) : tarihEkle(haftaBasi(t), -7);
+  const p = (await db.program.filter((x) => !!x.odak && (x.durum ?? 'kuruluyor') === 'kuruluyor').toArray())[0];
+  if (!p?.odak || p.odak.baslangic > tarihEkle(hb, 6)) return null;
+  if (await db.alan_degerlendirme.get(haftalikId(p.id, hb))) return null;
+  const kartlar = await db.ajanda_kart.where('kaynak_ref').startsWith(`${p.id}/`).toArray();
+  const idler = new Set(kartlar.map((k) => k.id));
+  const yapilan = (await db.ajanda_kayit.where('tarih').between(hb, tarihEkle(hb, 6), true, true).toArray()).filter((r) => r.yapildi && idler.has(r.kart_id)).length;
+  return { p, alanId: p.odak.alan, hafta: hb, yapilan };
+}
+const haftalikId = (pid: string, hb: string) => `hafta|${pid}|${hb}`;
+
+export async function haftalikKaydet(b: HaftalikBakis, c: Cevap3, not: string) {
+  await db.alan_degerlendirme.put({
+    id: haftalikId(b.p.id, b.hafta), alan_id: b.alanId, deger: UC_DEN_BESE[c], olcek: 3, cerceve: CERCEVE,
+    hafta: b.hafta, program_id: b.p.id, not: not.trim() || undefined, zaman: Date.now(),
+  });
 }

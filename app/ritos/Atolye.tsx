@@ -32,8 +32,8 @@ import { HAZIR_OLCULER, OLC_ONEK, olcuBlok } from '@/lib/olcum';
 import { koleksiyonlar } from '@/lib/kutuphane';
 import { ALAN_IKONLARI, EN_FAZLA_GORUNEN, alanEkle as yAlanEkle, alanGuncelle, alanOner, alanSil, alanSirala, alanlar as yAlanlar, alanlariGaranti } from '@/lib/yasamAlani';
 import type { YasamAlaniRow } from '@/lib/db';
-import { AjandadanRutinOnerisi, AlanKarolari, AlanSayfasi, AliskanlikOnerisi, AySonu, DengeKarti } from './Rutinler';
-import { YasamKapisi } from './HayatinaBak';
+import { AjandadanRutinOnerisi, AlanKarolari, AlanSayfasi, AliskanlikOnerisi, DengeKarti } from './Rutinler';
+import { HayatinaBak, YasamKapisi } from './HayatinaBak';
 import { arsivle, kuruluyoraDon, oturduIsaretle, rutinDurumu } from '@/lib/rutinDongu';
 import { hazirKartlar, hazirSablonlariYenile, hazirSablonuAl, useHazirSablonlar, type HazirSablon } from '@/lib/hazirSablon';
 
@@ -193,7 +193,7 @@ function Planlar({ genis, kapsam }: { genis: boolean; kapsam: Kapsam }) {
   );
   const yasamEkrani = ekran === 'yalan' && alan
     ? <AlanSayfasi alanId={alan} onRutin={(pid) => sec(`p:${pid}`)} onYeniRutin={() => setProgForm({ etiket: [alan] })} onDegerlendir={() => git('deg')} />
-    : ekran === 'deg' ? <AySonu onBitti={() => git('liste')} /> : null;
+    : ekran === 'deg' ? <HayatinaBak onKapat={() => git('liste')} /> : null; // 8 ekim: ay sonu da 'Hayatına bakalım' (3'lü)
   const grupDosyasi = null as React.ReactNode; // 7 ekim: grup dosyası Çevrem'de
 
   if (!hazir) return <div className="rt-atolye-plan" />;
