@@ -33,7 +33,7 @@ import { koleksiyonlar } from '@/lib/kutuphane';
 import { ALAN_IKONLARI, EN_FAZLA_GORUNEN, alanEkle as yAlanEkle, alanGuncelle, alanOner, alanSil, alanSirala, alanlar as yAlanlar, alanlariGaranti } from '@/lib/yasamAlani';
 import type { YasamAlaniRow } from '@/lib/db';
 import { AjandadanRutinOnerisi, AlanKarolari, AlanSayfasi, AliskanlikOnerisi, DengeKarti } from './Rutinler';
-import { HayatinaBak, YasamKapisi } from './HayatinaBak';
+import { HayatinaBak, KendimKur, YasamKapisi } from './HayatinaBak';
 import { arsivle, kuruluyoraDon, oturduIsaretle, rutinDurumu } from '@/lib/rutinDongu';
 import { hazirKartlar, hazirSablonlariYenile, hazirSablonuAl, useHazirSablonlar, type HazirSablon } from '@/lib/hazirSablon';
 
@@ -172,7 +172,9 @@ function Planlar({ genis, kapsam }: { genis: boolean; kapsam: Kapsam }) {
 
   const modallar = (
     <>
-      {progForm && <ProgramFormu id={progForm.id} etiket0={progForm.etiket} onKapat={() => setProgForm(null)} onOlustu={(id) => { setProgForm(null); setYeniBekle(`p:${id}`); sec(`p:${id}`); }} />}
+      {progForm && (kapsam === 'kendim' && !progForm.id
+        ? <KendimKur alan0={progForm.etiket?.[0]} onKapat={() => setProgForm(null)} onOlustu={() => setProgForm(null)} />
+        : <ProgramFormu id={progForm.id} etiket0={progForm.etiket} onKapat={() => setProgForm(null)} onOlustu={(id) => { setProgForm(null); setYeniBekle(`p:${id}`); sec(`p:${id}`); }} />)}
       {davet && <DavetModal sabitDisiplin={davet} onKapat={() => { setDavet(null); setDavetYenile((n) => n + 1); }} />}
       {alanEkle && <AlanEkleModal onKapat={() => setAlanEkle(false)} onEklendi={() => setAlanEkle(false)} />}
       {kartEkle && h && <KartEkle h={h} tarih={tarih < bugun() ? bugun() : tarih} onKapat={() => setKartEkle(false)} />}
@@ -876,7 +878,7 @@ function HedefSecici({ kapsam, hedefler, adaylar, seciliId, kompakt, kuruluyor, 
               </>
             )}
             {ac && !q && g.anahtar === RUTIN_BOLUM && (
-              <button type="button" className="rt-hedef-sat yeni" onClick={onYeniProgram}><span className="ic">＋</span><span className="ad">Yeni rutin</span></button>
+              <button type="button" className="rt-hedef-sat yeni" onClick={onYeniProgram}><span className="ic">＋</span><span className="ad">{kapsam === 'kendim' ? 'Kendim kurayım' : 'Yeni rutin'}</span></button>
             )}
           </div>
         );

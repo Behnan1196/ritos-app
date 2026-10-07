@@ -11,7 +11,11 @@ import { useCanli } from '@/lib/canli';
 import type { YasamAlaniRow } from '@/lib/db';
 import { alanAdi, alanlar as yAlanlar, alanlariGaranti } from '@/lib/yasamAlani';
 import { ALAN_SORUSU, ARDINDAN, HAFTA_SORUSU, HAZIR_RUTINLER, ISTEKLER, type HazirRutin } from '@/lib/hazirRutin';
-import { ODAK_HAFTA, alanOnerisi, bakisKaydet, bakisVarMi, haftalikBakisDurumu, haftalikKaydet, odak, odakRutinKur, odakSonu, type Cevap3 } from '@/lib/bakis';
+import { ODAK_HAFTA, ajandaKartiniBagla, alanOnerisi, bakisKaydet, bakisVarMi, haftalikBakisDurumu, haftalikKaydet, kartYasamDurumu, odak, odakRutinKur, odakSonu, rutinKur, type Cevap3 } from '@/lib/bakis';
+import { programGuncelle } from '@/lib/program';
+import { ikonOner } from '@/lib/programIkon';
+import { Modal } from './ortak';
+import type { AjandaKartRow } from '@/lib/db';
 import { GUN_KISA } from '@/lib/paket';
 
 const CEVAPLAR: [Cevap3, string][] = [[1, 'İyi değil'], [2, 'İdare eder'], [3, 'İyi']];
@@ -329,6 +333,122 @@ export function HaftalikBakisKarti() {
         <input className="rt-inp" value={not} onChange={(e) => setNot(e.target.value)} />
       </label>
       <button type="button" className="rt-btn primary" disabled={!c} onClick={async () => { if (!c) return; await haftalikKaydet(b, c, not); setTamam(true); }}>Tamam</button>
+    </div>
+  );
+}
+
+// ———————————————— Kendim kurayım (8 ekim) ————————————————
+
+/** Kendi rutinini kur: ne, hangi yanına iyi gelir (isteğe bağlı, tahmin yok), hangi günler, neyin ardından. Hazırlardan da seçilebilir. */
+export function KendimKur({ alan0, onKapat, onOlustu }: { alan0?: string; onKapat: () => void; onOlustu: (pid: string) => void }) {
+  useEffect(() => { alanlariGaranti().catch(() => {}); }, []);
+  const hepsi = useCanli(yAlanlar, [], [] as YasamAlaniRow[]);
+  const alanlar = hepsi.filter((a) => !a.gizli);
+  const [hazirAcik, setHazirAcik] = useState(false);
+  const [ad, setAd] = useState('');
+  const [ikon, setIkon] = useState<string | null>(null);
+  const [secili, setSecili] = useState<string[]>(alan0 ? [alan0] : []);
+  const [gunler, setGunler] = useState<number[]>([1, 2, 3, 4, 5, 6, 0]);
+  const [ardindan, setArdindan] = useState<string | null>(null);
+  const [saat, setSaat] = useState('');
+  const [bekle, setBekle] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  const hazirdan = (r: HazirRutin) => {
+    setAd(r.ad); setIkon(r.ikon);
+    setSecili(alanlar.filter((a) => a.kod && r.alanlar.includes(a.kod)).map((a) => a.id));
+    setGunler(r.gunler ?? [1, 2, 3, 4, 5, 6, 0]); setArdindan(r.ardindan); setSaat(''); setHazirAcik(false);
+  };
+  const kur = async () => {
+    if (!ad.trim() || !gunler.length) return;
+    setBekle(true); setHata(null);
+    try {
+      const ilk = alanlar.find((a) => a.id === secili[0]);
+      const pid = await rutinKur({ alanIdler: secili, ad, ikon: ikon ?? ikonOner(ad) ?? ilk?.ikon ?? '🌱', gunler: gunler.length === 7 ? null : gunler, ardindan, saat: ardindan === 'Belli bir saatte' && saat ? saat : null });
+      onOlustu(pid);
+    } catch (e) { setHata(e instanceof Error ? e.message : String(e)); setBekle(false); }
+  };
+  if (hazirAcik) return (
+    <Modal baslik="Hazır rutinler" onKapat={() => setHazirAcik(false)}>
+      <div className="rt-hb-hazirlar">
+        {alanlar.filter((a) => a.kod && HAZIR_RUTINLER.some((r) => r.alanlar[0] === a.kod)).map((a) => (
+          <div key={a.id} className="grup">
+            <span className="rt-hb-alt-baslik">{a.ikon} {alanAdi(a)}</span>
+            {HAZIR_RUTINLER.filter((r) => r.alanlar[0] === a.kod).map((r) => (
+              <button key={r.kod} type="button" className="rt-hb-secenek satir" onClick={() => hazirdan(r)}>
+                <span className="ik">{r.ikon}</span><span className="tx"><b>{r.ad}</b><small>{r.alt}</small></span>
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </Modal>
+  );
+  return (
+    <Modal baslik="Kendi rutinini kur" onKapat={onKapat}>
+      <div className="rt-hb-form">
+        <button type="button" className="rt-hb-fikir" onClick={() => setHazirAcik(true)}>Fikir mi lazım? Hazır rutinlere bak <span aria-hidden>›</span></button>
+        <label className="rt-hb-etiket">Ne yapacaksın?<input className="rt-inp" value={ad} placeholder="ör. Bahçeyle ilgilenmek" onChange={(e) => { setAd(e.target.value); setIkon(null); }} /></label>
+        <div className="rt-hb-etiket">Hayatının hangi yanına iyi gelir?
+          <div className="rt-hb-cipler">
+            {alanlar.map((a) => <button key={a.id} type="button" className={`rt-hb-cip kucuk${secili.includes(a.id) ? ' on' : ''}`} aria-pressed={secili.includes(a.id)} onClick={() => setSecili(secili.includes(a.id) ? secili.filter((x) => x !== a.id) : [...secili, a.id])}>{alanAdi(a)}</button>)}
+          </div>
+          <small className="rt-muted">Birden fazla seçebilirsin. Emin değilsen boş bırak.</small>
+        </div>
+        <div className="rt-hb-etiket">Hangi günler?
+          <div className="rt-hb-gunler">
+            {GUN_KISA.map(([g, e]) => <button key={g} type="button" className={gunler.includes(g) ? 'on' : ''} aria-pressed={gunler.includes(g)} onClick={() => setGunler(gunler.includes(g) ? gunler.filter((x) => x !== g) : [...gunler, g])}>{e}</button>)}
+          </div>
+        </div>
+        <div className="rt-hb-etiket">Neyin ardından? <span className="rt-muted">(istersen)</span>
+          <div className="rt-hb-cipler">
+            {ARDINDAN.map((e) => <button key={e} type="button" className={`rt-hb-cip kucuk${ardindan === e ? ' on' : ''}`} aria-pressed={ardindan === e} onClick={() => setArdindan(ardindan === e ? null : e)}>{e}</button>)}
+          </div>
+          {ardindan === 'Belli bir saatte' && <input className="rt-inp rt-hb-saat" type="time" value={saat} onChange={(e) => setSaat(e.target.value)} aria-label="Saat" />}
+        </div>
+        {hata && <p className="rt-hata">{hata}</p>}
+        <button type="button" className="rt-btn primary rt-hb-ana" disabled={!ad.trim() || !gunler.length || bekle} onClick={kur}>{bekle ? 'Ekleniyor…' : 'Ajandama ekle'}</button>
+      </div>
+    </Modal>
+  );
+}
+
+// ———————————————— Ajanda kart detayında: Yaşam Tarzı'na bağla (8 ekim) ————————————————
+
+export function YasamBag({ kart, onBitti }: { kart: AjandaKartRow; onBitti?: () => void }) {
+  useEffect(() => { alanlariGaranti().catch(() => {}); }, []);
+  const durum = useCanli(() => kartYasamDurumu(kart), [kart.id, kart.kaynak_ref, kart.bitis], null as Awaited<ReturnType<typeof kartYasamDurumu>>);
+  const hepsi = useCanli(yAlanlar, [], [] as YasamAlaniRow[]);
+  const alanlar = hepsi.filter((a) => !a.gizli);
+  const [acik, setAcik] = useState(false);
+  const [secili, setSecili] = useState<string[]>([]);
+  const [bekle, setBekle] = useState(false);
+  const [tamam, setTamam] = useState(false);
+  if (!durum) return null;
+  if (tamam) return <p className="rt-hb-bag-tamam">🌱 Yaşam Tarzım&apos;a bağlandı. Kart ajandanda aynen sürüyor.</p>;
+  if (durum.tur === 'rutin' && durum.p.alanlar?.length) {
+    const adlar = durum.p.alanlar.map((id) => hepsi.find((a) => a.id === id)).filter(Boolean).map((a) => alanAdi(a!)).join(', ');
+    return <p className="rt-muted rt-hb-bag-satir">🌱 Yaşam Tarzım · {adlar}</p>;
+  }
+  if (!acik) return <button type="button" className="rt-hb-bag-ac" onClick={() => setAcik(true)}><span>🌱 Bu bir alışkanlığın mı?</span><b>Yaşam Tarzına bağla ›</b></button>;
+  const bagla = async () => {
+    setBekle(true);
+    try {
+      if (durum.tur === 'rutin') await programGuncelle(durum.p.id, { alanlar: secili });
+      else await ajandaKartiniBagla(kart, secili);
+      setTamam(true); onBitti?.();
+    } finally { setBekle(false); }
+  };
+  return (
+    <div className="rt-hb-bag">
+      <b>Bu bir alışkanlığın mı?</b>
+      <span className="rt-muted">Hayatının hangi yanına iyi geldiğini seçersen Yaşam Tarzım&apos;da görünür, hayatına bakarken de sayılır.</span>
+      <div className="rt-hb-cipler">
+        {alanlar.map((a) => <button key={a.id} type="button" className={`rt-hb-cip kucuk${secili.includes(a.id) ? ' on' : ''}`} aria-pressed={secili.includes(a.id)} onClick={() => setSecili(secili.includes(a.id) ? secili.filter((x) => x !== a.id) : [...secili, a.id])}>{alanAdi(a)}</button>)}
+      </div>
+      <div className="rt-satir">
+        <button type="button" className="rt-btn" onClick={() => setAcik(false)}>Vazgeç</button>
+        <button type="button" className="rt-btn primary" disabled={!secili.length || bekle} onClick={bagla}>Yaşam Tarzıma bağla</button>
+      </div>
     </div>
   );
 }

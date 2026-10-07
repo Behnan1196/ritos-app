@@ -9,7 +9,8 @@
 //    kartı Ajanda'ya düşer; program "bu ayın odağı" olarak işaretlenir (yalnız biri).
 // ————————————————————————————————————————————————————————————————
 
-import { db, type AlanDegerlendirmeRow, type ProgramRow, type YasamAlaniRow } from './db';
+import { db, type AjandaKartRow, type AlanDegerlendirmeRow, type ProgramRow, type YasamAlaniRow } from './db';
+import { ikonOner } from './programIkon';
 import { ayKodu, haftaBasi } from './denge';
 import { arsivle } from './rutinDongu';
 import { bugun, gunFarki, tarihEkle, tarihParse } from './paket';
@@ -66,8 +67,13 @@ export interface YeniRutin { alanId: string; ad: string; ikon: string; gunler: n
 /** Rutini kur: program + alan etiketi + Ajanda kartı; bu ayın odağı yap. */
 export async function odakRutinKur(r: YeniRutin): Promise<string> {
   for (const p of await db.program.filter((x) => !!x.odak).toArray()) await programGuncelle(p.id, { odak: null });
+  return rutinKur({ ...r, alanIdler: [r.alanId] }, { alan: r.alanId, baslangic: bugun() });
+}
+
+/** Kendi rutinini kur (Kendim kurayım): program + alan etiketleri (boş olabilir) + Ajanda kartı. */
+export async function rutinKur(r: Omit<YeniRutin, 'alanId'> & { alanIdler: string[] }, odakBilgi: ProgramRow['odak'] = null): Promise<string> {
   const pid = await programOlustur(r.ad.trim(), '');
-  await programGuncelle(pid, { ikon: r.ikon, kimden: 'Kendim', alanlar: [r.alanId], odak: { alan: r.alanId, baslangic: bugun() } });
+  await programGuncelle(pid, { ikon: r.ikon, kimden: 'Kendim', alanlar: r.alanIdler, ...(odakBilgi ? { odak: odakBilgi } : {}) });
   const not = r.ardindan && r.ardindan !== 'Belli bir saatte' ? r.ardindan : null;
   await kocKartlariEkle({ tur: 'program', programId: pid }, [{
     tarih: ilkGun(r.gunler),
@@ -129,4 +135,34 @@ export async function haftalikKaydet(b: HaftalikBakis, c: Cevap3, not: string) {
     id: haftalikId(b.p.id, b.hafta), alan_id: b.alanId, deger: UC_DEN_BESE[c], olcek: 3, cerceve: CERCEVE,
     hafta: b.hafta, program_id: b.p.id, not: not.trim() || undefined, zaman: Date.now(),
   });
+}
+
+// ———————————————— Ajanda kartından Yaşam Tarzı'na (8 ekim) ————————————————
+
+/** Kendi (bağımsız, tekrar eden) Ajanda kartını rutine çevir: aynı kart yarından rutinin kartı olarak sürer, eskisi bugün biter
+ *  (henüz başlamadıysa yenisi aynı günden başlar, eskisi kalkar). İşaret geçmişi yerinde kalır. */
+export async function ajandaKartiniBagla(k: AjandaKartRow, alanIdler: string[]): Promise<string> {
+  const t = bugun();
+  const pid = await programOlustur(k.ad, '');
+  await programGuncelle(pid, { ikon: ikonOner(k.ad) ?? undefined, kimden: 'Kendim', alanlar: alanIdler });
+  const bas = k.baslangic > t ? k.baslangic : tarihEkle(t, 1);
+  await kocKartlariEkle({ tur: 'program', programId: pid }, [{
+    tarih: bas,
+    kart: { tip: k.tip, ad: k.ad, bloklar: k.bloklar, ek: k.ek ?? null, saatler: k.saatler },
+    tekrar: { gun: k.bitis ? gunFarki(bas, k.bitis) + 1 : null, gunler: k.gunler },
+  }]);
+  if (k.baslangic > t) await db.ajanda_kart.delete(k.id);
+  else await db.ajanda_kart.update(k.id, { bitis: t, guncellendi: Date.now() });
+  return pid;
+}
+
+/** Kartın Yaşam Tarzı durumu: bağlanabilir (kendi tekrar eden kartı), rutin (kendi programı; alanları) ya da yok. */
+export async function kartYasamDurumu(k: AjandaKartRow): Promise<{ tur: 'baglanir' } | { tur: 'rutin'; p: ProgramRow } | null> {
+  const t = bugun();
+  if (k.kaynak_modul === 'ajanda' && k.tip !== 'oku' && k.bitis !== k.baslangic && (k.bitis === null || k.bitis > t)) return { tur: 'baglanir' };
+  if (k.kaynak_modul === 'program') {
+    const p = await db.program.get((k.kaynak_ref ?? '').split('/')[0]);
+    if (p && !p.uzak && !p.sablon) return { tur: 'rutin', p };
+  }
+  return null;
 }

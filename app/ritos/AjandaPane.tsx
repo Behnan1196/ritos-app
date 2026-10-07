@@ -19,6 +19,7 @@ import { KlasorSecModal } from './Kutuphane';
 import { ajandadanKaydet } from '@/lib/kutuphane';
 import { db, type ProgramRow } from '@/lib/db';
 import { isUstlen } from '@/lib/cevrem';
+import { YasamBag } from './HayatinaBak';
 import { KAYNAK_TUR, filtreVar, filtreOku, filtreYaz, kaynakBilgi, uyar, type Filtre, type KaynakTur } from '@/lib/kaynakFiltre';
 
 // A1–A9 (ilk dilim). Ajanda yalnızca kart satırlarını bilir; kaynağın içini bilmez.
@@ -538,6 +539,7 @@ function KartDetay({ satir, tarih, onKapat }: { satir: GunSatiri; tarih: string;
           ? <p className="rt-muted">🔗 <b>{kart.kaynak_etiket}</b> uygulamasından geliyor; içeriğini ve gününü o uygulama yönetir. İşaretin ve girdiğin değerler ona geri yazılır.</p>
           : <p className="rt-muted">Bu kart <b>{kart.kaynak_etiket}</b> programından geliyor; içeriği ve günü programdan yönetilir.</p>)}
       {kart.geri_bildirim === 'uzak' && <YorumAlani kartId={kart.id} tarih={tarih} kime={aileDetay ? kart.kaynak_etiket ?? 'görevi veren' : 'koçun'} />}
+      {kart.geri_bildirim !== 'uzak' && !kart.ortak && <YasamBag kart={kart} />}
 
       {degerAc && (
         <DegerGir bloklar={kart.bloklar} ilk={kayitCanli?.degerler ?? null}
