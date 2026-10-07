@@ -7,9 +7,21 @@
 --   Gizlilik: gönderene e-postanın Ritos'ta kayıtlı olup olmadığı hiçbir durumda söylenmez.
 -- 'rehber': kişinin kendi e-posta listesi (yalnız kendisi görür); e-postayla davet edince kendiliğinden eklenir.
 -- 03-cevrem.sql ve 06-bildirim.sql'den sonra BİR KEZ çalıştır (yeniden çalıştırılabilir).
+-- 8 ekim (2): e-postalar eposta_anahtar() ile eşlenir — Gmail'de nokta ve +ek fark etmez.
 -- =====================================================================
 
 -- ——— kişiye davet ——————————————————————————————————————————————————————
+-- E-posta eşleme anahtarı: küçük harf; Gmail'de noktalar ve +ek önemsiz (a.b+x@gmail.com = ab@gmail.com).
+create or replace function public.eposta_anahtar(e text) returns text
+language sql immutable as $$
+  select case
+    when e is null then null
+    when split_part(lower(trim(e)), '@', 2) in ('gmail.com', 'googlemail.com')
+      then replace(split_part(split_part(lower(trim(e)), '@', 1), '+', 1), '.', '') || '@gmail.com'
+    else lower(trim(e))
+  end
+$$;
+
 create table if not exists public.grup_kisi_davet (
   id                uuid primary key default gen_random_uuid(),
   grup_id           uuid not null references public.grup(id) on delete cascade,
@@ -25,13 +37,14 @@ create table if not exists public.grup_kisi_davet (
 );
 create index if not exists grup_kisi_davet_grup on public.grup_kisi_davet (grup_id) where durum = 'bekliyor';
 create index if not exists grup_kisi_davet_alici on public.grup_kisi_davet (alici) where durum = 'bekliyor';
-create index if not exists grup_kisi_davet_eposta on public.grup_kisi_davet (lower(alici_eposta)) where durum = 'bekliyor';
+drop index if exists public.grup_kisi_davet_eposta;
+create index if not exists grup_kisi_davet_eanahtar on public.grup_kisi_davet (public.eposta_anahtar(alici_eposta)) where durum = 'bekliyor';
 
 alter table public.grup_kisi_davet enable row level security;
 drop policy if exists grup_kisi_davet_oku on public.grup_kisi_davet;
 create policy grup_kisi_davet_oku on public.grup_kisi_davet for select using (
   public.grup_uyesi_mi(grup_id) or alici = auth.uid()
-  or (alici_eposta is not null and lower(alici_eposta) = lower(coalesce(auth.jwt() ->> 'email', '')))
+  or (alici_eposta is not null and public.eposta_anahtar(alici_eposta) = public.eposta_anahtar(coalesce(auth.jwt() ->> 'email', '')))
 );
 -- yazma yalnız aşağıdaki işlevlerle
 
@@ -70,10 +83,10 @@ begin
   insert into public.rehber (sahip, eposta, ad) values (auth.uid(), e, nullif(trim(p_ad), ''))
   on conflict (sahip, eposta) do update set ad = coalesce(excluded.ad, public.rehber.ad);
   -- Kendi e-postam ya da zaten üye olan biri: sessizce geç (kim olduğu söylenmez).
-  select id into kim from auth.users where lower(email) = e;
+  select id into kim from auth.users where public.eposta_anahtar(email) = public.eposta_anahtar(e) order by (lower(email) = e) desc limit 1;
   if kim = auth.uid() then raise exception 'bu senin e-postan'; end if;
   if kim is not null and exists (select 1 from public.grup_uye where grup_id = p_grup and uye_id = kim and durum = 'aktif') then return; end if;
-  if exists (select 1 from public.grup_kisi_davet where grup_id = p_grup and lower(alici_eposta) = e and durum = 'bekliyor') then return; end if;
+  if exists (select 1 from public.grup_kisi_davet where grup_id = p_grup and public.eposta_anahtar(alici_eposta) = public.eposta_anahtar(e) and durum = 'bekliyor') then return; end if;
   select count(*) into n from public.grup_kisi_davet where davet_eden = auth.uid() and alici_eposta is not null and olusturuldu > now() - interval '1 day';
   if n >= 20 then raise exception 'Bugün yeterince e-posta daveti gönderdin; yarın yeniden dene'; end if;
   insert into public.grup_kisi_davet (grup_id, davet_eden, alici_eposta, alici_ad) values (p_grup, auth.uid(), e, nullif(trim(p_ad), ''));
@@ -92,7 +105,7 @@ language sql stable security definer set search_path = public, auth as $$
     left join public.profil p on p.id = d.davet_eden
     join auth.users me on me.id = auth.uid()
    where d.durum = 'bekliyor' and d.olusturuldu > now() - interval '30 days'
-     and (d.alici = auth.uid() or (d.alici_eposta is not null and lower(d.alici_eposta) = lower(me.email)))
+     and (d.alici = auth.uid() or (d.alici_eposta is not null and public.eposta_anahtar(d.alici_eposta) = public.eposta_anahtar(me.email)))
      and not exists (select 1 from public.grup_uye u where u.grup_id = d.grup_id and u.uye_id = auth.uid() and u.durum = 'aktif')
    order by d.olusturuldu desc;
 $$;
@@ -104,10 +117,10 @@ language plpgsql security definer set search_path = public, auth as $$
 declare d public.grup_kisi_davet%rowtype; e text; n int;
 begin
   if auth.uid() is null then raise exception 'oturum yok'; end if;
-  select lower(email) into e from auth.users where id = auth.uid();
+  select public.eposta_anahtar(email) into e from auth.users where id = auth.uid();
   select * into d from public.grup_kisi_davet where id = p_id for update;
   if not found or d.durum <> 'bekliyor' then raise exception 'Bu davet artık geçerli değil'; end if;
-  if not (coalesce(d.alici = auth.uid(), false) or coalesce(lower(d.alici_eposta) = e, false)) then raise exception 'Bu davet sana değil'; end if;
+  if not (coalesce(d.alici = auth.uid(), false) or coalesce(public.eposta_anahtar(d.alici_eposta) = e, false)) then raise exception 'Bu davet sana değil'; end if;
   if p_kabul then
     select count(*) into n from public.grup_uye where grup_id = d.grup_id and durum = 'aktif';
     if n >= 12 then raise exception 'Grup dolu (en fazla 12 kişi)'; end if;
@@ -116,7 +129,7 @@ begin
   end if;
   -- Aynı gruba bana gelen diğer davetler de kapansın.
   update public.grup_kisi_davet set durum = case when p_kabul then 'kabul' else 'ret' end, guncellendi = now()
-   where grup_id = d.grup_id and durum = 'bekliyor' and (alici = auth.uid() or lower(alici_eposta) = e);
+   where grup_id = d.grup_id and durum = 'bekliyor' and (alici = auth.uid() or public.eposta_anahtar(alici_eposta) = e);
   return d.grup_id;
 end $$;
 revoke all on function public.grup_kisi_davet_yanit(uuid, boolean) from public, anon;
@@ -136,7 +149,7 @@ create or replace function public.grup_kisi_davet_bildir() returns trigger
 language plpgsql security definer set search_path = public, auth as $$
 declare kim uuid := new.alici; ad text; gad text; url text; gizli text;
 begin
-  if kim is null then select id into kim from auth.users where lower(email) = lower(new.alici_eposta); end if;
+  if kim is null then select id into kim from auth.users where public.eposta_anahtar(email) = public.eposta_anahtar(new.alici_eposta) limit 1; end if;
   select coalesce(nullif(gorunen_ad, ''), 'Biri') into ad from public.profil where id = new.davet_eden;
   select g.ad into gad from public.grup g where g.id = new.grup_id;
   if kim is not null and kim <> new.davet_eden then
@@ -173,4 +186,31 @@ do $$ begin
     alter publication supabase_realtime add table public.grup_kisi_davet;
   exception when duplicate_object then null; when undefined_object then null;
   end;
+end $$;
+
+-- ——— danışmanlık e-posta davetleri de aynı eşlemeyle (05/06'daki tanımların güncel hali) ———
+create or replace function public.bana_gelen_dan_davetler()
+returns table (kod text, koc_ad text, disiplin text)
+language sql stable security definer set search_path = public, auth as $$
+  select d.kod, d.koc_ad, d.disiplin
+    from public.dan_davet d
+    join auth.users u on u.id = auth.uid()
+   where d.alici_eposta is not null and public.eposta_anahtar(d.alici_eposta) = public.eposta_anahtar(u.email)
+     and not d.kullanildi and d.son > now() and d.koc <> auth.uid()
+   order by d.olusturuldu;
+$$;
+revoke all on function public.bana_gelen_dan_davetler() from public, anon;
+grant execute on function public.bana_gelen_dan_davetler() to authenticated;
+
+create or replace function public.dan_davet_bildir() returns trigger
+language plpgsql security definer set search_path = public, auth as $$
+declare kim uuid;
+begin
+  if new.alici_eposta is null then return new; end if;
+  select id into kim from auth.users where public.eposta_anahtar(email) = public.eposta_anahtar(new.alici_eposta) limit 1;
+  if kim is null or kim = new.koc then return new; end if;
+  insert into public.bildirim (alici, kaynak, anahtar, baslik, metin, ac)
+  values (kim, 'danismanlik', 'davet:' || new.kod, 'Danışmanlık daveti', new.koc_ad || ' seni danışanı olarak eklemek istiyor', '/')
+  on conflict (alici, anahtar) do nothing;
+  return new;
 end $$;

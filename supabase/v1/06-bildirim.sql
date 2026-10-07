@@ -72,7 +72,7 @@ language plpgsql security definer set search_path = public, auth as $$
 declare kim uuid;
 begin
   if new.alici_eposta is null then return new; end if;
-  select id into kim from auth.users where lower(email) = lower(new.alici_eposta);
+  select id into kim from auth.users where public.eposta_anahtar(email) = public.eposta_anahtar(new.alici_eposta) limit 1;
   if kim is null or kim = new.koc then return new; end if;
   insert into public.bildirim (alici, kaynak, anahtar, baslik, metin, ac)
   values (kim, 'danismanlik', 'davet:' || new.kod, 'Danışmanlık daveti', new.koc_ad || ' seni danışanı olarak eklemek istiyor', '/')
