@@ -1406,3 +1406,5 @@ div.rt-cv-sat .ic{cursor:default;}
 .rt-baglan-kart p{margin:0;font-size:13px;color:var(--ink);line-height:1.4;}
 .rt-baglan-kart .rt-misafir-x{top:12px;transform:none;}
 .rt-veri-sil-bag{display:block;margin-top:14px;font-size:12.5px;color:var(--muted);}
+.rt-kullanici.bagsiz .rt-avatar{background:transparent!important;border:1.5px dashed rgba(239,233,221,.7);color:rgba(239,233,221,.9);}
+.rt-kmenu-bas .rt-avatar{border:0;}

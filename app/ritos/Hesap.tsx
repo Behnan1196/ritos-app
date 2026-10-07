@@ -350,7 +350,8 @@ export function KullaniciRozeti({ onSec, uyari }: { onSec: (e: HesapEkran | 'cik
   const sec = (e: HesapEkran | 'cikis') => { setAcik(false); onSec(e); };
   return (
     <div className="rt-kullanici-kok" ref={kok}>
-      <button type="button" className="rt-kullanici" onClick={() => setAcik(!acik)} aria-haspopup="menu" aria-expanded={acik} aria-label={`${ad} — hesap menüsü`}>
+      <button type="button" className={`rt-kullanici${o.hesapli ? '' : ' bagsiz'}`} onClick={() => setAcik(!acik)} aria-haspopup="menu" aria-expanded={acik}
+        aria-label={`${ad} — ${o.hesapli ? 'e-posta bağlı' : 'e-posta bağlı değil'}`} title={o.hesapli ? 'E-posta bağlı · yedekte' : 'E-posta bağlı değil · yalnız bu cihazda'}>
         <span className="rt-kullanici-ad">{ad}</span>
         <span className="rt-kullanici-av">
           <Avatar ad={ad} resim={resim} />
@@ -362,6 +363,7 @@ export function KullaniciRozeti({ onSec, uyari }: { onSec: (e: HesapEkran | 'cik
           <div className="rt-kmenu-bas">
             <Avatar ad={ad} resim={resim} boyut={38} />
             <span className="tx"><b>{ad}</b>{eposta && <small>{eposta}</small>}
+              {!o.hesapli && <small>Yalnız bu cihazda</small>}
               {o.hesapli && <small className={d.hata ? 'hata' : ''}>{d.hata ? '⚠ Şu an yedeklenemiyor' : d.son ? `Yedekte · ${zamanFarki(d.son)}` : ''}</small>}
             </span>
           </div>
