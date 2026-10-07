@@ -92,7 +92,7 @@ export async function paketiAl(p: PaylasimPaketi, gonderenAd: string, secenek: {
       calisma_baslangic: null, calisma_bitis: null, kimden: gonderenAd, guncellendi: Date.now(),
     });
     for (const a of p.program.adimlar) await adimEkle(id, a);
-    return "Rutinlerine eklendi (Kuruluyor)";
+    return "Yaşam Tarzına eklendi (Kuruluyor)";
   }
   throw new Error('Tanınmayan paylaşım');
 }

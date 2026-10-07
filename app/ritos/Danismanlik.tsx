@@ -247,7 +247,7 @@ export function DavetModal({ onKapat, sabitDisiplin }: { onKapat: () => void; sa
           {/* V1 (28 eylül): bağlantı/QR kapalı — telefonda PWA yerine tarayıcıda açılıp yeniden giriş istiyor; mobil uygulamada (V2) çözülecek. */}
           <div style={{ marginTop: sabitDisiplin ? 0 : 12 }}><Chips<'baglanti' | 'eposta'> secenekler={[['eposta', 'E-postayla'], ['baglanti', 'Bağlantı / kod']]} deger={yol} onSec={setYol} /></div>
           {yol === 'baglanti'
-            ? <p className="rt-muted" style={{ marginTop: 10 }}>Bağlantı tek kullanımlık, 7 gün geçerli. Danışanın bağlantıyı açar, Ritos hesabıyla girer (yoksa oluşturur) ve kabul eder. Bağlantı açılmazsa kodu Çevrem › Davet kodum var&apos;a yazabilir. Yüz yüzeysen QR kodu okutabilir.</p>
+            ? <p className="rt-muted" style={{ marginTop: 10 }}>Bağlantı tek kullanımlık, 7 gün geçerli. Danışanın bağlantıyı açar, e-postasına gelen kodla girer ve kabul eder. Bağlantı açılmazsa kodu Gruplar › Davet kodum var&apos;a yazabilir. Yüz yüzeysen QR kodu okutabilir.</p>
             : (
               <>
                 <p className="rt-muted" style={{ marginTop: 10 }}>Danışanın Ritos&apos;a bu e-postayla girdiğinde davet Gelenler&apos;ine düşer, oradan kabul eder. Hesabı yoksa aynı e-postayla kayıt olması yeter. Davet 30 gün geçerli.</p>

@@ -1,12 +1,13 @@
 'use client';
 
-// Hesap ekranları: giriş kapısı, şifre sıfırlama, Ayarlar. 7 ekim — v1: veri şifresi, kurtarma kelimeleri ve Google girişi kalktı.
+// Hesap ekranları: karşılama, e-postayla devam (kod), Profil, Ayarlar. 8 ekim — şifre yok; arayüzde "hesap"
+// kelimesi geçmez: kişi e-postasını bağlar, verisi sessizce yedeklenir.
 
 import { BildirimAyarlari } from './BildirimAyar';
 import React, { useEffect, useState } from 'react';
-import { SIFRE_EN_AZ, cikisYap, girisAc, girisYap, gorunenAdDegistir, kayitOl, misafirVerisiVar, sifirlamaIste, sifirlamaTamamla, sifreDegistir, useOturum } from '@/lib/hesap';
+import { cikisYap, girisAc, gorunenAdDegistir, kodDogrula, kodGonder, useOturum, yerelAd, yerelAdKaydet } from '@/lib/hesap';
 import { senkronla, useSenkronDurum } from '@/lib/senkron';
-import { Chips, Kap, Modal } from './ortak';
+import { Kap, Modal } from './ortak';
 import { PaketlerKap } from './Sinav';
 import { DanismanlikAyarlari } from './Danismanlik';
 import { useDanismanlik } from '@/lib/danismanlik';
@@ -16,109 +17,88 @@ import { hesabimiSil, verileriSifirla, type SifirlaSecim } from '@/lib/sifirla';
 
 const EPOSTA = /\S+@\S+\.\S+/;
 
-/** Hesap açık değilse uygulama yerine bu ekran görünür. */
-export function GirisEkrani({ yeniden, onVazgec }: { yeniden?: boolean; onVazgec?: () => void }) {
-  const [kip, setKip] = useState<'giris' | 'kayit' | 'unuttum'>('giris');
-  const [ad, setAd] = useState('');
+/** E-postayla devam: önce e-posta, sonra gelen kod. Modal içinde ya da tam ekranda kullanılır. */
+function KodAdimlari({ ilkMetin }: { ilkMetin?: React.ReactNode }) {
+  const [adim, setAdim] = useState<'eposta' | 'kod'>('eposta');
   const [eposta, setEposta] = useState('');
-  const [sifre, setSifre] = useState('');
-  const [sifre2, setSifre2] = useState('');
+  const [kod, setKod] = useState('');
   const [hata, setHata] = useState<string | null>(null);
-  const [bilgi, setBilgi] = useState<string | null>(null);
   const [bekle, setBekle] = useState(false);
-  const [tasinacak, setTasinacak] = useState(false);
-  useEffect(() => { misafirVerisiVar().then(setTasinacak).catch(() => {}); }, []);
-  const gecerli = kip === 'unuttum'
-    ? EPOSTA.test(eposta)
-    : EPOSTA.test(eposta) && sifre.length >= SIFRE_EN_AZ && (kip === 'giris' || (ad.trim().length > 0 && sifre === sifre2));
+  const [sure, setSure] = useState(0);
+  useEffect(() => { if (sure <= 0) return; const t = setTimeout(() => setSure(sure - 1), 1000); return () => clearTimeout(t); }, [sure]);
+  const gonder = async () => {
+    setBekle(true); setHata(null);
+    const r = await kodGonder(eposta);
+    setBekle(false);
+    if (!r.tamam) { setHata(r.hata); return; }
+    setAdim('kod'); setKod(''); setSure(30);
+  };
+  const dogrula = async (k = kod) => {
+    setBekle(true); setHata(null);
+    const r = await kodDogrula(eposta, k);
+    if (!r.tamam) { setHata(r.hata); setBekle(false); }
+  };
+  if (adim === 'eposta') return (
+    <>
+      {ilkMetin ?? <p className="rt-metin">E-postanı yaz, sana bir kod gönderelim.</p>}
+      <input className="rt-inp" type="email" inputMode="email" placeholder="E-posta adresin" autoComplete="email" autoFocus value={eposta}
+        onChange={(e) => setEposta(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && EPOSTA.test(eposta) && !bekle) void gonder(); }} />
+      {hata && <p className="rt-hata">{hata}</p>}
+      <button type="button" className="rt-btn primary rt-genis" disabled={!EPOSTA.test(eposta) || bekle} onClick={gonder}>{bekle ? 'Gönderiliyor…' : 'Kod gönder'}</button>
+    </>
+  );
+  return (
+    <>
+      <p className="rt-metin"><b>{eposta}</b> adresine bir kod gönderdik. Kodu buraya yaz.</p>
+      <input className="rt-inp rt-kod-inp" inputMode="numeric" autoComplete="one-time-code" placeholder="Kod" autoFocus maxLength={10} value={kod}
+        onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); setKod(v); if (v.length >= 6 && v.length <= 8 && !bekle && e.nativeEvent instanceof InputEvent && (e.nativeEvent.inputType === 'insertFromPaste' || e.nativeEvent.inputType === 'insertReplacementText')) void dogrula(v); }}
+        onKeyDown={(e) => { if (e.key === 'Enter' && kod.length >= 6 && !bekle) void dogrula(); }} />
+      {hata && <p className="rt-hata">{hata}</p>}
+      <button type="button" className="rt-btn primary rt-genis" disabled={kod.length < 6 || bekle} onClick={() => dogrula()}>{bekle ? 'Bekle…' : 'Devam'}</button>
+      <div className="rt-satir rt-kod-alt">
+        <button type="button" className="rt-linkbtn" onClick={() => { setAdim('eposta'); setHata(null); }}>‹ E-postayı değiştir</button>
+        <button type="button" className="rt-linkbtn" disabled={sure > 0 || bekle} onClick={gonder}>{sure > 0 ? `Yeniden gönder (${sure})` : 'Yeniden gönder'}</button>
+      </div>
+      <p className="rt-muted kucuk">Gelmediyse istenmeyen (spam) klasörüne de bak.</p>
+    </>
+  );
+}
 
-  async function gonder() {
-    setBekle(true); setHata(null); setBilgi(null);
-    try {
-      const r = kip === 'kayit' ? await kayitOl(ad, eposta, sifre) : kip === 'giris' ? await girisYap(eposta, sifre) : await sifirlamaIste(eposta);
-      if (!r.tamam) setHata(r.hata);
-      else if (kip === 'unuttum') setBilgi('E-postana bir bağlantı gönderdik. Bağlantıyı bu cihazda aç; yeni şifreni orada belirleyeceksin.');
-    } finally { setBekle(false); }
-  }
+/** Hesapsızken kimlik isteyen bir yerden açılır (Gruplar, Paylaş, davet bağlantısı, "Daha önce kullandım"). */
+export function KodGirisModal({ onKapat, baslik = 'E-postanla devam et', metin }: { onKapat: () => void; baslik?: string; metin?: React.ReactNode }) {
+  return <Modal baslik={baslik} onKapat={onKapat}><div className="rt-kod-kutu"><KodAdimlari ilkMetin={metin} /></div></Modal>;
+}
 
+/** Bu cihaz birine bağlıyken oturum kapanmışsa (nadir): tam ekran, yeniden kod. */
+export function GirisEkrani() {
   return (
     <div className="rt-giris">
       <div className="rt-giris-kutu">
         <div className="rt-giris-logo">Ritos</div>
-        {yeniden
-          ? <p className="rt-muted">Oturumun kapanmış. Devam etmek için yeniden giriş yap; verin bu cihazda duruyor.</p>
-          : <p className="rt-muted">Günlük düzenin, rutinlerin ve çevrenle paylaştıkların için. Verin hesabında saklanır; bütün cihazlarında aynı.</p>}
-        {kip !== 'unuttum' && (
-          <>
-            <Chips secenekler={[['giris', 'Giriş'], ['kayit', 'Hesap oluştur']]} deger={kip} onSec={(k) => { setKip(k); setHata(null); }} />
-          </>
-        )}
-        {kip === 'unuttum' && <p className="rt-metin"><b>Şifremi unuttum</b></p>}
-        {kip === 'kayit' && <input className="rt-inp" placeholder="Adın" value={ad} onChange={(e) => setAd(e.target.value)} />}
-        <input className="rt-inp" type="email" placeholder="E-posta" autoComplete="email" value={eposta} onChange={(e) => setEposta(e.target.value)} />
-        {kip !== 'unuttum' && (
-          <input className="rt-inp" type="password" placeholder={`Şifre (en az ${SIFRE_EN_AZ})`} autoComplete={kip === 'giris' ? 'current-password' : 'new-password'} value={sifre}
-            onChange={(e) => setSifre(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && gecerli && !bekle) gonder(); }} />
-        )}
-        {kip === 'kayit' && <input className="rt-inp" type="password" placeholder="Şifre tekrar" autoComplete="new-password" value={sifre2} onChange={(e) => setSifre2(e.target.value)} />}
-        {kip === 'kayit' && sifre2 && sifre !== sifre2 && <p className="rt-hata">Şifreler aynı değil.</p>}
-        {hata && <p className="rt-hata">{hata}</p>}
-        {bilgi && <p className="rt-tamam">{bilgi}</p>}
-        <button type="button" className="rt-btn primary rt-genis" disabled={!gecerli || bekle} onClick={gonder}>
-          {bekle ? 'Bekle…' : kip === 'giris' ? 'Giriş yap' : kip === 'kayit' ? 'Hesap oluştur' : 'Bağlantı gönder'}
-        </button>
-        {kip === 'giris' && <button type="button" className="rt-linkbtn" onClick={() => { setKip('unuttum'); setHata(null); }}>Şifremi unuttum</button>}
-        {kip === 'unuttum' && <button type="button" className="rt-linkbtn" onClick={() => { setKip('giris'); setHata(null); setBilgi(null); }}>Girişe dön</button>}
-        {tasinacak && kip !== 'unuttum' && <p className="rt-muted">Bu tarayıcıda hesapsız girdiğin her şey hesabına taşınır.</p>}
-        {onVazgec && <button type="button" className="rt-linkbtn" onClick={onVazgec}>‹ Hesapsız devam et</button>}
+        <KodAdimlari ilkMetin={<p className="rt-metin">Devam etmek için e-postanı yaz, sana bir kod gönderelim. Her şeyin yerinde.</p>} />
       </div>
     </div>
   );
 }
 
-/** İlk açılış (hesapsız): kısa karşılama — hesapsız başla ya da giriş. Bir kez görünür. */
+/** İlk açılış: adını sor, başla. Daha önce kullanan e-postasıyla döner. */
 export const KARSILAMA_ANAHTAR = 'ritos-karsilandi';
-export function Karsilama({ onBasla, onGiris }: { onBasla: () => void; onGiris: () => void }) {
+export function Karsilama({ onBasla, onDaha }: { onBasla: () => void; onDaha: () => void }) {
+  const [ad, setAd] = useState(() => yerelAd() ?? '');
+  const basla = () => { yerelAdKaydet(ad); onBasla(); };
   return (
     <div className="rt-giris">
       <div className="rt-giris-kutu rt-karsilama">
         <div className="rt-giris-logo">Ritos</div>
-        <p className="rt-metin">Günlük düzenin, rutinlerin ve yaşam alanlarının dengesi için.</p>
+        <p className="rt-metin">Günlük düzenin, rutinlerin ve sevdiklerinle paylaştıkların bir arada.</p>
         <ul className="rt-karsilama-liste">
           <li><span>📅</span><div><b>Ajandam</b><small>Günün kartları; yaptıkça işaretle.</small></div></li>
-          <li><span>🌱</span><div><b>Rutinlerim</b><small>Alışkanlıklarını kur, alanlarının dengesini gör.</small></div></li>
-          <li><span>🏡</span><div><b>Çevrem</b><small>Ailen ve arkadaşlarınla listeler, ortak işler, ricalar (hesapla).</small></div></li>
+          <li><span>🌱</span><div><b>Yaşam Tarzım</b><small>Alışkanlıklarını kur, hayatının dengesini gör.</small></div></li>
+          <li><span>👥</span><div><b>Gruplar</b><small>Ailen ve arkadaşlarınla listeler, buluşmalar, birlikte rutinler.</small></div></li>
         </ul>
-        <button type="button" className="rt-btn primary rt-genis" onClick={onBasla}>Hesapsız başla</button>
-        <button type="button" className="rt-btn rt-genis" onClick={onGiris}>Giriş yap · Hesap aç</button>
-        <p className="rt-muted rt-karsilama-not">Hesapsız kullanımda verin bu tarayıcıda kalır. İstediğin zaman hesap açarsın; girdiklerin hesabına taşınır.</p>
-      </div>
-    </div>
-  );
-}
-
-/** Sıfırlama bağlantısından dönüş: yeni şifre. */
-export function SifreSifirlaEkrani() {
-  const [sifre, setSifre] = useState('');
-  const [sifre2, setSifre2] = useState('');
-  const [hata, setHata] = useState<string | null>(null);
-  const [bekle, setBekle] = useState(false);
-  const gecerli = sifre.length >= SIFRE_EN_AZ && sifre === sifre2;
-  return (
-    <div className="rt-giris">
-      <div className="rt-giris-kutu">
-        <div className="rt-giris-logo">Ritos</div>
-        <p className="rt-metin"><b>Yeni şifre belirle</b></p>
-        <input className="rt-inp" type="password" placeholder={`Yeni şifre (en az ${SIFRE_EN_AZ})`} autoComplete="new-password" value={sifre} onChange={(e) => setSifre(e.target.value)} />
-        <input className="rt-inp" type="password" placeholder="Yeni şifre tekrar" autoComplete="new-password" value={sifre2} onChange={(e) => setSifre2(e.target.value)} />
-        {sifre2 && sifre !== sifre2 && <p className="rt-hata">Şifreler aynı değil.</p>}
-        {hata && <p className="rt-hata">{hata}</p>}
-        <button type="button" className="rt-btn primary rt-genis" disabled={!gecerli || bekle} onClick={async () => {
-          setBekle(true); setHata(null);
-          try { const r = await sifirlamaTamamla(sifre); if (!r.tamam) setHata(r.hata); }
-          catch (e) { setHata(e instanceof Error ? e.message : String(e)); }
-          finally { setBekle(false); }
-        }}>{bekle ? 'Bekle…' : 'Şifreyi kaydet'}</button>
+        <label className="rt-alan">Sana nasıl seslenelim?<input className="rt-inp" value={ad} onChange={(e) => setAd(e.target.value)} placeholder="Adın" onKeyDown={(e) => { if (e.key === 'Enter') basla(); }} /></label>
+        <button type="button" className="rt-btn primary rt-genis" onClick={basla}>Başla</button>
+        <button type="button" className="rt-linkbtn rt-karsilama-daha" onClick={onDaha}>Daha önce kullandım</button>
       </div>
     </div>
   );
@@ -140,7 +120,7 @@ function zamanFarki(ms: number) {
 // Her biri "‹ Geri" ile dönülen bir ekran (telefonda ana alanda, geniş ekranda sağ bölmede).
 
 export type HesapEkran = 'profil' | 'bildirim' | 'ayarlar';
-export const HESAP_EKRAN_AD: Record<HesapEkran, string> = { profil: '👤 Profil ve hesap', bildirim: '🔔 Bildirimler', ayarlar: '⚙️ Ayarlar' };
+export const HESAP_EKRAN_AD: Record<HesapEkran, string> = { profil: '👤 Profil', bildirim: '🔔 Bildirimler', ayarlar: '⚙️ Ayarlar' };
 
 export function HesapEkrani({ ekran, onGeri }: { ekran: HesapEkran; onGeri: () => void }) {
   return (
@@ -154,44 +134,42 @@ export function HesapEkrani({ ekran, onGeri }: { ekran: HesapEkran; onGeri: () =
 function ProfilIcerik() {
   const o = useOturum();
   const d = useSenkronDurum();
-  const [modal, setModal] = useState<null | 'sifre'>(null);
   const [adDuzenle, setAdDuzenle] = useState<string | null>(null);
+  const [baglan, setBaglan] = useState(false);
   const uid = o.session?.user.id;
   const u = o.session?.user;
-  const ad = o.gorunenAd ?? '—';
+  const ad = (o.hesapli ? o.gorunenAd : yerelAd()) ?? '—';
   const meta = (u?.user_metadata ?? {}) as Record<string, unknown>;
   const resim = (typeof meta.avatar_url === 'string' && meta.avatar_url) || (typeof meta.picture === 'string' && meta.picture) || null;
+  const kaydet = async () => {
+    if (!adDuzenle?.trim()) return;
+    if (o.hesapli && uid) { await gorunenAdDegistir(uid, adDuzenle); location.reload(); }
+    else { yerelAdKaydet(adDuzenle); setAdDuzenle(null); }
+  };
   return (
     <>
       <Kap baslik="Profil">
         <div className="rt-profil-bas">
           <Avatar ad={ad} resim={resim} boyut={48} />
           {adDuzenle === null ? (
-            <span className="tx"><span><b>{ad}</b> <button type="button" className="rt-linkbtn" onClick={() => setAdDuzenle(o.gorunenAd ?? '')}>değiştir</button></span><small>{u?.email}</small></span>
+            <span className="tx"><span><b>{ad}</b> <button type="button" className="rt-linkbtn" onClick={() => setAdDuzenle(ad === '—' ? '' : ad)}>değiştir</button></span>{u?.email && <small>{u.email}</small>}</span>
           ) : (
             <div className="rt-satir" style={{ flexWrap: 'nowrap', flex: 1 }}>
               <input className="rt-inp" value={adDuzenle} onChange={(e) => setAdDuzenle(e.target.value)} autoFocus />
-              <button type="button" className="rt-btn primary" disabled={!adDuzenle.trim()} onClick={async () => { await gorunenAdDegistir(uid!, adDuzenle); setAdDuzenle(null); location.reload(); }}>Kaydet</button>
+              <button type="button" className="rt-btn primary" disabled={!adDuzenle.trim()} onClick={kaydet}>Kaydet</button>
             </div>
           )}
         </div>
-        <p className="rt-muted">Görünen adın davetlerde, gruplarda ve koçunun listesinde görünür.</p>
+        {o.hesapli
+          ? <p className="rt-muted">{d.hata ? <span className="rt-hata">⚠ Şu an yedeklenemiyor; internet gelince kendiliğinden devam eder.</span> : d.son ? `Her şeyin yedekte · ${zamanFarki(d.son)}` : 'Her şeyin yedekte.'}</p>
+          : (
+            <>
+              <p className="rt-muted">E-postanı bağlarsan ailenle, arkadaşlarınla paylaşabilir, Ritos'unu başka bir telefonda ya da bilgisayarda da açabilirsin.</p>
+              <div className="rt-satir"><button type="button" className="rt-btn primary" onClick={() => setBaglan(true)}>E-postamı bağla</button></div>
+            </>
+          )}
       </Kap>
-      <Kap baslik="Giriş ve güvenlik">
-        <p className="rt-metin">Giriş: <b>e-posta + şifre</b></p>
-        <div className="rt-satir">
-          <button type="button" className="rt-btn" onClick={() => setModal('sifre')}>Şifre değiştir</button>
-        </div>
-        <p className="rt-muted">Şifreni unutursan giriş ekranındaki "Şifremi unuttum" ile e-postana bağlantı gelir; verin hesabında durur.</p>
-      </Kap>
-      <Kap baslik="Eşitleme">
-        <p className="rt-muted">
-          {d.hata ? <span className="rt-hata">⚠ {d.hata}</span> : d.son ? `Son eşitleme: ${zamanFarki(d.son)}` : 'Henüz eşitlenmedi'}
-          {d.bekleyen > 0 && ` · ${d.bekleyen} değişiklik bekliyor`}
-        </p>
-        {o.session && <div className="rt-satir"><button type="button" className="rt-btn" disabled={d.calisiyor} onClick={() => senkronla()}>{d.calisiyor ? 'Eşitleniyor…' : 'Şimdi eşitle'}</button></div>}
-      </Kap>
-      {modal === 'sifre' && <SifreModal onKapat={() => setModal(null)} />}
+      {baglan && <KodGirisModal onKapat={() => setBaglan(false)} />}
     </>
   );
 }
@@ -199,20 +177,21 @@ function ProfilIcerik() {
 function AyarlarIcerik() {
   const o = useOturum();
   const dn = useDanismanlik();
-  const [veriModal, setVeriModal] = useState<null | 'sifirla' | 'sil'>(null);
+  const [veriModal, setVeriModal] = useState<null | 'cikis' | 'sifirla' | 'sil'>(null);
   return (
     <>
       {dn.profil?.koc && <PaketlerKap />}
       <DanismanlikAyarlari />
       {o.hesapli && (
-        <Kap baslik="Veriler">
-          <p className="rt-muted">Bu cihazı temizlemek için &quot;Çıkış yap&quot; yeter: çıkışta cihazdaki kopya silinir, veri hesapta kalır.</p>
+        <Kap baslik="Bu cihaz ve verilerim">
           <div className="rt-satir">
+            <button type="button" className="rt-btn" onClick={() => setVeriModal('cikis')}>Bu cihazdan çık</button>
             <button type="button" className="rt-btn" onClick={() => setVeriModal('sifirla')}>Verilerimi sıfırla</button>
             <button type="button" className="rt-btn tehlike" onClick={() => setVeriModal('sil')}>Hesabımı sil</button>
           </div>
         </Kap>
       )}
+      {veriModal === 'cikis' && <CikisOnayi onKapat={() => setVeriModal(null)} />}
       {veriModal === 'sifirla' && <SifirlaModal onKapat={() => setVeriModal(null)} />}
       {veriModal === 'sil' && <HesapSilModal onKapat={() => setVeriModal(null)} />}
     </>
@@ -228,42 +207,12 @@ export function CikisOnayi({ onKapat }: { onKapat: () => void }) {
 function CikisModal({ onKapat, bekleyen }: { onKapat: () => void; bekleyen: number }) {
   const [bekle, setBekle] = useState(false);
   return (
-    <Modal baslik="Çıkış yap" onKapat={onKapat}>
-      <p className="rt-metin">Çıkış yapınca bu cihazdaki kopya silinir. Verin hesabında durur; yeniden giriş yapınca geri iner.</p>
-      {bekleyen > 0 && <p className="rt-uyari">{bekleyen} değişiklik henüz eşitlenmedi. İnternet varsa çıkıştan önce gönderilir; yoksa bu değişiklikler kaybolur.</p>}
+    <Modal baslik="Bu cihazdan çık" onKapat={onKapat}>
+      <p className="rt-metin">Ritos bu cihazda boş açılır. Her şeyin yedekte; e-postanla yeniden girince geri gelir.</p>
+      {bekleyen > 0 && <p className="rt-uyari">Son değişikliklerin henüz gönderilmedi. İnternete bağlıyken çıkarsan onlar da gider.</p>}
       <div className="rt-satir">
         <button type="button" className="rt-btn" onClick={onKapat}>Vazgeç</button>
-        <button type="button" className="rt-btn primary" disabled={bekle} onClick={async () => { setBekle(true); await cikisYap(); }}>{bekle ? 'Çıkılıyor…' : 'Çıkış yap'}</button>
-      </div>
-    </Modal>
-  );
-}
-
-function SifreModal({ onKapat }: { onKapat: () => void }) {
-  const ne = 'şifre';
-  const [eski, setEski] = useState('');
-  const [yeni, setYeni] = useState('');
-  const [yeni2, setYeni2] = useState('');
-  const [hata, setHata] = useState<string | null>(null);
-  const [bekle, setBekle] = useState(false);
-  const [tamam, setTamam] = useState(false);
-  if (tamam) return (
-    <Modal baslik="Şifre değişti" onKapat={onKapat}>
-      <p className="rt-metin">Yeni {ne}n diğer cihazlarda da geçerli.</p>
-      <div className="rt-satir"><button type="button" className="rt-btn primary" onClick={onKapat}>Tamam</button></div>
-    </Modal>
-  );
-  return (
-    <Modal baslik="Şifre değiştir" onKapat={onKapat}>
-      <input className="rt-inp" type="password" placeholder={`Mevcut ${ne}`} autoComplete="current-password" value={eski} onChange={(e) => setEski(e.target.value)} />
-      <input className="rt-inp" type="password" placeholder={`Yeni ${ne} (en az ${SIFRE_EN_AZ})`} autoComplete="new-password" value={yeni} onChange={(e) => setYeni(e.target.value)} />
-      <input className="rt-inp" type="password" placeholder={`Yeni ${ne} tekrar`} autoComplete="new-password" value={yeni2} onChange={(e) => setYeni2(e.target.value)} />
-      {hata && <p className="rt-hata">{hata}</p>}
-      <div className="rt-satir">
-        <button type="button" className="rt-btn primary" disabled={bekle || !eski || yeni.length < SIFRE_EN_AZ || yeni !== yeni2}
-          onClick={async () => { setBekle(true); setHata(null); try { await sifreDegistir(eski, yeni); setTamam(true); } catch (e) { setHata((e as Error).message); } finally { setBekle(false); } }}>
-          {bekle ? 'Değiştiriliyor…' : 'Değiştir'}
-        </button>
+        <button type="button" className="rt-btn primary" disabled={bekle} onClick={async () => { setBekle(true); await cikisYap(); }}>{bekle ? 'Çıkılıyor…' : 'Çık'}</button>
       </div>
     </Modal>
   );
@@ -335,37 +284,42 @@ function HesapSilModal({ onKapat }: { onKapat: () => void }) {
 
 // ———————————— 7 ekim: hesapsız kullanım ————————————
 
-const SERIT_GIZLI = 'ritos-misafir-serit';
-/** Tarayıcıda hesapsızken üstte ince şerit: veri yalnız bu tarayıcıda. Safari'de (ana ekrana eklenmemişse)
- *  7 gün kullanılmayan sitenin verisi silinebilir — bunu da söyler. × ile bir günlüğüne gizlenir. */
-export function MisafirSeridi() {
-  const [gizli, setGizli] = useState(true);
-  const [safari, setSafari] = useState(false);
+const BAGLAN_GIZLI = 'ritos-baglan-gizli';
+/** Hesapsız birkaç gün kullanıldıktan sonra Home'da bir kez: e-postanı bağla (fayda diliyle; × ile bir daha çıkmaz). */
+export function BaglanKarti() {
+  const o = useOturum();
+  const [goster, setGoster] = useState(false);
+  const [baglan, setBaglan] = useState(false);
   useEffect(() => {
-    try { setGizli(Number(localStorage.getItem(SERIT_GIZLI) ?? 0) > Date.now()); } catch { setGizli(false); }
-    const ua = navigator.userAgent;
-    const anaEkran = window.matchMedia?.('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
-    setSafari(/safari/i.test(ua) && !/chrome|crios|fxios|android|edg/i.test(ua) && !anaEkran);
-  }, []);
-  if (gizli) return null;
+    if (o.hesapli) return;
+    try {
+      if (localStorage.getItem(BAGLAN_GIZLI)) return;
+      const ilk = Number(localStorage.getItem(KARSILAMA_ANAHTAR) ?? 0);
+      setGoster(ilk > 1 && Date.now() - ilk > 3 * 86400000);
+    } catch { /* yoksay */ }
+  }, [o.hesapli]);
+  if (!goster || o.hesapli) return null;
   return (
-    <div className="rt-misafir-serit" role="status">
-      <span>{safari ? "Verin yalnız bu tarayıcıda; Safari, 7 gün açılmazsa silebilir." : 'Verin yalnız bu tarayıcıda.'}</span>
-      <button type="button" className="rt-linkbtn" onClick={girisAc}>Hesap aç, kaybolmasın</button>
-      <button type="button" className="rt-misafir-x" aria-label="Bugünlük gizle" onClick={() => { try { localStorage.setItem(SERIT_GIZLI, String(Date.now() + 86400000)); } catch { /* yoksay */ } setGizli(true); }}>×</button>
+    <div className="rt-baglan-kart">
+      <button type="button" className="rt-misafir-x" aria-label="Kapat" onClick={() => { try { localStorage.setItem(BAGLAN_GIZLI, '1'); } catch { /* yoksay */ } setGoster(false); }}>×</button>
+      <b>Ritos'unu sevdiklerinle paylaş</b>
+      <p>E-postanı bağlarsan ailenle, arkadaşlarınla listeler ve buluşmalar kurabilir, Ritos'unu başka bir telefonda da açabilirsin.</p>
+      <button type="button" className="rt-btn primary" onClick={() => setBaglan(true)}>E-postamı bağla</button>
+      {baglan && <KodGirisModal onKapat={() => setBaglan(false)} />}
     </div>
   );
 }
 
-/** Hesap isteyen ekranlarda (Çevrem…) hesapsızken gösterilir. */
+/** Kimlik isteyen ekranlarda (Gruplar…) hesapsızken gösterilir. */
 export function HesapGerekli({ ikon, baslik, metin }: { ikon: string; baslik: string; metin: string }) {
+  const [acik, setAcik] = useState(false);
   return (
     <div className="rt-cv-bos">
       <div className="resim" aria-hidden>{ikon}</div>
       <h3>{baslik}</h3>
       <p className="rt-muted">{metin}</p>
-      <button type="button" className="rt-btn primary rt-genis" onClick={girisAc}>Hesap aç ya da giriş yap</button>
-      <p className="rt-muted kucuk">Ajandam ve Rutinlerim hesapsız da çalışır; hesap açınca bu tarayıcıdaki verin hesabına taşınır.</p>
+      <button type="button" className="rt-btn primary rt-genis" onClick={() => setAcik(true)}>E-postanla devam et</button>
+      {acik && <KodGirisModal onKapat={() => setAcik(false)} />}
     </div>
   );
 }
@@ -394,7 +348,7 @@ export function Avatar({ ad, resim, boyut = 28 }: { ad: string; resim?: string |
   return <span className="rt-avatar" style={{ ...st, background: renkSec(ad) }} aria-hidden>{basHarfler(ad)}</span>;
 }
 
-export function KullaniciRozeti({ onSec, uyari }: { onSec: (e: HesapEkran | 'cikis') => void; uyari?: boolean }) {
+export function KullaniciRozeti({ onSec, uyari }: { onSec: (e: HesapEkran) => void; uyari?: boolean }) {
   const o = useOturum();
   const d = useSenkronDurum();
   const [acik, setAcik] = useState(false);
@@ -407,13 +361,12 @@ export function KullaniciRozeti({ onSec, uyari }: { onSec: (e: HesapEkran | 'cik
     document.addEventListener('keydown', esc);
     return () => { document.removeEventListener('pointerdown', dis); document.removeEventListener('keydown', esc); };
   }, [acik]);
-  if (!o.hesapli) return null;
-  const u = o.session?.user;
+  const u = o.hesapli ? o.session?.user : null;
   const eposta = u?.email ?? '';
-  const ad = o.gorunenAd ?? (eposta ? eposta.split('@')[0] : 'Ben');
+  const ad = (o.hesapli ? o.gorunenAd : yerelAd()) ?? (eposta ? eposta.split('@')[0] : 'Ben');
   const meta = (u?.user_metadata ?? {}) as Record<string, unknown>;
   const resim = (typeof meta.avatar_url === 'string' && meta.avatar_url) || (typeof meta.picture === 'string' && meta.picture) || null;
-  const sec = (e: HesapEkran | 'cikis') => { setAcik(false); onSec(e); };
+  const sec = (e: HesapEkran) => { setAcik(false); onSec(e); };
   return (
     <div className="rt-kullanici-kok" ref={kok}>
       <button type="button" className="rt-kullanici" onClick={() => setAcik(!acik)} aria-haspopup="menu" aria-expanded={acik} aria-label={`${ad} — hesap menüsü`}>
@@ -427,14 +380,14 @@ export function KullaniciRozeti({ onSec, uyari }: { onSec: (e: HesapEkran | 'cik
         <div className="rt-kmenu" role="menu">
           <div className="rt-kmenu-bas">
             <Avatar ad={ad} resim={resim} boyut={38} />
-            <span className="tx"><b>{ad}</b><small>{eposta}</small>
-              <small className={d.hata ? 'hata' : ''}>{d.hata ? '⚠ Eşitleme sorunu' : d.calisiyor ? 'Eşitleniyor…' : d.son ? `Eşitlendi · ${zamanFarki(d.son)}` : ''}</small>
+            <span className="tx"><b>{ad}</b>{eposta && <small>{eposta}</small>}
+              {o.hesapli && <small className={d.hata ? 'hata' : ''}>{d.hata ? '⚠ Şu an yedeklenemiyor' : d.son ? `Yedekte · ${zamanFarki(d.son)}` : ''}</small>}
             </span>
           </div>
-          <button type="button" role="menuitem" onClick={() => sec('profil')}>👤 Profil ve hesap{uyari && <i className="rt-kmenu-nokta" aria-label="Bakılması gereken bir şey var" />}</button>
-          <button type="button" role="menuitem" onClick={() => sec('bildirim')}>🔔 Bildirimler</button>
+          <button type="button" role="menuitem" onClick={() => sec('profil')}>👤 Profil{uyari && <i className="rt-kmenu-nokta" aria-label="Bakılması gereken bir şey var" />}</button>
+          {o.hesapli && <button type="button" role="menuitem" onClick={() => sec('bildirim')}>🔔 Bildirimler</button>}
           <button type="button" role="menuitem" onClick={() => sec('ayarlar')}>⚙️ Ayarlar</button>
-          <button type="button" role="menuitem" className="cikis" onClick={() => sec('cikis')}>Çıkış yap</button>
+          {!o.hesapli && <button type="button" role="menuitem" onClick={() => { setAcik(false); girisAc(); }}>✉️ E-postamı bağla</button>}
         </div>
       )}
     </div>

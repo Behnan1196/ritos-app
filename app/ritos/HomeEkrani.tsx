@@ -11,6 +11,7 @@
 // Bkz. mockup "Ritos Home".
 // ————————————————————————————————————————————————————————————————
 
+import { BaglanKarti } from './Hesap';
 import React, { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useCanli } from '@/lib/canli';
 import { type BaglantiRow, type NotRow } from '@/lib/db';
@@ -189,6 +190,7 @@ export function HomeEkrani() {
         <span>HOME</span>
         <button type="button" className="rt-home-duz" onClick={() => setDuzenle(!duzenle)}>{duzenle ? 'Bitti' : 'Düzenle'}</button>
       </div>
+      {!duzenle && <BaglanKarti />}
       {acikSirali.length > 0 && (
         <div className="rt-hw-acik-alan">
           {acikSirali.map((x) => (

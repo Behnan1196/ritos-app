@@ -542,7 +542,7 @@ export function KartEditor({ tarih, kart, onKapat, onPlan, tekrarYok, tarihsiz, 
           <input type="checkbox" checked={ortak} onChange={(e) => { setOrtak(e.target.checked); if (e.target.checked) setTekrar(false); }} />
           <span>{grupIkonu(aile!)} Ortak iş — {gruplar.length > 1
             ? <select className="rt-ortak-grup-sec" aria-label="Grup" value={aile!.id} onChange={(e) => setOrtakGrup(e.target.value)}>{gruplar.map((g) => <option key={g.id} value={g.id}>{g.ad}</option>)}</select>
-            : <b>{aile!.ad}</b>} grubunun Çevrem listesine düşer <span className="rt-muted">(biri &quot;Ben alırım&quot; der; üstlenenin ajandasına geçer)</span></span>
+            : <b>{aile!.ad}</b>} grubunun ortak işlerine düşer <span className="rt-muted">(biri &quot;Ben alırım&quot; der; üstlenenin ajandasına geçer)</span></span>
         </label>
       )}
       {geri && (

@@ -68,7 +68,7 @@ export default function Cevrem() {
   const sec = (id: string) => { setSeciliId(id); setEkran({ t: 'ana' }); try { localStorage.setItem(SECILI, id); } catch { /* yoksay */ } };
 
   if (!d.hazir) return <div className="rt-cv"><p className="rt-muted">Yükleniyor…</p></div>;
-  if (!d.uid) return <div className="rt-cv"><HesapGerekli ikon="🏠" baslik="Evdekilerle işleri paylaş" metin="Market listesi, evin işleri, birinden küçük bir rica. Çevrem, ailen ve arkadaşlarınla canlı paylaşım için hesap ister." /></div>;
+  if (!d.uid) return <div className="rt-cv"><HesapGerekli ikon="👥" baslik="Ailen ve arkadaşlarınla" metin="Ortak listeler, evin işleri, buluşmalar, birlikte rutinler. Seni gruplara tanıtmak için e-postan yeter." /></div>;
   const ortakSayfalar = (
     <>
       {sayfa === 'kur' && <GrupKurModal onKapat={() => setSayfa(null)} onKuruldu={(id) => { sec(id); setSayfa('davet'); }} />}
@@ -864,7 +864,7 @@ function DavetModal({ grup, d, onKapat }: { grup: Grup; d: CevremDurum; onKapat:
   const kopyala = async (metin: string, ne: string) => { try { await navigator.clipboard.writeText(metin); setKopya(ne); } catch { setKopya(null); } };
   return (
     <Modal baslik={`${grupIkonu(grup)} ${grup.ad} · davet`} onKapat={onKapat}>
-      <p className="rt-metin">Bu kodu evdekilerle paylaş. Ritos'ta hesap açıp <b>Çevrem › Davet kodum var</b> ile katılırlar. Kod 7 gün geçerli.</p>
+      <p className="rt-metin">Bu kodu evdekilerle paylaş. Ritos'ta hesap açıp <b>Gruplar › Davet kodum var</b> ile katılırlar. Kod 7 gün geçerli.</p>
       {hata && <p className="rt-hata">{hata}</p>}
       {kod ? <div className="rt-cv-kod" aria-label="Davet kodu">{kod}</div> : !hata && <p className="rt-muted">Kod hazırlanıyor…</p>}
       {kod && (

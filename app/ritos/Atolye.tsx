@@ -515,7 +515,7 @@ function KutuphanedenEkle({ h, tarih, onKapat }: { h: Hedef; tarih: string; onKa
         </div>
       )}
       {kartlar.length > 6 && <input className="rt-inp" type="search" placeholder="Kartlarda ara…" value={ara} onChange={(e) => setAra(e.target.value)} />}
-      {tumKartlar.length === 0 && <p className="rt-muted">Kütüphanen boş. Rutinlerim › 📚 Kütüphane&apos;den kart ekleyebilir ya da Ajandam&apos;daki bir kartı &quot;Kütüphaneye kaydet&quot; ile saklayabilirsin.</p>}
+      {tumKartlar.length === 0 && <p className="rt-muted">Kütüphanen boş. Yaşam Tarzım › 📚 Kütüphane&apos;den kart ekleyebilir ya da Ajandam&apos;daki bir kartı &quot;Kütüphaneye kaydet&quot; ile saklayabilirsin.</p>}
       <div className="rt-kut-liste">
         {liste.map((k) => (
           <div key={k.id} className="rt-kut-oge">

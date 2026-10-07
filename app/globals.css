@@ -1396,3 +1396,12 @@ div.rt-cv-sat .ic{cursor:default;}
 .rt-cv-yanit button.on.gelemem{background:#f6e3df;border-color:#d9a79c;color:var(--red);font-weight:700;}
 .rt-cv-iki{gap:10px;}
 .rt-cv-iki .rt-alan{flex:1;min-width:0;}
+
+/* E-postayla devam (kod) + bağlan kartı (8 ekim) */
+.rt-kod-kutu{display:flex;flex-direction:column;gap:10px;}
+.rt-kod-inp{font-size:24px;letter-spacing:6px;text-align:center;font-weight:700;}
+.rt-kod-alt{justify-content:space-between;}
+.rt-karsilama-daha{align-self:center;margin-top:2px;}
+.rt-baglan-kart{position:relative;background:var(--green2);border:1px solid #cfe0c6;border-radius:14px;padding:14px 38px 14px 14px;margin:0 0 12px;display:flex;flex-direction:column;gap:6px;align-items:flex-start;}
+.rt-baglan-kart p{margin:0;font-size:13px;color:var(--ink);line-height:1.4;}
+.rt-baglan-kart .rt-misafir-x{top:12px;transform:none;}

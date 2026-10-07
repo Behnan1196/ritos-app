@@ -464,7 +464,7 @@ async function ajandayaYansit() {
   const eski = new Map(mevcutlar.map((k) => [k.id, k]));
   const kart = (id: string, ad: string, aciklama: string | null, baslangic: string, bitis: string | null, gunler: number[] | null, saat: string | null, grup: string, olusturan: string | null): AjandaKartRow => ({
     id, tip: 'yap', ad, bloklar: bloklar(aciklama), baslangic, bitis, gunler, saatler: saat ? [saat] : [], hatirlatma: null,
-    kaynak_modul: 'ortak', kaynak_ref: `cevrem:${grup}`, kaynak_etiket: grupAd.get(grup) ?? 'Çevrem', sahip: olusturan ?? 'cevrem',
+    kaynak_modul: 'ortak', kaynak_ref: `cevrem:${grup}`, kaynak_etiket: grupAd.get(grup) ?? 'Grup', sahip: olusturan ?? 'cevrem',
     izinler: IZIN, geri_bildirim: 'yerel', sira: eski.get(id)?.sira ?? ++sira, guncellendi: Date.now(),
     ortak: { aile: grup, olusturan: olusturan ?? '', olusturan_ad: uyeAdi(d, olusturan), ustlenen: d.uid, ustlenen_ad: 'Ben', yapan_ad: null },
   });
@@ -487,7 +487,7 @@ async function ajandayaYansit() {
     const sayi = haftaSayisi(d, r.id, d.uid, hb);
     if (sayi >= r.hedef) for (let g = t; g <= tarihEkleGun(hb, 6); g = tarihEkleGun(g, 1)) if (!yapilan.has(g)) atla.push(g);
     const c = kart(id, `${r.ikon ? `${r.ikon} ` : ''}${r.ad}`, r.aciklama, bas, null, null, null, r.grup_id, r.olusturan);
-    c.kaynak_etiket = `${grupAd.get(r.grup_id) ?? 'Çevrem'} · bu hafta ${Math.min(sayi, r.hedef)}/${r.hedef}`;
+    c.kaynak_etiket = `${grupAd.get(r.grup_id) ?? 'Grup'} · bu hafta ${Math.min(sayi, r.hedef)}/${r.hedef}`;
     c.atla = atla;
     istenen.set(id, c);
   }

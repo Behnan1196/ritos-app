@@ -139,7 +139,7 @@ export function PaylasDugmesi({ paketUret }: { paketUret: () => Promise<Paylasim
           {mesaj ? <><p className="rt-tamam">{mesaj}</p><div className="rt-satir"><button type="button" className="rt-btn" onClick={() => setAcik(false)}>Tamam</button></div></> : (
             <>
               <p className="rt-muted">Yalnız tanım gider; işaretlerin ve girdiğin değerler gitmez. Alan kişi kendi kopyasını alır.</p>
-              {kisiler.length > 0 && <p className="rt-cv-alt-h">👥 Çevrem</p>}
+              {kisiler.length > 0 && <p className="rt-cv-alt-h">👥 Gruplarım</p>}
               {kisiler.map((k) => (
                 <button key={k.id} type="button" className="rt-gelen" onClick={() => gonder(k.ad, (p) => paylasimGonder(k.id, p))}>
                   <span className="tx"><span className="t">{k.ad}</span><span className="s">{k.gruplar.join(', ')}</span></span>
@@ -182,7 +182,7 @@ function AlModal({ p, kim, onAlindi, onKapat }: { p: PaylasimPaketi; kim: string
             <button type="button" className="rt-btn primary" onClick={async () => {
               try { setSonuc(await paketiAl(p, kim, { baslangic: tarih, klasor: null })); await onAlindi(); }
               catch (e) { setHata(e instanceof Error ? e.message : String(e)); }
-            }}>{p.tur === 'program' ? 'Rutinlerime al' : "Ajandama al"}</button>
+            }}>{p.tur === 'program' ? 'Yaşam Tarzıma al' : "Ajandama al"}</button>
           </div>
         </>
       )}

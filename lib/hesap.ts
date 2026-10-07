@@ -5,7 +5,8 @@
 //
 // 7 ekim: Ritos hesapsız da çalışır (misafir veritabanı, yalnız bu tarayıcıda); hesap Çevrem,
 // danışmanlık, paylaşım, bildirim ve eşitleme için. Hesap açınca / girince hesapsız veri hesaba taşınır.
-// Hesapla: kayıt / giriş (e-posta + şifre). Bir cihazda bir hesap açık
+// 8 ekim: şifre yok — e-postaya gelen kodla girilir (yeni kullanıcı da aynı yoldan). "Hesap" kelimesi
+// arayüzde geçmez; kullanıcı "e-postasını bağlar". Bağlıyken bir cihazda bir hesap açık
 // olur; verisi cihazda o hesabın veritabanında durur, sunucudaki `kayit` tablosuyla eşitlenir
 // (düz JSON, yalnız sahibi okur — RLS), internetsiz de çalışır. Çıkışta cihazdaki kopya silinir.
 // Veri şifresi, kurtarma kelimeleri ve Google girişi yok.
@@ -18,9 +19,7 @@ import { MISAFIR_DB, RitosDB, SENKRON_TABLOLARI, aktifHesap, aktifHesapAyarla, d
 import { supabase } from './supabase';
 import { senkronBaslat, senkronDurdur, senkronla } from './senkron';
 
-export const SIFRE_EN_AZ = 8;
-
-/** Hesapsızken giriş / kayıt ekranını aç (Çevrem, Paylaş gibi hesap isteyen yerlerden). */
+/** Hesapsızken "e-postanla devam et" penceresini aç (Gruplar, Paylaş gibi kimlik isteyen yerlerden). */
 export const GIRIS_OLAY = 'ritos-giris-ac';
 export function girisAc() { if (typeof window !== 'undefined') window.dispatchEvent(new Event(GIRIS_OLAY)); }
 
@@ -133,37 +132,43 @@ async function misafirVerisiniTasi(uid: string, nasil: 'kayit' | 'giris') {
   await Dexie.delete(MISAFIR_DB);
 }
 
-// ———————————————— kayıt / giriş ————————————————
+// ———————————————— e-posta kodu ile giriş (8 ekim) ————————————————
 
-export async function kayitOl(gorunenAd: string, eposta: string, sifre: string): Promise<Sonuc> {
-  const sb = supabase();
-  if (!sb) return { tamam: false, hata: 'Sunucu ayarı yok' };
-  if (!navigator.onLine) return { tamam: false, hata: 'İnternet yok' };
-  const email = eposta.trim().toLowerCase();
-  const r = await sb.auth.signUp({ email, password: sifre, options: { data: { gorunen_ad: gorunenAd.trim() } } });
-  if (r.error) {
-    if (/registered|already/i.test(r.error.message)) return { tamam: false, hata: 'Bu e-postayla bir hesap var — giriş yap.' };
-    return { tamam: false, hata: r.error.message };
-  }
-  const uid = r.data.user?.id;
-  if (!uid) return { tamam: false, hata: 'Kayıt tamamlanamadı.' };
-  if (!r.data.session) return { tamam: false, hata: 'E-postana bir doğrulama bağlantısı gönderdik. Bağlantıyı açtıktan sonra giriş yap.' };
-  await hesabiAc(uid, 'kayit');
-  location.reload();
-  return { tamam: true };
+/** Hesapsız kullanırken verilen ad (karşılamada "Sana nasıl seslenelim?"). Bağlanınca profile geçer. */
+const YEREL_AD = 'ritos-ad';
+export function yerelAd(): string | null { try { return localStorage.getItem(YEREL_AD) || null; } catch { return null; } }
+export function yerelAdKaydet(ad: string) { try { if (ad.trim()) localStorage.setItem(YEREL_AD, ad.trim()); else localStorage.removeItem(YEREL_AD); } catch { /* yoksay */ } }
+
+function sunucuHatasi(m: string): string {
+  if (/rate|too many|seconds/i.test(m)) return 'Biraz bekleyip yeniden dene.';
+  if (/expired|invalid|token/i.test(m)) return 'Kod doğru değil ya da süresi dolmuş.';
+  return m;
 }
 
-export async function girisYap(eposta: string, sifre: string): Promise<Sonuc> {
+/** E-postaya giriş kodu gönder. Bu e-postayla daha önce gelinmediyse kişi kendiliğinden oluşur. */
+export async function kodGonder(eposta: string): Promise<Sonuc> {
   const sb = supabase();
   if (!sb) return { tamam: false, hata: 'Sunucu ayarı yok' };
   if (!navigator.onLine) return { tamam: false, hata: 'İnternet yok' };
+  const ad = yerelAd();
+  const r = await sb.auth.signInWithOtp({ email: eposta.trim().toLowerCase(), options: { shouldCreateUser: true, data: ad ? { gorunen_ad: ad } : undefined } });
+  return r.error ? { tamam: false, hata: sunucuHatasi(r.error.message) } : { tamam: true };
+}
+
+/** Kodu doğrula; bu cihazı o kişiye bağla (hesapsız girilenler sessizce eklenir) ve yeniden aç. */
+export async function kodDogrula(eposta: string, kod: string): Promise<Sonuc> {
+  const sb = supabase();
+  if (!sb) return { tamam: false, hata: 'Sunucu ayarı yok' };
   const email = eposta.trim().toLowerCase();
-  const r = await sb.auth.signInWithPassword({ email, password: sifre });
-  if (r.error || !r.data.user) {
-    if (r.error && /confirm/i.test(r.error.message)) return { tamam: false, hata: 'E-posta adresin henüz doğrulanmamış. Gelen kutundaki bağlantıyı aç.' };
-    return { tamam: false, hata: 'E-posta ya da şifre hatalı.' };
-  }
-  await hesabiAc(r.data.user.id);
+  const token = kod.replace(/\s/g, '');
+  let r = await sb.auth.verifyOtp({ email, token, type: 'email' });
+  if (r.error) { const r2 = await sb.auth.verifyOtp({ email, token, type: 'signup' }); if (!r2.error) r = r2; }
+  const u = r.data?.user;
+  if (r.error || !u) return { tamam: false, hata: sunucuHatasi(r.error?.message ?? 'Kod doğru değil.') };
+  const yeni = Date.now() - Date.parse(u.created_at) < 15 * 60000;
+  const ad = yerelAd();
+  if (yeni && ad) { try { await sb.from('profil').update({ gorunen_ad: ad }).eq('id', u.id); } catch { /* yoksay */ } }
+  await hesabiAc(u.id, yeni ? 'kayit' : 'giris');
   location.reload();
   return { tamam: true };
 }
@@ -178,43 +183,8 @@ export async function cikisYap() {
   await supabase()?.auth.signOut({ scope: 'local' });
   if (uid) { db.close(); await Dexie.delete(dbAdi(uid)); }
   aktifHesapAyarla(null);
+  try { localStorage.removeItem('ritos-karsilandi'); } catch { /* yoksay */ } // karşılama yeniden: "Başla" ya da "Daha önce kullandım"
   location.reload();
-}
-
-// ———————————————— şifre değiştirme ve sıfırlama ————————————————
-
-export async function sifreDegistir(eski: string, yeni: string) {
-  const sb = supabase();
-  if (!sb) throw new Error('Sunucu ayarı yok');
-  const { data } = await sb.auth.getSession();
-  const email = data.session?.user.email;
-  if (!email) throw new Error('Oturum yok');
-  const dogrula = await sb.auth.signInWithPassword({ email, password: eski });
-  if (dogrula.error) throw new Error('Mevcut şifre hatalı.');
-  const u = await sb.auth.updateUser({ password: yeni });
-  if (u.error) throw new Error(u.error.message);
-}
-
-/** "Şifremi unuttum": e-postaya sıfırlama bağlantısı. Bağlantı uygulamayı ?sifirla=1 ile açar. */
-export async function sifirlamaIste(eposta: string): Promise<Sonuc> {
-  const sb = supabase();
-  if (!sb) return { tamam: false, hata: 'Sunucu ayarı yok' };
-  const r = await sb.auth.resetPasswordForEmail(eposta.trim().toLowerCase(), { redirectTo: `${location.origin}/?sifirla=1` });
-  return r.error ? { tamam: false, hata: r.error.message } : { tamam: true };
-}
-
-/** Sıfırlama bağlantısından dönüldü (oturum açık): yeni şifreyi kaydet, hesabı bu cihazda aç. */
-export async function sifirlamaTamamla(yeni: string): Promise<Sonuc> {
-  const sb = supabase();
-  if (!sb) return { tamam: false, hata: 'Sunucu ayarı yok' };
-  const { data } = await sb.auth.getSession();
-  const uid = data.session?.user.id;
-  if (!uid) return { tamam: false, hata: 'Bağlantının süresi dolmuş; yeniden iste.' };
-  const u = await sb.auth.updateUser({ password: yeni });
-  if (u.error) return { tamam: false, hata: u.error.message };
-  await hesabiAc(uid);
-  location.replace(location.pathname);
-  return { tamam: true };
 }
 
 export async function gorunenAdDegistir(uid: string, ad: string) {

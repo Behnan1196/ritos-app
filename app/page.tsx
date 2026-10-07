@@ -21,10 +21,10 @@ import { DavetKarsilama } from './ritos/Danismanlik';
 import { SenkronIsareti } from './ritos/Paylasim';
 import { GelenlerEkrani, useGelenlerOzeti } from './ritos/Sohbet';
 import { HomeEkrani, homeEkraniAc } from './ritos/HomeEkrani';
-import { CikisOnayi, GirisEkrani, KARSILAMA_ANAHTAR, Karsilama, HesapEkrani, KullaniciRozeti, MisafirSeridi, type HesapEkran, SifreSifirlaEkrani } from './ritos/Hesap';
+import { GirisEkrani, KARSILAMA_ANAHTAR, Karsilama, HesapEkrani, KodGirisModal, KullaniciRozeti, type HesapEkran } from './ritos/Hesap';
 import Cevrem from './ritos/Cevrem';
 import { useCevremBaslat } from '@/lib/cevrem';
-import { GIRIS_OLAY, girisAc, misafirVerisiVar, useHesapBaslat, useOturum } from '@/lib/hesap';
+import { GIRIS_OLAY, misafirVerisiVar, useHesapBaslat, useOturum } from '@/lib/hesap';
 
 const NARROW_BREAKPOINT = 760;
 // Testte (NEXT_PUBLIC_RITOS_TEST=1 ile derlenmiş sürüm) giriş kapısı atlanır; gerçek sürümde yok.
@@ -34,44 +34,46 @@ type Sekme = 'home' | 'gunum' | 'rutin' | 'atolye' | 'gelenler';
 type Sag = 'home' | 'rutin' | 'atolye' | 'gelenler'; // geniş ekranda Ajandam'ın yanındaki bölme
 // Alt menü (5 ekim): Ayarlar sekmesi kalktı, avatar menüsüne taşındı. Yeni sekme buraya eklenir.
 // 5 ekim: Rutinlerim (kendim için: rutinler + Kütüphane) ve Çevrem (eski Atölye: danışmanlık + gruplar).
-const MOBIL_SEKMELER: [Sekme, string, string][] = [['home', '🏠', 'Home'], ['gunum', '📅', 'Ajandam'], ['rutin', '🌱', 'Rutinlerim'], ['atolye', '👥', 'Çevrem']];
-const GENIS_SEKMELER: [Sag, string, string][] = [['home', '🏠', 'Home'], ['rutin', '🌱', 'Rutinlerim'], ['atolye', '👥', 'Çevrem']];
+const MOBIL_SEKMELER: [Sekme, string, string][] = [['home', '🏠', 'Home'], ['gunum', '📅', 'Ajandam'], ['rutin', '🌱', 'Yaşam Tarzım'], ['atolye', '👥', 'Gruplar']];
+const GENIS_SEKMELER: [Sag, string, string][] = [['home', '🏠', 'Home'], ['rutin', '🌱', 'Yaşam Tarzım'], ['atolye', '👥', 'Gruplar']];
 
 export default function RitosLab() {
   const o = useOturum();
   useBeklemeIzleyici(); // yaptıktan sonra bekleme dolunca uyarı
   useSayacIzleyici(); // kart sayaçları: hedef süre dolunca uyarı (hangi sekmede olunursa olunsun)
-  const [sifirla, setSifirla] = useState(false);
-  // 7 ekim: hesapsız kullanım — giriş ekranı ilk ekran değil; hesap isteyen yerden ya da davet bağlantısıyla açılır.
-  const [girisAcik, setGirisAcik] = useState(false);
+  // 8 ekim: hesapsız açılır; "e-postanla devam et" penceresi kimlik isteyen yerden, davet bağlantısından
+  // ya da karşılamadaki "Daha önce kullandım"dan açılır. Şifre yok (kod).
+  const [girisAcik, setGirisAcik] = useState<null | 'giris' | 'davet'>(null);
   useEffect(() => {
     try {
       const u = new URL(location.href);
-      setSifirla(u.searchParams.has('sifirla'));
-      if (!o.hesapli && (u.searchParams.has('katil') || u.searchParams.has('davet'))) setGirisAcik(true);
+      if (!o.hesapli && (u.searchParams.has('katil') || u.searchParams.has('davet'))) setGirisAcik('davet');
     } catch { /* yoksay */ }
-    const f = () => setGirisAcik(true);
+    const f = () => setGirisAcik('giris');
     window.addEventListener(GIRIS_OLAY, f);
     return () => window.removeEventListener(GIRIS_OLAY, f);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // İlk açılış karşılaması: hesapsız, daha önce görülmemiş ve tarayıcıda veri yoksa.
+  // İlk açılış karşılaması: hesapsız, daha önce görülmemiş ve tarayıcıda veri yoksa. Değer: ilk başlama anı (ms).
   const [karsilama, setKarsilama] = useState<'?' | 'goster' | 'gec'>('?');
   useEffect(() => {
     if (!o.hazir) return;
     if (o.hesapli) { setKarsilama('gec'); return; }
     let gorulmus = false;
-    try { gorulmus = localStorage.getItem(KARSILAMA_ANAHTAR) === '1'; } catch { /* yoksay */ }
+    try { gorulmus = !!localStorage.getItem(KARSILAMA_ANAHTAR); } catch { /* yoksay */ }
     if (gorulmus) { setKarsilama('gec'); return; }
     misafirVerisiVar().then((v) => setKarsilama(v ? 'gec' : 'goster')).catch(() => setKarsilama('gec'));
   }, [o.hazir, o.hesapli]);
-  const karsilandi = () => { try { localStorage.setItem(KARSILAMA_ANAHTAR, '1'); } catch { /* yoksay */ } setKarsilama('gec'); };
+  const karsilandi = () => { try { if (!localStorage.getItem(KARSILAMA_ANAHTAR)) localStorage.setItem(KARSILAMA_ANAHTAR, String(Date.now())); } catch { /* yoksay */ } setKarsilama('gec'); };
   if (!o.hazir || (!o.hesapli && karsilama === '?')) return <div className="rt-kilit-bos" />;
-  if (sifirla) return o.session ? <SifreSifirlaEkrani /> : <GirisEkrani />;
-  if (o.hesapli && !TEST && o.kilitli) return <GirisEkrani yeniden />;
-  if (girisAcik && !o.hesapli) return <GirisEkrani onVazgec={() => { setGirisAcik(false); karsilandi(); }} />;
-  if (!o.hesapli && karsilama === 'goster') return <Karsilama onBasla={karsilandi} onGiris={() => setGirisAcik(true)} />;
-  return <RitosUygulama />;
+  if (o.hesapli && !TEST && o.kilitli) return <GirisEkrani />;
+  const pencere = girisAcik && !o.hesapli && (
+    <KodGirisModal onKapat={() => setGirisAcik(null)}
+      baslik={girisAcik === 'davet' ? 'Davete katıl' : 'E-postanla devam et'}
+      metin={girisAcik === 'davet' ? <p className="rt-metin">Davete katılmak için e-postanı yaz, sana bir kod gönderelim.</p> : undefined} />
+  );
+  if (!o.hesapli && karsilama === 'goster' && girisAcik !== 'davet') return <><Karsilama onBasla={karsilandi} onDaha={() => setGirisAcik('giris')} />{pencere}</>;
+  return <><RitosUygulama />{pencere}</>;
 }
 
 function RitosUygulama() {
@@ -111,8 +113,7 @@ function RitosUygulama() {
   // Avatar menüsünden açılan hesap ekranları (Profil · Bildirimler · Ayarlar): telefonda ana alanda,
   // geniş ekranda sağ bölmede; bir sekmeye dokununca kapanır.
   const [hesap, setHesap] = useState<HesapEkran | null>(null);
-  const [cikis, setCikis] = useState(false);
-  const menuSec = (e: HesapEkran | 'cikis') => { if (e === 'cikis') setCikis(true); else setHesap(e); };
+  const menuSec = (e: HesapEkran) => setHesap(e);
   // 4 ekim: Home'daki Danışmanlık ekranı kalktı — davet, sonlananlar, alan açma Atölye seçicisinde;
   // şablonlar ve sınav paketi Atölye › Kütüphane'de; sonlandırma kişinin Bilgiler sekmesinde.
   const home = <HomeEkrani />;
@@ -127,7 +128,7 @@ function RitosUygulama() {
   const ustSag = (
     <div className="rt-ust-sag">
       <SenkronIsareti />
-      {o.hesapli ? <KullaniciRozeti onSec={menuSec} uyari={kurtarma} /> : <button type="button" className="rt-giris-dugme" onClick={girisAc}>Giriş · Hesap aç</button>}
+      <KullaniciRozeti onSec={menuSec} uyari={kurtarma} />
     </div>
   );
   const hesapEkrani = hesap && <HesapEkrani ekran={hesap} onGeri={() => setHesap(null)} />;
@@ -151,11 +152,9 @@ function RitosUygulama() {
   return (
     <div className="shell">
       <DavetKarsilama />
-      {cikis && <CikisOnayi onKapat={() => setCikis(false)} />}
       {isNarrow ? (
         <div className="mobile-app">
           <div className="mobile-hd"><b>Ritos</b>{ustSag}</div>
-          {!o.hesapli && <MisafirSeridi />}
           <div className="mobile-main">{hesapEkrani || (sekme === 'gunum' ? <AjandaPane /> : sagSekme(sekme))}</div>
           <div className="mobile-nav">
             {MOBIL_SEKMELER.map(([k, ic, ad]) => (
@@ -166,7 +165,6 @@ function RitosUygulama() {
       ) : (
         <>
           <div className="topbar"><b>Ritos</b>{ustSag}</div>
-          {!o.hesapli && <MisafirSeridi />}
           <SplitPane
               ratio={ratio}
               setRatio={setRatio}
