@@ -50,7 +50,8 @@ type Sayfa = null | 'ekle' | 'is' | 'rica' | 'liste' | 'davet' | 'katil' | 'kur'
 
 export default function Cevrem() {
   const d = useCevrem();
-  const [seciliId, setSeciliId] = useState<string | null>(() => { try { return localStorage.getItem(SECILI); } catch { return null; } });
+  // 8 ekim: önce "Gruplarım" listesi; gruba dokununca grubun sayfası (WhatsApp gibi).
+  const [seciliId, setSeciliId] = useState<string | null>(null);
   const [ekran, setEkran] = useState<Ekran>({ t: 'ana' });
   const [sayfa, setSayfa] = useState<Sayfa>(null);
   const [katilKod, setKatilKod] = useState<string>('');
@@ -64,7 +65,7 @@ export default function Cevrem() {
     } catch { /* yoksay */ }
   }, []);
 
-  const grup = d.gruplar.find((g) => g.id === seciliId) ?? d.gruplar[0] ?? null;
+  const grup = d.gruplar.find((g) => g.id === seciliId) ?? null;
   const sec = (id: string) => { setSeciliId(id); setEkran({ t: 'ana' }); try { localStorage.setItem(SECILI, id); } catch { /* yoksay */ } };
 
   if (!d.hazir) return <div className="rt-cv"><p className="rt-muted">Yükleniyor…</p></div>;
@@ -75,10 +76,17 @@ export default function Cevrem() {
       {sayfa === 'katil' && <KatilModal kod0={katilKod} onKapat={() => setSayfa(null)} onKatildi={(id) => { sec(id); setSayfa(null); }} />}
     </>
   );
-  if (!grup) return (
+  if (!d.gruplar.length) return (
     <div className="rt-cv">
       {d.hata && <p className="rt-hata">⚠ {d.hata}</p>}
       <BosEkran onKur={() => setSayfa('kur')} onKatil={() => setSayfa('katil')} />
+      {ortakSayfalar}
+    </div>
+  );
+  if (!grup) return (
+    <div className="rt-cv">
+      {d.hata && <p className="rt-hata">⚠ {d.hata}</p>}
+      <GruplarListesi d={d} onSec={sec} onKur={() => setSayfa('kur')} onKatil={() => setSayfa('katil')} />
       {ortakSayfalar}
     </div>
   );
@@ -91,7 +99,7 @@ export default function Cevrem() {
         : ekran.t === 'ayar' ? <GrupAyarlari d={d} grup={grup} onGeri={() => setEkran({ t: 'ana' })} onDavet={() => setSayfa('davet')} />
         : (
           <>
-            <GrupBasligi d={d} grup={grup} onSec={sec} onKur={() => setSayfa('kur')} onKatil={() => setSayfa('katil')} onDavet={() => setSayfa('davet')} onAyar={() => setEkran({ t: 'ayar' })} />
+            <GrupUst d={d} grup={grup} onGeri={() => setSeciliId(null)} onDavet={() => setSayfa('davet')} onAyar={() => setEkran({ t: 'ayar' })} />
             <GelenRicalar d={d} grup={grup} />
             {grup.tur === 'arkadas' ? (
               <>
@@ -109,7 +117,6 @@ export default function Cevrem() {
               </>
             )}
             <GonderilenRicalar d={d} grup={grup} />
-            <SonOlanlar d={d} grup={grup} />
             <button type="button" className="rt-cv-fab" aria-label="Ekle" onClick={() => setSayfa('ekle')}>＋</button>
           </>
         )}
@@ -142,7 +149,82 @@ function BosEkran({ onKur, onKatil }: { onKur: () => void; onKatil: () => void }
   );
 }
 
-// ———————————————— grup başlığı ————————————————
+// ———————————————— Gruplarım (liste) + grup sayfasının başı (8 ekim) ————————————————
+
+const KISA_GUN = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
+
+function grupOzeti(d: CevremDurum, g: Grup) {
+  const t = bugun();
+  const ricalar = d.ricalar.filter((r) => r.grup_id === g.id && r.istenen === d.uid && r.durum === 'bekliyor').length;
+  const bulusmalar = d.bulusmalar.filter((b) => b.grup_id === g.id && !b.iptal && b.tarih >= t).sort((a, b) => a.tarih.localeCompare(b.tarih) || (a.saat ?? '').localeCompare(b.saat ?? ''));
+  const yanitsiz = bulusmalar.filter((b) => !yanitim(d, b.id)).length;
+  const listeler = d.listeler.filter((l) => l.grup_id === g.id && !l.silindi);
+  const rutinler = d.rutinler.filter((r) => r.grup_id === g.id && !r.silindi);
+  const isler = d.isler.filter((i) => i.grup_id === g.id && !i.silindi && isGunu(i, t) && !isKaydi(d, i.id, t)).length;
+  return { bekleyen: ricalar + yanitsiz, bulusmalar, listeler, rutinler, isler };
+}
+
+function GruplarListesi({ d, onSec, onKur, onKatil }: { d: CevremDurum; onSec: (id: string) => void; onKur: () => void; onKatil: () => void }) {
+  return (
+    <>
+      <h2 className="rt-cv-h rt-cv-gruplar-h">Gruplarım</h2>
+      <div className="rt-cv-gruplar">
+        {d.gruplar.map((g) => {
+          const o = grupOzeti(d, g);
+          const uyeler = aktifUyeler(d, g.id);
+          const b = o.bulusmalar[0];
+          const parcalar: { k: string; metin: string }[] = [
+            ...o.listeler.slice(0, 3).map((l) => ({ k: `l${l.id}`, metin: `${l.ikon ?? '📝'} ${l.ad} · ${d.maddeler.filter((m) => m.liste_id === l.id && !m.isaretli && !m.silindi).length}` })),
+            ...(o.listeler.length > 3 ? [{ k: 'lf', metin: `+${o.listeler.length - 3} liste` }] : []),
+            ...(b ? [{ k: 'b', metin: `📅 ${b.tarih === bugun() ? 'Bugün' : b.tarih === tarihEkle(bugun(), 1) ? 'Yarın' : KISA_GUN[tarihParse(b.tarih).getDay()]}${b.saat ? ` ${b.saat}` : ''} · ${b.ad}` }] : []),
+            ...o.rutinler.slice(0, 2).map((r) => ({ k: `r${r.id}`, metin: `${r.ikon ?? '🤝'} ${r.ad}` })),
+            ...(o.isler ? [{ k: 'i', metin: `🧹 Bugün ${o.isler} iş` }] : []),
+          ];
+          return (
+            <button key={g.id} type="button" className="rt-cv-gk" onClick={() => onSec(g.id)}>
+              <span className="ust">
+                <span className="ik" aria-hidden>{grupIkonu(g)}</span>
+                <span className="ad"><b>{g.ad}</b><small>{GRUP_TUR[g.tur]?.ad ?? ''} · {uyeler.length} kişi</small></span>
+                {o.bekleyen > 0 && <i className="rozet" aria-label={`${o.bekleyen} şey seni bekliyor`}>{o.bekleyen}</i>}
+                <span className="chev" aria-hidden>›</span>
+              </span>
+              <span className="ozet">
+                {parcalar.length ? parcalar.map((x) => <span key={x.k}>{x.metin}</span>) : <span className="bos">Henüz bir şey yok — gir ve ekle</span>}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="rt-cv-gruplar-alt">
+        <button type="button" className="rt-btn" onClick={onKur}>＋ Grup kur</button>
+        <button type="button" className="rt-btn" onClick={onKatil}>✉️ Davet kodum var</button>
+      </div>
+    </>
+  );
+}
+
+function GrupUst({ d, grup, onGeri, onDavet, onAyar }: { d: CevremDurum; grup: Grup; onGeri: () => void; onDavet: () => void; onAyar: () => void }) {
+  const uyeler = aktifUyeler(d, grup.id);
+  return (
+    <div className="rt-cv-ust">
+      <div className="rt-geri-bar">
+        <button type="button" className="rt-geri-dugme" onClick={onGeri}>‹ Gruplarım</button>
+        <button type="button" className="rt-cv-ayar-d" aria-label="Grup ayarları" onClick={onAyar}>⚙️</button>
+      </div>
+      <div className="rt-cv-ust-ic">
+        <span className="ik" aria-hidden>{grupIkonu(grup)}</span>
+        <b>{grup.ad}</b>
+        <div className="rt-cv-uyeler">
+          {uyeler.slice(0, 5).map((u) => <span key={u.uye_id} title={u.uye_id === d.uid ? 'Ben' : u.ad}><Avatar ad={u.ad} resim={u.avatar} boyut={26} /></span>)}
+          {uyeler.length > 5 && <span className="rt-cv-fazla">+{uyeler.length - 5}</span>}
+          {uyeler.length < GRUP_SINIR && <button type="button" className="rt-cv-davet" onClick={onDavet} aria-label="Davet et">＋</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ———————————————— grup başlığı (eski, kullanılmıyor) ————————————————
 
 function GrupBasligi({ d, grup, onSec, onKur, onKatil, onDavet, onAyar }: { d: CevremDurum; grup: Grup; onSec: (id: string) => void; onKur: () => void; onKatil: () => void; onDavet: () => void; onAyar: () => void }) {
   const [acik, setAcik] = useState(false);

@@ -1538,3 +1538,26 @@ div.rt-cv-sat .ic{cursor:default;}
 .rt-google{display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;border:1.5px solid var(--line);min-height:48px;font-weight:700;}
 .rt-giris-ya-da{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12.5px;margin:4px 0;}
 .rt-giris-ya-da::before,.rt-giris-ya-da::after{content:"";flex:1;height:1px;background:var(--line);}
+
+/* Gruplarım (8 ekim) */
+.rt-cv-gruplar-h{margin:0;}
+.rt-cv-gruplar{display:flex;flex-direction:column;gap:10px;}
+.rt-cv-gk{display:flex;flex-direction:column;gap:10px;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;font:inherit;color:var(--ink);cursor:pointer;}
+.rt-cv-gk:hover{border-color:#cfc5b2;}
+.rt-cv-gk .ust{display:flex;align-items:center;gap:12px;}
+.rt-cv-gk .ik{width:42px;height:42px;flex:0 0 auto;border-radius:12px;background:var(--green2);display:inline-flex;align-items:center;justify-content:center;font-size:22px;}
+.rt-cv-gk .ad{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
+.rt-cv-gk .ad b{font-size:16.5px;}
+.rt-cv-gk .ad small{font-size:12.5px;color:var(--muted);}
+.rt-cv-gk .rozet{font-style:normal;min-width:22px;height:22px;border-radius:11px;background:#c2703c;color:#fff;font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;padding:0 6px;}
+.rt-cv-gk .chev{color:var(--muted);font-size:22px;}
+.rt-cv-gk .ozet{display:flex;flex-wrap:wrap;gap:6px;}
+.rt-cv-gk .ozet span{font-size:12.5px;background:#f6f1e7;border-radius:999px;padding:4px 10px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rt-cv-gk .ozet span.bos{background:none;padding:0;color:var(--muted);}
+.rt-cv-gruplar-alt{display:flex;gap:8px;flex-wrap:wrap;}
+.rt-cv-ust{display:flex;flex-direction:column;gap:6px;}
+.rt-cv-ust .rt-geri-bar{justify-content:space-between;}
+.rt-cv-ayar-d{width:44px;height:44px;border:0;background:none;font-size:20px;cursor:pointer;}
+.rt-cv-ust-ic{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.rt-cv-ust-ic .ik{font-size:24px;}
+.rt-cv-ust-ic b{font-size:20px;flex:1;min-width:0;}
