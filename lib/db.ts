@@ -122,6 +122,7 @@ export interface ProgramRow {
   malzeme?: string | null;       // 5 ekim — bağlı Kütüphane koleksiyonu (klasor id): Kütüphaneden eklerken önce gelir
   plan?: boolean;                // 28 eylül — kişisel program Ajanda'dan planlanır: tarihler mutlak, kendiliğinden bitmez
   hafta_notlari?: Record<string, { metin: string; zaman: number }>; // 3 ekim — koçun haftalık değerlendirmesi (anahtar: haftanın pazartesisi)
+  odak?: { alan: string; baslangic: string } | null; // 8 ekim — "bu ayın odağı": Hayatına bakalım akışından kurulan rutin
   uzak?: UzakProgram | null;     // D5/D6 — danışana atanmış (koç tarafı) ya da koçtan gelen (danışan tarafı)
   guncellendi: number;
 }
@@ -187,6 +188,7 @@ export interface YasamAlaniRow {
   gizli: boolean;
   kriterler?: string[];          // 3. adım: kriterli öz değerlendirme
   kriterli?: boolean;
+  ad_ozel?: boolean;             // 8 ekim — hazır alanın adı kullanıcı tarafından değiştirildi (yoksa ad o anki dilin çevirisinden gelir)
   guncellendi: number;
 }
 
@@ -197,6 +199,13 @@ export interface AlanDegerlendirmeRow {
   zaman: number;
   ay?: string;                   // 5 ekim — 'YYYY-MM' (ay sonu değerlendirmesi; id = '<alan>|<ay>')
   kriter?: number[];             // 5 ekim — kriterli alanda her kriterin puanı (1..5), deger = ortalaması
+  // 8 ekim — "Hayatına bakalım": cevap 3'lü ölçekte verilir, deger 1..5'e çevrilip saklanır (1→1, 2→3, 3→5).
+  olcek?: number;                // cevabın ölçeği (3); yoksa 5
+  cerceve?: string;              // hangi çerçeveyle (varsayılan 'ritos-8')
+  istek?: string[];              // alan_id '__istek' satırında: "neyin biraz daha olmasını isterdin?" seçimleri
+  not?: string;                  // serbest metin (istek satırında ya da haftalık bakışta)
+  hafta?: string;                // haftalık bakış satırında: haftanın pazartesisi
+  program_id?: string;           // haftalık bakış hangi odak rutini için
 }
 
 // ———————————————————————————————— v3 — 25 eylül: Gelenler + kişiler ————————————————————————————————

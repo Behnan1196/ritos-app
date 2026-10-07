@@ -42,7 +42,15 @@ export async function alanlar(): Promise<YasamAlaniRow[]> {
 }
 
 export async function alanGuncelle(id: string, patch: Partial<Omit<YasamAlaniRow, 'id' | 'kod'>>) {
-  await db.yasam_alani.update(id, { ...patch, guncellendi: Date.now() });
+  // Ad değiştiyse hazır alanın adı artık kullanıcınındır (dil değişse de korunur).
+  const ek = patch.ad !== undefined ? { ad_ozel: true } : {};
+  await db.yasam_alani.update(id, { ...patch, ...ek, guncellendi: Date.now() });
+}
+
+/** Ekranda görünen ad: hazır alanın adını kullanıcı değiştirmediyse o anki dilin adı (şimdilik Türkçe). Etiketler addan değil kimlikten (alan:<kod>) gider. */
+export function alanAdi(a: Pick<YasamAlaniRow, 'kod' | 'ad' | 'ad_ozel'>): string {
+  if (a.kod && !a.ad_ozel) return HAZIR_ALANLAR.find((h) => h.kod === a.kod)?.ad ?? a.ad;
+  return a.ad;
 }
 
 export async function alanEkle(ad: string, ikon: string, aciklama = ''): Promise<string> {

@@ -33,6 +33,7 @@ import { koleksiyonlar } from '@/lib/kutuphane';
 import { ALAN_IKONLARI, EN_FAZLA_GORUNEN, alanEkle as yAlanEkle, alanGuncelle, alanOner, alanSil, alanSirala, alanlar as yAlanlar, alanlariGaranti } from '@/lib/yasamAlani';
 import type { YasamAlaniRow } from '@/lib/db';
 import { AjandadanRutinOnerisi, AlanKarolari, AlanSayfasi, AliskanlikOnerisi, AySonu, DengeKarti } from './Rutinler';
+import { YasamKapisi } from './HayatinaBak';
 import { arsivle, kuruluyoraDon, oturduIsaretle, rutinDurumu } from '@/lib/rutinDongu';
 import { hazirKartlar, hazirSablonlariYenile, hazirSablonuAl, useHazirSablonlar, type HazirSablon } from '@/lib/hazirSablon';
 
@@ -48,7 +49,7 @@ type Durum = { ekran: Ekran; alan: string | null; tarih: string | null; hafta: b
 const yeniDurum = (): Durum => ({ ekran: 'liste', alan: null, tarih: null, hafta: true, dosya: 'plan', sag: 'gelisim' });
 const DURUMLAR: Record<Kapsam, Durum> = { cevre: yeniDurum(), kendim: yeniDurum() };
 const alanSekDurum: { sek: AlanSek } = { sek: 'malzeme' };
-export const KAPSAM_AD: Record<Kapsam, string> = { cevre: 'DANIŞANLARIM', kendim: 'RUTİNLERİM' };
+export const KAPSAM_AD: Record<Kapsam, string> = { cevre: 'DANIŞANLARIM', kendim: 'YAŞAM TARZIM' };
 // Başka ekrandan "planla" (hedef önceden seçili): liste atlanır. Sekme henüz açık değilken de yakalanır.
 if (typeof window !== 'undefined') {
   window.addEventListener('ritos-atolyeye-git', () => { DURUMLAR.cevre.ekran = 'hedef'; DURUMLAR.cevre.dosya = 'plan'; });
@@ -809,6 +810,7 @@ function HedefSecici({ kapsam, hedefler, adaylar, seciliId, kompakt, kuruluyor, 
       {!kompakt && <p className="rt-ekran-bas">{KAPSAM_AD[kapsam]}</p>}
       {kapsam === 'kendim' && gorunurAlan.length > 0 && (
         <div className="rt-alan-blok">
+          <YasamKapisi />
           <DengeKarti onDegerlendir={onDegerlendir} />
           <AlanKarolari onAlan={onYasamAlani} kompakt={kompakt} />
           <AliskanlikOnerisi />

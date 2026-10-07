@@ -57,7 +57,7 @@ export function DengeKarti({ onDegerlendir }: { onDegerlendir: () => void }) {
   const zaman = degerlendirmeZamani(deg);
   return (
     <>
-      {zaman && (
+      {zaman && Object.keys(deg).length > 0 && ( // ilk bakış Yaşam Tarzım'daki "Hayatına bakalım" kapısından (8 ekim)
         <div className="rt-deg-uyari">
           <span>🗓 <b>{Object.keys(deg).length ? 'Ay sonu değerlendirmesi' : 'İlk değerlendirmen'}</b> — {alanlar.length} alan, bir dakika.</span>
           <button type="button" className="rt-btn" onClick={onDegerlendir}>Başla</button>
