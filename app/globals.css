@@ -1581,3 +1581,4 @@ div.rt-cv-sat .ic{cursor:default;}
 .rt-cv-dv-yeni{display:flex;flex-direction:column;gap:8px;}
 .rt-cv-dv-yeni .rt-btn{align-self:flex-start;}
 .rt-cv-dv-ekle{min-height:46px;border:1.5px dashed #d8cfbd;background:none;border-radius:12px;font:inherit;font-weight:700;color:var(--ink);cursor:pointer;text-align:left;padding:0 14px;}
+.rt-plan-durdur{display:flex;justify-content:flex-end;margin:-4px 0 6px;}

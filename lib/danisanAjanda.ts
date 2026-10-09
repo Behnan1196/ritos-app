@@ -134,6 +134,34 @@ export async function kocKartlariEkle(h: PlanHedef, liste: { tarih: string; kart
   return gecerli.length;
 }
 
+/**
+ * 9 ekim — Planı durdur: danışanın bugünden sonraki bütün koç kartları kalkar; danışmanlık sürer.
+ * Yapılmış kartlar ve geçmiş günler kalır. Bugün yapılmışsa bugün de kalır, yapılmamışsa bugün de kalkar.
+ * Henüz başlamamış kartlar tamamen silinir. Değişiklik mevcut kanal ile danışana gider.
+ */
+export async function planDurdur(h: PlanHedef): Promise<number> {
+  const t0 = bugun();
+  let n = 0;
+  for (const p of await hedefProgramlari(h)) {
+    const adimlar = await db.program_adim.where('program_id').equals(p.id).toArray();
+    for (const a of adimlar) {
+      const z = adimZamanlama(a, taban(p));
+      if (z.bitis !== null && z.bitis < t0) continue;                 // geçmişte bitmiş
+      if (p.calisma_bitis && p.calisma_bitis < t0) continue;          // program zaten durmuş
+      if (z.baslangic > t0) { await adimSil(a.id); n++; continue; }   // henüz başlamamış
+      const son = (await db.geri_bildirim.where('kaynak_ref').equals(`${p.id}/${a.id}`).toArray())
+        .filter((o) => o.tarih === t0 && o.olay !== 'yorum').sort((x, y) => y.zaman - x.zaman)[0];
+      const bugunYapildi = gunAktif(z, t0) && !!son && son.olay !== 'geri_alindi';
+      const yeniSon = bugunYapildi ? t0 : tarihEkle(t0, -1);
+      if (yeniSon < z.baslangic) { await adimSil(a.id); n++; continue; } // bugün başlıyordu, yapılmadı
+      if (z.bitis === yeniSon) continue;
+      await adimGuncelle(a.id, { sure_gun: gunFarki(z.baslangic, yeniSon) + 1 }, tarihEkle(yeniSon, 1));
+      n++;
+    }
+  }
+  return n;
+}
+
 /** Birden çok güne yayılan kart: bugünden itibaren biter (henüz başlamadıysa tamamen kalkar); yapılmış günler kalır. */
 export async function kocSeriBitir(k: KocKarti) {
   const bas = tarihEkle(taban(k.program), k.adim.basla_gun);

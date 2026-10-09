@@ -5,7 +5,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useCanli } from '@/lib/canli';
-import { hedefGrubu, danisanGunleri, planDurumu, planGonder, haftaKartlari, haftaSablonKaydet, haftaUygula, kocKartEkle, kocKartGuncelle, kocKartSil, kocKartTasi, kocSeriBitir, sablonKartlari, type KocKarti, type KocKartTaslak, type KocTekrar, type PlanHedef } from '@/lib/danisanAjanda';
+import { hedefGrubu, danisanGunleri, planDurumu, planGonder, haftaKartlari, haftaSablonKaydet, haftaUygula, kocKartEkle, planDurdur, kocKartGuncelle, kocKartSil, kocKartTasi, kocSeriBitir, sablonKartlari, type KocKarti, type KocKartTaslak, type KocTekrar, type PlanHedef } from '@/lib/danisanAjanda';
 import { KartEditor } from './KartEditor';
 import type { AjandaKartRow } from '@/lib/db';
 import { disiplinAdi } from '@/lib/danismanlik';
@@ -31,6 +31,7 @@ export function DanisanAjandasi({ h, baslik, tarih, hafta, haftaBas, onGun }: { 
   const [hata, setHata] = useState<string | null>(null);
   const [haftaIs, setHaftaIs] = useState<null | 'uygula' | 'kaydet'>(null);
   const [bilgi, setBilgi] = useState<string | null>(null);
+  const [durdurSor, setDurdurSor] = useState(false);
   const t0 = bugun();
   // 3 ekim — taslak modu: gönderilmemiş değişiklikler ve Gönder.
   const pd = useCanli(() => planDurumu(h), [hedefKey(h)], null as Awaited<ReturnType<typeof planDurumu>>);
@@ -92,6 +93,23 @@ export function DanisanAjandasi({ h, baslik, tarih, hafta, haftaBas, onGun }: { 
           <span>✏️ <b>{pd.bekleyen}</b> değişiklik taslakta — {h.il.danisan_ad} henüz görmüyor.</span>
           <button type="button" className="rt-btn primary" onClick={async () => { setHata(null); try { await planGonder(h); setBilgi(`Gönderildi — ${h.il.danisan_ad}, Ajanda'sında görecek.`); } catch (e) { setHata((e as Error).message); } }}>Gönder</button>
         </div>
+      )}
+      {h.tur === 'danisan' && !durdurSor && (
+        <div className="rt-plan-durdur"><button type="button" className="rt-linkbtn" onClick={() => setDurdurSor(true)}>⏹ Planı durdur</button></div>
+      )}
+      {h.tur === 'danisan' && durdurSor && (
+        <OnayKutusu
+          metin={`Bugünden itibaren bütün kartlar kalksın mı? Yapılmış kartlar ve geçmiş günler kalır. Danışmanlık sürer; istediğin zaman yeni kart eklersin.`}
+          evet="Durdur"
+          onVazgec={() => setDurdurSor(false)}
+          onEvet={async () => {
+            setDurdurSor(false); setHata(null); setBilgi(null);
+            try {
+              const n = await planDurdur(h);
+              setBilgi(n ? `Plan durduruldu — ${h.il.danisan_ad} için bugünden sonraki kartlar kalktı.` : 'Bugünden sonra kaldırılacak kart yoktu.');
+            } catch (e) { setHata((e as Error).message); }
+          }}
+        />
       )}
       {bilgi && <p className="rt-tamam" onClick={() => setBilgi(null)}>{bilgi}</p>}
       {hata && <p className="rt-hata" onClick={() => setHata(null)}>⚠ {hata}</p>}
