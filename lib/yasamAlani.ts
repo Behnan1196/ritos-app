@@ -8,17 +8,10 @@
 // ————————————————————————————————————————————————————————————————
 
 import { db, type YasamAlaniRow } from './db';
+import { aktifCerceve, bilinenAlanAdi, cerceve } from './cerceve';
 
-export const HAZIR_ALANLAR: { kod: string; ad: string; ikon: string; aciklama: string }[] = [
-  { kod: 'hareket', ad: 'Hareket', ikon: '🏃', aciklama: 'egzersiz, yürüyüş, esneme' },
-  { kod: 'beslenme', ad: 'Beslenme', ikon: '🥗', aciklama: 'öğünler, su, mutfak' },
-  { kod: 'uyku', ad: 'Uyku', ikon: '😴', aciklama: 'uyku düzeni, dinlenme' },
-  { kod: 'zihin', ad: 'Zihin', ikon: '🧘', aciklama: 'nefes, meditasyon, stres' },
-  { kod: 'sosyal', ad: 'Sosyal bağlar', ikon: '🤝', aciklama: 'aile, arkadaşlar, birlikte vakit' },
-  { kod: 'ogrenme', ad: 'Öğrenme', ikon: '📚', aciklama: 'okuma, kurs, beceri' },
-  { kod: 'keyif', ad: 'Keyif', ikon: '🎨', aciklama: 'hobi, oyun, yaratıcılık' },
-  { kod: 'anlam', ad: 'Anlam', ikon: '🧭', aciklama: 'değerler, katkı, gönüllülük' },
-];
+/** Etkin çerçevenin hazır alanları (9 ekim: alanlar paketten gelir, bkz. lib/cerceve.ts). */
+export const hazirAlanlar = () => cerceve().alanlar;
 export const EN_FAZLA_GORUNEN = 10;
 export const ALAN_IKONLARI = ['🏃', '🥗', '😴', '🧘', '🤝', '📚', '🎨', '🧭', '💼', '💰', '🏡', '🌿', '🙏', '❤️', '🧠', '🎵', '✈️', '🐾', '👶', '🛠'];
 export const hazirId = (kod: string) => `alan:${kod}`;
@@ -28,17 +21,21 @@ export const hazirId = (kod: string) => `alan:${kod}`;
  * kurulan varsayılanlar sunucudaki (kullanıcının değiştirdiği) halin üzerine yazmaz; sunucu hali gelince yerini alır.
  */
 export async function alanlariGaranti() {
+  const c = await aktifCerceve();
   const var_ = new Set((await db.yasam_alani.toArray()).map((a) => a.id));
-  const eksik: YasamAlaniRow[] = HAZIR_ALANLAR
-    .map((h, i) => ({ id: hazirId(h.kod), kod: h.kod, ad: h.ad, ikon: h.ikon, aciklama: h.aciklama, sira: i + 1, gizli: false, guncellendi: 0 }))
+  const eksik: YasamAlaniRow[] = c.alanlar
+    .map((h, i) => ({ id: hazirId(h.kod), kod: h.kod, ad: h.ad, ikon: h.ikon, aciklama: h.kisa ?? '', sira: i + 1, gizli: false, guncellendi: 0 }))
     .filter((a) => !var_.has(a.id));
   if (!eksik.length) return;
   db.uzaktan = true;
   try { await db.yasam_alani.bulkPut(eksik); } finally { db.uzaktan = false; }
 }
 
+/** Görünen alan listesi: etkin çerçevenin alanları + kişinin kendi alanları (başka çerçevenin alanları saklanır, görünmez). */
 export async function alanlar(): Promise<YasamAlaniRow[]> {
-  return (await db.yasam_alani.toArray()).sort((a, b) => a.sira - b.sira);
+  const c = await aktifCerceve();
+  const kodlar = new Set(c.alanlar.map((a) => a.kod));
+  return (await db.yasam_alani.toArray()).filter((a) => !a.kod || kodlar.has(a.kod)).sort((a, b) => a.sira - b.sira);
 }
 
 export async function alanGuncelle(id: string, patch: Partial<Omit<YasamAlaniRow, 'id' | 'kod'>>) {
@@ -49,7 +46,7 @@ export async function alanGuncelle(id: string, patch: Partial<Omit<YasamAlaniRow
 
 /** Ekranda görünen ad: hazır alanın adını kullanıcı değiştirmediyse o anki dilin adı (şimdilik Türkçe). Etiketler addan değil kimlikten (alan:<kod>) gider. */
 export function alanAdi(a: Pick<YasamAlaniRow, 'kod' | 'ad' | 'ad_ozel'>): string {
-  if (a.kod && !a.ad_ozel) return HAZIR_ALANLAR.find((h) => h.kod === a.kod)?.ad ?? a.ad;
+  if (a.kod && !a.ad_ozel) return bilinenAlanAdi(a.kod) ?? a.ad;
   return a.ad;
 }
 
@@ -83,32 +80,11 @@ export async function rutinAlanlari(programId: string, alanIdler: string[]) {
   await db.program.update(programId, { alanlar: alanIdler, guncellendi: Date.now() });
 }
 
-// Addan alan önerisi — yalnız hazır alanlar için, kaba anahtar kelimeler.
-const ONERI: [string, string[]][] = [
-  ['yürü', ['hareket']], ['koş', ['hareket']], ['spor', ['hareket']], ['egzersiz', ['hareket']], ['esneme', ['hareket']], ['yoga', ['hareket', 'zihin']],
-  ['pilates', ['hareket']], ['bisiklet', ['hareket']], ['yüz', ['hareket']], ['salon', ['hareket']], ['tai chi', ['hareket', 'zihin']],
-  ['öğün', ['beslenme']], ['kahvaltı', ['beslenme']], ['yemek', ['beslenme']], ['su iç', ['beslenme']], ['beslen', ['beslenme']], ['diyet', ['beslenme']], ['tarif', ['beslenme', 'keyif']],
-  ['uyku', ['uyku']], ['uyu', ['uyku']], ['ekran kapat', ['uyku']], ['yatış', ['uyku']],
-  ['medit', ['zihin']], ['nefes', ['zihin']], ['şükran', ['zihin', 'anlam']], ['günlük yaz', ['zihin']], ['stres', ['zihin']],
-  ['arkadaş', ['sosyal']], ['aile', ['sosyal']], ['ara ', ['sosyal']], ['ziyaret', ['sosyal']], ['buluş', ['sosyal']],
-  ['kitap', ['ogrenme', 'keyif']], ['oku', ['ogrenme']], ['ingilizce', ['ogrenme']], ['dil', ['ogrenme']], ['kurs', ['ogrenme']], ['ders', ['ogrenme']], ['lgs', ['ogrenme']], ['tyt', ['ogrenme']],
-  ['gitar', ['ogrenme', 'keyif']], ['piyano', ['ogrenme', 'keyif']], ['müzik', ['keyif']], ['resim', ['keyif']], ['çiz', ['keyif']], ['bahçe', ['keyif', 'hareket']], ['hobi', ['keyif']],
-  ['gönüllü', ['anlam', 'sosyal']], ['bağış', ['anlam']], ['ibadet', ['anlam']], ['dua', ['anlam']],
-];
-/** Rutin adından önerilen hazır alan kimlikleri. */
+/** Rutin adından önerilen hazır alan kimlikleri (etkin çerçevedeki anahtar kelimelerden). */
 export function alanOner(ad: string): string[] {
-  const a = ` ${ad.toLocaleLowerCase('tr')} `;
-  return Array.from(new Set(ONERI.filter(([k]) => a.includes(k)).flatMap(([, v]) => v))).map(hazirId);
+  const m = ` ${ad.toLocaleLowerCase('tr')} `;
+  return cerceve().alanlar.filter((a) => (a.anahtarlar ?? []).some((k) => m.includes(k))).map((a) => hazirId(a.kod));
 }
 
-// Hazır alanlar için önerilen kriterler (kriterli değerlendirme açılınca gelir; kullanıcı değiştirir).
-export const ONERILEN_KRITER: Record<string, string[]> = {
-  hareket: ['Haftada yeterince hareket ediyorum', 'Gün içinde uzun süre oturmuyorum', 'Bedenim güçlü ve esnek hissediyor'],
-  beslenme: ['Düzenli ve dengeli yiyorum', 'Yeterince su içiyorum', 'Ne yediğimin farkındayım'],
-  uyku: ['Dinlenmiş uyanıyorum', 'Uyku saatim düzenli', 'Kolay uykuya dalıyorum'],
-  zihin: ['Stresle baş edebiliyorum', 'Kendime sakin anlar ayırıyorum', 'Duygularımı fark ediyorum'],
-  sosyal: ['Yakınlarımla yeterince vakit geçiriyorum', 'Derdimi anlatabileceğim biri var', 'Yalnız hissetmiyorum'],
-  ogrenme: ['Yeni bir şey öğreniyorum', 'Merakımı besliyorum'],
-  keyif: ['Kendime keyif veren şeylere vakit ayırıyorum', 'Gülüyor, eğleniyorum'],
-  anlam: ['Yaptıklarım bana önemli geliyor', 'Kendimden büyük bir şeye katkı veriyorum'],
-};
+/** Hazır alan için önerilen kriterler (kriterli değerlendirme açılınca gelir; kullanıcı değiştirir). */
+export const onerilenKriter = (kod: string | null | undefined): string[] => (kod ? cerceve().alanlar.find((a) => a.kod === kod)?.kriterler ?? [] : []);

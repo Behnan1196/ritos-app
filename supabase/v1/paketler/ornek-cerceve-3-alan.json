@@ -1,0 +1,187 @@
+{
+ "tur": "cerceve",
+ "motor": 1,
+ "kod": "deneme-3",
+ "surum": 1,
+ "dil": "tr",
+ "ad": "Üç yan (deneme)",
+ "aciklama": "Beden, iç dünya ve bağlar.",
+ "yayinci": "Deneme",
+ "olcek": {
+  "etiketler": [
+   "Zor",
+   "Fena değil",
+   "Güzel"
+  ]
+ },
+ "metinler": {
+  "istek_sorusu": "Bu aralar en çok neye ihtiyacın var?",
+  "uzman_notu": "Kendini uzun süredir iyi hissetmiyorsan bir uzmana danış."
+ },
+ "alanlar": [
+  {
+   "kod": "beden",
+   "ad": "Beden",
+   "ikon": "💪",
+   "kisa": "hareket, beslenme, uyku",
+   "soru": "Bedenin bu aralar nasıl?",
+   "hafta_sorusu": "Bu hafta bedenin nasıldı?",
+   "nedir": {
+    "ne": "Hareket, beslenme ve uykun.",
+    "neden": "Bedenin iyiyse gerisi kolaylaşır.",
+    "ornek": [
+     "Kısa bir yürüyüş",
+     "Erken yatmak"
+    ]
+   },
+   "kriterler": [],
+   "anahtarlar": [
+    "yürü",
+    "uyku",
+    "su iç"
+   ]
+  },
+  {
+   "kod": "ic-dunya",
+   "ad": "İç dünya",
+   "ikon": "🌤️",
+   "kisa": "zihin, keyif, öğrenme",
+   "soru": "İçin bu aralar nasıl?",
+   "hafta_sorusu": "Bu hafta için nasıldı?",
+   "nedir": {
+    "ne": "Duyguların, merakın, keyfin.",
+    "neden": "Kendine iyi davranmak her şeyi değiştirir.",
+    "ornek": [
+     "Üç dakika nefes",
+     "Sevdiğin müzik"
+    ]
+   },
+   "kriterler": [],
+   "anahtarlar": [
+    "nefes",
+    "kitap",
+    "müzik"
+   ]
+  },
+  {
+   "kod": "baglar",
+   "ad": "Bağlar",
+   "ikon": "🫶",
+   "kisa": "aile, arkadaşlar, katkı",
+   "soru": "İnsanlarla bağın nasıl?",
+   "hafta_sorusu": "Bu hafta insanlarla bağın nasıldı?",
+   "nedir": {
+    "ne": "Sevdiklerin ve topluluğun.",
+    "neden": "Bağlar zor günde dayanak olur.",
+    "ornek": [
+     "Bir dostu aramak"
+    ]
+   },
+   "kriterler": [],
+   "anahtarlar": [
+    "arkadaş",
+    "aile",
+    "gönüllü"
+   ]
+  }
+ ],
+ "istekler": [
+  {
+   "metin": "Dinlenmek",
+   "alanlar": [
+    "beden",
+    "ic-dunya"
+   ]
+  },
+  {
+   "metin": "Sevdiklerimle vakit",
+   "alanlar": [
+    "baglar"
+   ]
+  },
+  {
+   "metin": "Kendime zaman",
+   "alanlar": [
+    "ic-dunya"
+   ]
+  }
+ ],
+ "ardindan": [
+  "Sabah kalkınca",
+  "Öğle yemeğinden sonra",
+  "Yatmadan önce"
+ ],
+ "oneri": {
+  "kural": "en-dusuk",
+  "istek_onceligi": true,
+  "adet": 2
+ },
+ "rutinler": [
+  {
+   "kod": "d3-yuruyus",
+   "alanlar": [
+    "beden"
+   ],
+   "ikon": "🚶",
+   "ad": "Akşam 15 dakika yürü",
+   "alt": "Her gün",
+   "gunler": null,
+   "ardindan": "Yatmadan önce"
+  },
+  {
+   "kod": "d3-nefes",
+   "alanlar": [
+    "ic-dunya"
+   ],
+   "ikon": "🌬️",
+   "ad": "Sabah 3 dakika nefes",
+   "alt": "Her gün",
+   "gunler": null,
+   "ardindan": "Sabah kalkınca"
+  },
+  {
+   "kod": "d3-ara",
+   "alanlar": [
+    "baglar"
+   ],
+   "ikon": "📞",
+   "ad": "Haftada bir eski bir dostu ara",
+   "alt": "Pazar",
+   "gunler": [
+    0
+   ],
+   "ardindan": "Öğle yemeğinden sonra"
+  }
+ ],
+ "esleme": [
+  {
+   "kaynak": "ritos-8",
+   "alanlar": {
+    "hareket": [
+     "beden"
+    ],
+    "beslenme": [
+     "beden"
+    ],
+    "uyku": [
+     "beden"
+    ],
+    "zihin": [
+     "ic-dunya"
+    ],
+    "keyif": [
+     "ic-dunya"
+    ],
+    "ogrenme": [
+     "ic-dunya"
+    ],
+    "sosyal": [
+     "baglar"
+    ],
+    "anlam": [
+     "baglar"
+    ]
+   }
+  }
+ ]
+}

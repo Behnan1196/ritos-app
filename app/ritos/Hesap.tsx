@@ -7,7 +7,9 @@ import { BildirimAyarlari } from './BildirimAyar';
 import React, { useEffect, useState } from 'react';
 import { cikisYap, girisAc, googleIleGir, gorunenAdDegistir, kodDogrula, kodGonder, useOturum, yerelAd, yerelAdKaydet } from '@/lib/hesap';
 import { senkronla, useSenkronDurum } from '@/lib/senkron';
-import { Kap, Modal } from './ortak';
+import { Kap, Modal, OnayKutusu } from './ortak';
+import { useCanli } from '@/lib/canli';
+import { cerceveSec, cerceveler, cerceveleriYenile, useCerceve, type Cerceve } from '@/lib/cerceve';
 import { PaketlerKap } from './Sinav';
 import { DanismanlikAyarlari } from './Danismanlik';
 import { useDanismanlik } from '@/lib/danismanlik';
@@ -200,7 +202,46 @@ function ProfilIcerik() {
 function AyarlarIcerik() {
   // 8 ekim — web test ortamı: "Bu cihaz" (çıkış, verilerimi sil) kalktı; çıkış avatar menüsünde. Hesap silme mobilde.
   const dn = useDanismanlik();
-  return dn.profil?.koc ? <PaketlerKap /> : <p className="rt-muted">Şimdilik ayarlanacak bir şey yok.</p>;
+  const liste = useCanli(cerceveler, [], [] as Cerceve[]);
+  useEffect(() => { void cerceveleriYenile().catch(() => {}); }, []);
+  const cerceveVar = liste.length > 1;
+  if (!dn.profil?.koc && !cerceveVar) return <p className="rt-muted">Şimdilik ayarlanacak bir şey yok.</p>;
+  return <>{cerceveVar && <CerceveAyari liste={liste} />}{dn.profil?.koc && <PaketlerKap />}</>;
+}
+
+/** 9 ekim — Yaşam Tarzım çerçevesi: birden fazla çerçeve paketi varsa seçilir (alanlar, sorular, hazır rutinler). */
+function CerceveAyari({ liste }: { liste: Cerceve[] }) {
+  const cer = useCerceve();
+  const [sor, setSor] = useState<Cerceve | null>(null);
+  const [hata, setHata] = useState<string | null>(null);
+  return (
+    <Kap baslik="Yaşam Tarzım">
+      <p className="rt-muted">Hayatına bakarken kullanılan alanlar, sorular ve hazır rutinler.</p>
+      <div className="rt-cerceve-liste">
+        {liste.map((c) => (
+          <button key={c.kod} type="button" className={`rt-hb-secenek${c.kod === cer.kod ? ' on' : ''}`} aria-pressed={c.kod === cer.kod} onClick={() => { if (c.kod !== cer.kod) setSor(c); }}>
+            <span className="bas"><b>{c.ad}</b>{c.kod === cer.kod && <em>Kullanılıyor</em>}</span>
+            <small>{[c.aciklama, c.alanlar.map((a) => `${a.ikon} ${a.ad}`).join(' · ')].filter(Boolean).join(' — ')}</small>
+          </button>
+        ))}
+      </div>
+      {sor && (
+        <OnayKutusu
+          metin={`"${sor.ad}" kullanılsın mı? Yaşam Tarzım'daki alanlar buna göre değişir; rutinlerin ve geçmiş bakışların kalır.`}
+          evet="Geç"
+          onVazgec={() => setSor(null)}
+          onEvet={async () => { const c = sor; setSor(null); setHata(null); try { await cerceveSec(c.kod); } catch (e) { setHata(e instanceof Error ? e.message : String(e)); } }}
+        />
+      )}
+      {hata && <p className="rt-hata">{hata}</p>}
+    </Kap>
+  );
+}
+
+/** Uygulama açılınca çerçeve paketlerini sunucudan yoklar (6 saatte bir). Görünmez. */
+function CerceveYoklayici() {
+  useEffect(() => { void cerceveleriYenile().catch(() => {}); }, []);
+  return null;
 }
 
 /** Çıkış onayı (avatar menüsünden ve Ayarlar'dan). */
@@ -341,6 +382,7 @@ export function KullaniciRozeti({ onSec, uyari }: { onSec: (e: HesapEkran | 'cik
   const o = useOturum();
   const dn = useDanismanlik();
   const d = useSenkronDurum();
+  const cerceveSayisi = useCanli(async () => (await cerceveler()).length, [], 1);
   const [acik, setAcik] = useState(false);
   const kok = React.useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -359,6 +401,7 @@ export function KullaniciRozeti({ onSec, uyari }: { onSec: (e: HesapEkran | 'cik
   const sec = (e: HesapEkran | 'cikis') => { setAcik(false); onSec(e); };
   return (
     <div className="rt-kullanici-kok" ref={kok}>
+      <CerceveYoklayici />
       <button type="button" className={`rt-kullanici${o.hesapli ? '' : ' bagsiz'}`} onClick={() => setAcik(!acik)} aria-haspopup="menu" aria-expanded={acik}
         aria-label={`${ad} — ${o.hesapli ? 'e-posta bağlı' : 'e-posta bağlı değil'}`} title={o.hesapli ? 'E-posta bağlı · yedekte' : 'E-posta bağlı değil · yalnız bu cihazda'}>
         <span className="rt-kullanici-ad">{ad}</span>
@@ -378,7 +421,7 @@ export function KullaniciRozeti({ onSec, uyari }: { onSec: (e: HesapEkran | 'cik
           </div>
           <button type="button" role="menuitem" onClick={() => sec('profil')}>👤 Profil{uyari && <i className="rt-kmenu-nokta" aria-label="Bakılması gereken bir şey var" />}</button>
           {o.hesapli && <button type="button" role="menuitem" onClick={() => sec('bildirim')}>🔔 Bildirimler</button>}
-          {dn.profil?.koc && <button type="button" role="menuitem" onClick={() => sec('ayarlar')}>⚙️ Ayarlar</button>}
+          {(dn.profil?.koc || cerceveSayisi > 1) && <button type="button" role="menuitem" onClick={() => sec('ayarlar')}>⚙️ Ayarlar</button>}
           {!o.hesapli && <button type="button" role="menuitem" onClick={() => { setAcik(false); girisAc(); }}>✉️ E-postamı bağla</button>}
           {o.hesapli && <button type="button" role="menuitem" className="cikis" onClick={() => sec('cikis')}>Çıkış yap</button>}
         </div>

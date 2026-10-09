@@ -8,7 +8,7 @@
 import React, { useEffect, useState } from 'react';
 import { useCanli } from '@/lib/canli';
 import type { AlanDegerlendirmeRow, ProgramRow, YasamAlaniRow } from '@/lib/db';
-import { alanGuncelle, alanlar as yAlanlar, ONERILEN_KRITER } from '@/lib/yasamAlani';
+import { alanGuncelle, alanlar as yAlanlar, onerilenKriter } from '@/lib/yasamAlani';
 import { alanRutinleri, ayAdi, ayKodu, degerlendir, degerlendirmeler, degerlendirmeZamani, emekHesapla, oncekiAy, type AlanEmek } from '@/lib/denge';
 import { Modal } from './ortak';
 import { db } from '@/lib/db';
@@ -175,7 +175,7 @@ function KriterliPuan({ alan, mevcut }: { alan: YasamAlaniRow; mevcut?: AlanDege
 }
 
 function KriterModal({ alan, onKapat }: { alan: YasamAlaniRow; onKapat: () => void }) {
-  const oneri = (alan.kod && ONERILEN_KRITER[alan.kod]) || [];
+  const oneri = onerilenKriter(alan.kod);
   const [liste, setListe] = useState<string[]>(alan.kriterler?.length ? alan.kriterler : oneri.length ? oneri : ['']);
   const temiz = liste.map((x) => x.trim()).filter(Boolean);
   return (

@@ -17,7 +17,7 @@ import { bugun, gunFarki, tarihEkle, tarihParse } from './paket';
 import { programGuncelle, programOlustur } from './program';
 import { kocKartlariEkle } from './danisanAjanda';
 import { metindenBelge } from './belge';
-import { CERCEVE, ISTEKLER } from './hazirRutin';
+import { SAAT_SECENEGI, aktifCerceve, cerceve, type Cerceve } from './cerceve';
 
 export type Cevap3 = 1 | 2 | 3;
 export const UC_DEN_BESE: Record<Cevap3, number> = { 1: 1, 2: 3, 3: 5 };
@@ -29,6 +29,7 @@ export const ODAK_HAFTA = 4;
 export async function bakisKaydet(cevaplar: Record<string, Cevap3>, istek: string[], not: string) {
   const ay = ayKodu();
   const zaman = Date.now();
+  const CERCEVE = (await aktifCerceve()).kod;
   const satirlar: AlanDegerlendirmeRow[] = Object.entries(cevaplar).map(([alan_id, c]) => ({
     id: `${alan_id}|${ay}`, alan_id, ay, deger: UC_DEN_BESE[c], olcek: 3, cerceve: CERCEVE, zaman,
   }));
@@ -48,9 +49,10 @@ export async function sonIstek(): Promise<AlanDegerlendirmeRow | null> {
 }
 
 /** Öneri sırası: en düşük cevaplı alanlar önce; eşitlikte isteklerle eşleşen önce. İlk ikisi önerilir. */
-export function alanOnerisi(alanlar: YasamAlaniRow[], cevaplar: Record<string, Cevap3>, istek: string[]): YasamAlaniRow[] {
-  const istenen = new Set(ISTEKLER.filter(([e]) => istek.includes(e)).flatMap(([, k]) => k));
-  const puan = (a: YasamAlaniRow) => (cevaplar[a.id] ?? 2) * 10 - (a.kod && istenen.has(a.kod) ? 5 : 0);
+export function alanOnerisi(alanlar: YasamAlaniRow[], cevaplar: Record<string, Cevap3>, istek: string[], c: Cerceve = cerceve()): YasamAlaniRow[] {
+  const istenen = new Set(c.istekler.filter((e) => istek.includes(e.metin)).flatMap((e) => e.alanlar));
+  const oncelik = c.oneri?.istek_onceligi !== false;
+  const puan = (a: YasamAlaniRow) => (cevaplar[a.id] ?? 2) * 10 - (oncelik && a.kod && istenen.has(a.kod) ? 5 : 0);
   return [...alanlar].sort((a, b) => puan(a) - puan(b) || a.sira - b.sira);
 }
 
@@ -74,7 +76,7 @@ export async function odakRutinKur(r: YeniRutin): Promise<string> {
 export async function rutinKur(r: Omit<YeniRutin, 'alanId'> & { alanIdler: string[] }, odakBilgi: ProgramRow['odak'] = null): Promise<string> {
   const pid = await programOlustur(r.ad.trim(), '');
   await programGuncelle(pid, { ikon: r.ikon, kimden: 'Kendim', alanlar: r.alanIdler, ...(odakBilgi ? { odak: odakBilgi } : {}) });
-  const not = r.ardindan && r.ardindan !== 'Belli bir saatte' ? r.ardindan : null;
+  const not = r.ardindan && r.ardindan !== SAAT_SECENEGI ? r.ardindan : null;
   await kocKartlariEkle({ tur: 'program', programId: pid }, [{
     tarih: ilkGun(r.gunler),
     kart: { tip: 'yap', ad: r.ad.trim(), bloklar: not ? [{ tur: 'belge', belge: metindenBelge(not) }] : [], saatler: r.saat ? [r.saat] : [] },
@@ -132,7 +134,7 @@ const haftalikId = (pid: string, hb: string) => `hafta|${pid}|${hb}`;
 
 export async function haftalikKaydet(b: HaftalikBakis, c: Cevap3, not: string) {
   await db.alan_degerlendirme.put({
-    id: haftalikId(b.p.id, b.hafta), alan_id: b.alanId, deger: UC_DEN_BESE[c], olcek: 3, cerceve: CERCEVE,
+    id: haftalikId(b.p.id, b.hafta), alan_id: b.alanId, deger: UC_DEN_BESE[c], olcek: 3, cerceve: (await aktifCerceve()).kod,
     hafta: b.hafta, program_id: b.p.id, not: not.trim() || undefined, zaman: Date.now(),
   });
 }

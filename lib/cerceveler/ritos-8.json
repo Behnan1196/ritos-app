@@ -1,0 +1,753 @@
+{
+  "tur": "cerceve",
+  "motor": 1,
+  "kod": "ritos-8",
+  "surum": 1,
+  "dil": "tr",
+  "ad": "Ritos 8 alan",
+  "aciklama": "Hayatın sekiz yanı: hareket, beslenme, uyku, zihin, sosyal bağlar, öğrenme, keyif ve anlam.",
+  "yayinci": "Ritos",
+  "olcek": {
+    "etiketler": [
+      "İyi değil",
+      "İdare eder",
+      "İyi"
+    ]
+  },
+  "metinler": {
+    "istek_sorusu": "Hayatında neyin biraz daha olmasını isterdin?",
+    "uzman_notu": "Uzun süredir kendini iyi hissetmiyorsan bir uzmanla konuşmak iyi gelir."
+  },
+  "alanlar": [
+    {
+      "kod": "hareket",
+      "ad": "Hareket",
+      "ikon": "🏃",
+      "kisa": "egzersiz, yürüyüş, esneme",
+      "soru": "Son zamanlarda ne kadar hareket ediyorsun?",
+      "hafta_sorusu": "Bu hafta bedenin nasıldı, yeterince hareket edebildin mi?",
+      "nedir": {
+        "ne": "Gün içinde bedenini kullanman: yürümek, esnemek, ev ve bahçe işi, spor.",
+        "neden": "Düzenli hareket kalbi, kasları ve kemikleri korur; uykuyu ve ruh halini de iyileştirir. Az da olsa her hareket sayılır.",
+        "ornek": [
+          "Yemekten sonra kısa bir yürüyüş",
+          "Asansör yerine merdiven",
+          "Torunla oyun oynamak"
+        ]
+      },
+      "kriterler": [
+        "Haftada yeterince hareket ediyorum",
+        "Gün içinde uzun süre oturmuyorum",
+        "Bedenim güçlü ve esnek hissediyor"
+      ],
+      "anahtarlar": [
+        "yürü",
+        "koş",
+        "spor",
+        "egzersiz",
+        "esneme",
+        "yoga",
+        "pilates",
+        "bisiklet",
+        "yüz",
+        "salon",
+        "tai chi",
+        "bahçe"
+      ]
+    },
+    {
+      "kod": "beslenme",
+      "ad": "Beslenme",
+      "ikon": "🥗",
+      "kisa": "öğünler, su, mutfak",
+      "soru": "Son zamanlarda beslenmen nasıl?",
+      "hafta_sorusu": "Bu hafta beslenmen nasıldı?",
+      "nedir": {
+        "ne": "Ne yediğin ve nasıl yediğin: öğünlerin düzeni, sebze ve meyve, su.",
+        "neden": "Enerjini ve uzun vadede sağlığını etkiler. Yasak listesi değil, küçük iyileştirmeler önemli.",
+        "ornek": [
+          "Her öğünle bir bardak su",
+          "Tabağın yarısı sebze",
+          "Atıştırmalık yerine meyve"
+        ]
+      },
+      "kriterler": [
+        "Düzenli ve dengeli yiyorum",
+        "Yeterince su içiyorum",
+        "Ne yediğimin farkındayım"
+      ],
+      "anahtarlar": [
+        "öğün",
+        "kahvaltı",
+        "yemek",
+        "su iç",
+        "beslen",
+        "diyet",
+        "tarif"
+      ]
+    },
+    {
+      "kod": "uyku",
+      "ad": "Uyku",
+      "ikon": "😴",
+      "kisa": "uyku düzeni, dinlenme",
+      "soru": "Son zamanlarda uykun nasıl?",
+      "hafta_sorusu": "Bu hafta uykun nasıldı?",
+      "nedir": {
+        "ne": "Ne kadar ve ne kadar dinlendirici uyuduğun.",
+        "neden": "İyi uyku hafızayı, ruh halini ve bedenin kendini onarmasını destekler. Düzenli saatler çoğu zaman uyku süresi kadar önemlidir.",
+        "ornek": [
+          "Her gün aynı saatte kalkmak",
+          "Yatmadan önce ekranı kapatmak"
+        ]
+      },
+      "kriterler": [
+        "Dinlenmiş uyanıyorum",
+        "Uyku saatim düzenli",
+        "Kolay uykuya dalıyorum"
+      ],
+      "anahtarlar": [
+        "uyku",
+        "uyu",
+        "ekran kapat",
+        "yatış"
+      ]
+    },
+    {
+      "kod": "zihin",
+      "ad": "Zihin",
+      "ikon": "🧘",
+      "kisa": "nefes, meditasyon, stres",
+      "soru": "Son zamanlarda içinden nasıl geçiyor, kafan ne kadar rahat?",
+      "hafta_sorusu": "Bu hafta içinden nasıl geçti, kafan rahat mıydı?",
+      "nedir": {
+        "ne": "İçinin nasıl olduğu: kaygı, stres, sakinlik, kendine iyi davranabilmek.",
+        "neden": "Stresi fark edip ara vermek bedeni de rahatlatır. Nefes, kısa sessiz anlar ve duygularını yazmak işe yarar. Uzun süredir kendini kötü hissediyorsan bir uzmanla konuşmak iyi gelir.",
+        "ornek": [
+          "Üç dakika yavaş nefes",
+          "Akşam iyi giden üç şeyi yazmak"
+        ]
+      },
+      "kriterler": [
+        "Stresle baş edebiliyorum",
+        "Kendime sakin anlar ayırıyorum",
+        "Duygularımı fark ediyorum"
+      ],
+      "anahtarlar": [
+        "yoga",
+        "tai chi",
+        "medit",
+        "nefes",
+        "şükran",
+        "günlük yaz",
+        "stres"
+      ]
+    },
+    {
+      "kod": "sosyal",
+      "ad": "Sosyal bağlar",
+      "ikon": "🤝",
+      "kisa": "aile, arkadaşlar, birlikte vakit",
+      "soru": "Sevdiklerinle bağın nasıl?",
+      "hafta_sorusu": "Bu hafta sevdiklerinle bağın nasıldı?",
+      "nedir": {
+        "ne": "Ailen, arkadaşların, komşuların: derdini anlatabildiğin, birlikte vakit geçirdiğin insanlar.",
+        "neden": "Güçlü bağlar sağlıklı ve uzun bir hayatla en çok ilişkilendirilen şeylerden biri. Yalnızlığın sağlığa etkisi küçümsenmeyecek kadar büyük.",
+        "ornek": [
+          "Eski bir dostu aramak",
+          "Komşuya çaya uğramak",
+          "Bir arkadaşla yürüyüş"
+        ]
+      },
+      "kriterler": [
+        "Yakınlarımla yeterince vakit geçiriyorum",
+        "Derdimi anlatabileceğim biri var",
+        "Yalnız hissetmiyorum"
+      ],
+      "anahtarlar": [
+        "arkadaş",
+        "aile",
+        "ara ",
+        "ziyaret",
+        "buluş",
+        "gönüllü"
+      ]
+    },
+    {
+      "kod": "ogrenme",
+      "ad": "Öğrenme",
+      "ikon": "📚",
+      "kisa": "okuma, kurs, beceri",
+      "soru": "Yeni şeyler öğrenmeye vakit buluyor musun?",
+      "hafta_sorusu": "Bu hafta yeni bir şeyler öğrenebildin mi?",
+      "nedir": {
+        "ne": "Merakını beslemek: okumak, yeni bir beceri, bir dil, bir kurs.",
+        "neden": "Öğrenmek zihni canlı tutar ve kendine güveni artırır. Yaşı yoktur.",
+        "ornek": [
+          "Her gün birkaç sayfa okumak",
+          "Yeni bir şey öğreten bir video"
+        ]
+      },
+      "kriterler": [
+        "Yeni bir şey öğreniyorum",
+        "Merakımı besliyorum"
+      ],
+      "anahtarlar": [
+        "kitap",
+        "oku",
+        "ingilizce",
+        "dil",
+        "kurs",
+        "ders",
+        "lgs",
+        "tyt",
+        "gitar",
+        "piyano"
+      ]
+    },
+    {
+      "kod": "keyif",
+      "ad": "Keyif",
+      "ikon": "🎨",
+      "kisa": "hobi, oyun, yaratıcılık",
+      "soru": "Sana keyif veren şeylere vakit ayırabiliyor musun?",
+      "hafta_sorusu": "Bu hafta kendine keyif veren şeylere vakit ayırabildin mi?",
+      "nedir": {
+        "ne": "Sırf hoşuna gittiği için yaptığın şeyler: hobi, müzik, oyun, gülmek.",
+        "neden": "Keyif vakti lüks değil; dinlenmeni ve hayattan tat almanı sağlar.",
+        "ornek": [
+          "Sevdiğin müziği açıp dinlemek",
+          "Bitkilerle ilgilenmek",
+          "Hobine bir saat ayırmak"
+        ]
+      },
+      "kriterler": [
+        "Kendime keyif veren şeylere vakit ayırıyorum",
+        "Gülüyor, eğleniyorum"
+      ],
+      "anahtarlar": [
+        "tarif",
+        "kitap",
+        "gitar",
+        "piyano",
+        "müzik",
+        "resim",
+        "çiz",
+        "bahçe",
+        "hobi"
+      ]
+    },
+    {
+      "kod": "anlam",
+      "ad": "Anlam",
+      "ikon": "🧭",
+      "kisa": "değerler, katkı, gönüllülük",
+      "soru": "Yaptıkların sana anlamlı geliyor mu?",
+      "hafta_sorusu": "Bu hafta yaptıkların sana anlamlı geldi mi?",
+      "nedir": {
+        "ne": "Yaptıklarının sana önemli gelmesi ve kendinden büyük bir şeye katkı: ailene destek olmak, gönüllülük, inancın, değerlerin, bir şey üretmek.",
+        "neden": "Hayatının bir amacı olduğunu hissetmek zor zamanlarda dayanak olur. Herkes için başka bir şey ifade eder; senin için neyin önemli olduğu belirleyicidir.",
+        "ornek": [
+          "Birine karşılıksız bir iyilik",
+          "Bildiğin bir şeyi birine öğretmek",
+          "Senin için önemli olanı birkaç satır yazmak"
+        ]
+      },
+      "kriterler": [
+        "Yaptıklarım bana önemli geliyor",
+        "Kendimden büyük bir şeye katkı veriyorum"
+      ],
+      "anahtarlar": [
+        "şükran",
+        "gönüllü",
+        "bağış",
+        "ibadet",
+        "dua"
+      ]
+    }
+  ],
+  "istekler": [
+    {
+      "metin": "Dinlenmek",
+      "alanlar": [
+        "uyku",
+        "zihin"
+      ]
+    },
+    {
+      "metin": "Sevdiklerimle vakit",
+      "alanlar": [
+        "sosyal"
+      ]
+    },
+    {
+      "metin": "Kendime zaman",
+      "alanlar": [
+        "keyif",
+        "zihin"
+      ]
+    },
+    {
+      "metin": "Hareket",
+      "alanlar": [
+        "hareket"
+      ]
+    },
+    {
+      "metin": "Yeni bir şey öğrenmek",
+      "alanlar": [
+        "ogrenme"
+      ]
+    },
+    {
+      "metin": "Bir işe yaramak",
+      "alanlar": [
+        "anlam"
+      ]
+    },
+    {
+      "metin": "Huzur",
+      "alanlar": [
+        "zihin",
+        "anlam"
+      ]
+    },
+    {
+      "metin": "Neşe",
+      "alanlar": [
+        "keyif",
+        "sosyal"
+      ]
+    }
+  ],
+  "ardindan": [
+    "Sabah kalkınca",
+    "Sabah kahvesinden sonra",
+    "Kahvaltıdan sonra",
+    "Öğle yemeğinden sonra",
+    "Akşam yemeğinden sonra",
+    "Yatmadan önce"
+  ],
+  "oneri": {
+    "kural": "en-dusuk",
+    "istek_onceligi": true,
+    "adet": 2
+  },
+  "rutinler": [
+    {
+      "kod": "yemek-sonrasi-yuruyus",
+      "alanlar": [
+        "hareket"
+      ],
+      "ikon": "🚶",
+      "ad": "Yemekten sonra 10 dakika yürü",
+      "alt": "Her gün, kısa ve kolay",
+      "gunler": null,
+      "ardindan": "Akşam yemeğinden sonra"
+    },
+    {
+      "kod": "sabah-esneme",
+      "alanlar": [
+        "hareket"
+      ],
+      "ikon": "🙆",
+      "ad": "Sabah 5 dakika esne",
+      "alt": "Kalkınca bedenini uyandır",
+      "gunler": null,
+      "ardindan": "Sabah kalkınca"
+    },
+    {
+      "kod": "haftada-iki-yuruyus",
+      "alanlar": [
+        "hareket"
+      ],
+      "ikon": "👟",
+      "ad": "20 dakikalık yürüyüş",
+      "alt": "Haftada iki gün",
+      "gunler": [
+        2,
+        4
+      ],
+      "ardindan": "Kahvaltıdan sonra"
+    },
+    {
+      "kod": "muzikle-hareket",
+      "alanlar": [
+        "hareket",
+        "keyif"
+      ],
+      "ikon": "💃",
+      "ad": "Sevdiğin bir şarkıyla hareket et",
+      "alt": "Haftada bir, bir şarkı boyu",
+      "gunler": [
+        6
+      ],
+      "ardindan": null
+    },
+    {
+      "kod": "ogunle-su",
+      "alanlar": [
+        "beslenme"
+      ],
+      "ikon": "💧",
+      "ad": "Her öğünle bir bardak su iç",
+      "alt": "Her gün",
+      "gunler": null,
+      "ardindan": "Öğle yemeğinden sonra"
+    },
+    {
+      "kod": "yarisi-sebze",
+      "alanlar": [
+        "beslenme"
+      ],
+      "ikon": "🥗",
+      "ad": "Tabağının yarısı sebze olsun",
+      "alt": "Öğle yemeğinde",
+      "gunler": null,
+      "ardindan": null
+    },
+    {
+      "kod": "meyve-atistirma",
+      "alanlar": [
+        "beslenme"
+      ],
+      "ikon": "🍎",
+      "ad": "Atıştırmalık yerine meyve",
+      "alt": "İkindi vakti",
+      "gunler": null,
+      "ardindan": null
+    },
+    {
+      "kod": "yeni-tarif",
+      "alanlar": [
+        "beslenme",
+        "keyif"
+      ],
+      "ikon": "🍲",
+      "ad": "Yeni bir sağlıklı tarif dene",
+      "alt": "Haftada bir",
+      "gunler": [
+        0
+      ],
+      "ardindan": null
+    },
+    {
+      "kod": "ekran-kapat",
+      "alanlar": [
+        "uyku"
+      ],
+      "ikon": "📵",
+      "ad": "Yatmadan 30 dakika önce ekranı kapat",
+      "alt": "Her gece",
+      "gunler": null,
+      "ardindan": "Yatmadan önce"
+    },
+    {
+      "kod": "ayni-saatte-kalk",
+      "alanlar": [
+        "uyku"
+      ],
+      "ikon": "⏰",
+      "ad": "Her gün aynı saatte kalk",
+      "alt": "Hafta sonu da",
+      "gunler": null,
+      "ardindan": "Belli bir saatte"
+    },
+    {
+      "kod": "ogleden-sonra-kahve-yok",
+      "alanlar": [
+        "uyku"
+      ],
+      "ikon": "☕",
+      "ad": "Öğleden sonra kahve içme",
+      "alt": "Bitki çayı iyi bir yerine geçer",
+      "gunler": null,
+      "ardindan": null
+    },
+    {
+      "kod": "yatmadan-gevse",
+      "alanlar": [
+        "uyku",
+        "zihin"
+      ],
+      "ikon": "🌙",
+      "ad": "Yatmadan önce 5 dakika gevşe",
+      "alt": "Yavaş nefes, hafif esneme",
+      "gunler": null,
+      "ardindan": "Yatmadan önce"
+    },
+    {
+      "kod": "uc-dakika-nefes",
+      "alanlar": [
+        "zihin"
+      ],
+      "ikon": "🌬️",
+      "ad": "3 dakika yavaş nefes",
+      "alt": "Her gün",
+      "gunler": null,
+      "ardindan": "Sabah kahvesinden sonra"
+    },
+    {
+      "kod": "uc-iyi-sey",
+      "alanlar": [
+        "zihin",
+        "anlam"
+      ],
+      "ikon": "📝",
+      "ad": "Bugün iyi giden 3 şeyi yaz",
+      "alt": "Her akşam birkaç satır",
+      "gunler": null,
+      "ardindan": "Yatmadan önce"
+    },
+    {
+      "kod": "telefonsuz-disari",
+      "alanlar": [
+        "zihin",
+        "hareket"
+      ],
+      "ikon": "🌳",
+      "ad": "Telefonsuz 15 dakika dışarıda ol",
+      "alt": "Haftada üç gün",
+      "gunler": [
+        1,
+        3,
+        5
+      ],
+      "ardindan": null
+    },
+    {
+      "kod": "sessiz-yarim-saat",
+      "alanlar": [
+        "zihin",
+        "keyif"
+      ],
+      "ikon": "🕯️",
+      "ad": "Kendine sessiz bir yarım saat",
+      "alt": "Haftada bir",
+      "gunler": [
+        3
+      ],
+      "ardindan": null
+    },
+    {
+      "kod": "eski-dostu-ara",
+      "alanlar": [
+        "sosyal"
+      ],
+      "ikon": "📞",
+      "ad": "Eski bir dostunu ara",
+      "alt": "Haftada bir, 10 dakika yeter",
+      "gunler": [
+        0
+      ],
+      "ardindan": "Öğle yemeğinden sonra"
+    },
+    {
+      "kod": "komsuya-cay",
+      "alanlar": [
+        "sosyal"
+      ],
+      "ikon": "🫖",
+      "ad": "Bir komşuna çaya uğra",
+      "alt": "Haftada bir",
+      "gunler": [
+        3
+      ],
+      "ardindan": null
+    },
+    {
+      "kod": "arkadasla-yuru",
+      "alanlar": [
+        "sosyal",
+        "hareket"
+      ],
+      "ikon": "👭",
+      "ad": "Bir arkadaşınla birlikte yürü",
+      "alt": "Haftada bir",
+      "gunler": [
+        6
+      ],
+      "ardindan": null
+    },
+    {
+      "kod": "sevdiklerine-mesaj",
+      "alanlar": [
+        "sosyal"
+      ],
+      "ikon": "💬",
+      "ad": "Sevdiklerine bir fotoğraf ya da mesaj gönder",
+      "alt": "Haftada iki kez",
+      "gunler": [
+        1,
+        4
+      ],
+      "ardindan": "Akşam yemeğinden sonra"
+    },
+    {
+      "kod": "on-sayfa",
+      "alanlar": [
+        "ogrenme"
+      ],
+      "ikon": "📖",
+      "ad": "Her gün 10 sayfa oku",
+      "alt": "Kısa ama her gün",
+      "gunler": null,
+      "ardindan": "Yatmadan önce"
+    },
+    {
+      "kod": "ogretici-video",
+      "alanlar": [
+        "ogrenme"
+      ],
+      "ikon": "🎧",
+      "ad": "Yeni bir şey öğreten bir video izle",
+      "alt": "Haftada bir",
+      "gunler": [
+        5
+      ],
+      "ardindan": null
+    },
+    {
+      "kod": "dil-on-dakika",
+      "alanlar": [
+        "ogrenme"
+      ],
+      "ikon": "🗣️",
+      "ad": "Günde 10 dakika yabancı dil",
+      "alt": "Hafta içi",
+      "gunler": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "ardindan": "Sabah kahvesinden sonra"
+    },
+    {
+      "kod": "birine-anlat",
+      "alanlar": [
+        "ogrenme",
+        "sosyal"
+      ],
+      "ikon": "🧑‍🏫",
+      "ad": "Öğrendiğin bir şeyi birine anlat",
+      "alt": "Haftada bir",
+      "gunler": [
+        0
+      ],
+      "ardindan": null
+    },
+    {
+      "kod": "muzik-dinle",
+      "alanlar": [
+        "keyif"
+      ],
+      "ikon": "🎵",
+      "ad": "Sevdiğin müziği açıp yalnızca dinle",
+      "alt": "Haftada üç kez",
+      "gunler": [
+        1,
+        3,
+        5
+      ],
+      "ardindan": "Akşam yemeğinden sonra"
+    },
+    {
+      "kod": "hobi-saati",
+      "alanlar": [
+        "keyif"
+      ],
+      "ikon": "🎨",
+      "ad": "Hobine bir saat ayır",
+      "alt": "Haftada bir",
+      "gunler": [
+        6
+      ],
+      "ardindan": null
+    },
+    {
+      "kod": "bitkiler",
+      "alanlar": [
+        "keyif"
+      ],
+      "ikon": "🪴",
+      "ad": "Bitkilerinle ilgilen",
+      "alt": "Haftada iki kez",
+      "gunler": [
+        2,
+        5
+      ],
+      "ardindan": "Sabah kahvesinden sonra"
+    },
+    {
+      "kod": "guldiren-sey",
+      "alanlar": [
+        "keyif",
+        "zihin"
+      ],
+      "ikon": "😄",
+      "ad": "Seni güldüren bir şey izle",
+      "alt": "Haftada bir",
+      "gunler": [
+        5
+      ],
+      "ardindan": "Akşam yemeğinden sonra"
+    },
+    {
+      "kod": "karsiliksiz-yardim",
+      "alanlar": [
+        "anlam",
+        "sosyal"
+      ],
+      "ikon": "🤝",
+      "ad": "Birine karşılıksız bir iyilik yap",
+      "alt": "Haftada bir",
+      "gunler": [
+        4
+      ],
+      "ardindan": null
+    },
+    {
+      "kod": "gonullu-saat",
+      "alanlar": [
+        "anlam",
+        "sosyal"
+      ],
+      "ikon": "🌍",
+      "ad": "Bir gönüllü işe bir saat ayır",
+      "alt": "Haftada bir",
+      "gunler": [
+        6
+      ],
+      "ardindan": null
+    },
+    {
+      "kod": "onem-verdiklerim",
+      "alanlar": [
+        "anlam"
+      ],
+      "ikon": "🧭",
+      "ad": "Senin için neyin önemli olduğunu birkaç satır yaz",
+      "alt": "Haftada bir",
+      "gunler": [
+        0
+      ],
+      "ardindan": "Akşam yemeğinden sonra"
+    },
+    {
+      "kod": "bildigini-ogret",
+      "alanlar": [
+        "anlam",
+        "ogrenme"
+      ],
+      "ikon": "🌱",
+      "ad": "Bildiğin bir şeyi birine öğret",
+      "alt": "Haftada bir",
+      "gunler": [
+        3
+      ],
+      "ardindan": null
+    }
+  ]
+}

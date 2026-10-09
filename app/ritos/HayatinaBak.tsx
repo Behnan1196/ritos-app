@@ -10,7 +10,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useCanli } from '@/lib/canli';
 import type { YasamAlaniRow } from '@/lib/db';
 import { alanAdi, alanlar as yAlanlar, alanlariGaranti } from '@/lib/yasamAlani';
-import { ALAN_ACIKLAMA, ALAN_SORUSU, ARDINDAN, HAFTA_SORUSU, HAZIR_RUTINLER, ISTEKLER, type HazirRutin } from '@/lib/hazirRutin';
+import { SAAT_SECENEGI, alanTanimi, ardindanSecenekleri, istekSorusu, useCerceve, uzmanNotu, type Cerceve, type HazirRutin } from '@/lib/cerceve';
 import { ODAK_HAFTA, ajandaKartiniBagla, alanOnerisi, bakisKaydet, bakisVarMi, haftalikBakisDurumu, haftalikKaydet, kartYasamDurumu, odak, odakRutinKur, odakSonu, rutinKur, type Cevap3 } from '@/lib/bakis';
 import { programGuncelle } from '@/lib/program';
 import { ikonOner } from '@/lib/programIkon';
@@ -18,7 +18,8 @@ import { Modal } from './ortak';
 import type { AjandaKartRow } from '@/lib/db';
 import { GUN_KISA } from '@/lib/paket';
 
-const CEVAPLAR: [Cevap3, string][] = [[1, 'İyi değil'], [2, 'İdare eder'], [3, 'İyi']];
+/** Üç yüzlü ölçeğin etiketleri çerçeve paketinden (ör. İyi değil / İdare eder / İyi). */
+const cevaplar = (c: Cerceve): [Cevap3, string][] => [[1, c.olcek.etiketler[0]], [2, c.olcek.etiketler[1]], [3, c.olcek.etiketler[2]]];
 
 function Yuz({ c, boyut = 40 }: { c: Cevap3; boyut?: number }) {
   const agiz = c === 1 ? 'M11.5 23.5c3.3-3.3 7.7-3.3 11 0' : c === 2 ? 'M12 22h10' : 'M11 20.5c3.3 4 8.7 4 12 0';
@@ -32,6 +33,7 @@ function Yuz({ c, boyut = 40 }: { c: Cevap3; boyut?: number }) {
 // ———————————————— Yaşam Tarzım'daki kapı / odak kartı ————————————————
 
 export function YasamKapisi() {
+  useCerceve(); // çerçeve paketlerini yükler/yoklar
   const [acik, setAcik] = useState(false);
   const bakis = useCanli(bakisVarMi, [], null as boolean | null);
   const od = useCanli(odak, [], null as Awaited<ReturnType<typeof odak>>);
@@ -93,7 +95,8 @@ export function YasamKapisi() {
 type Adim = { t: 'bak'; i: number } | { t: 'istek' } | { t: 'cark' } | { t: 'adim' } | { t: 'zaman' } | { t: 'bitti' };
 
 export function HayatinaBak({ onKapat }: { onKapat: () => void }) {
-  useEffect(() => { alanlariGaranti().catch(() => {}); }, []);
+  const cer = useCerceve();
+  useEffect(() => { alanlariGaranti().catch(() => {}); }, [cer.kod]);
   const hepsi = useCanli(yAlanlar, [], [] as YasamAlaniRow[]);
   const alanlar = useMemo(() => hepsi.filter((a) => !a.gizli), [hepsi]);
   const [adim, setAdim] = useState<Adim>({ t: 'bak', i: 0 });
@@ -116,11 +119,11 @@ export function HayatinaBak({ onKapat }: { onKapat: () => void }) {
 
   useEffect(() => { document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = ''; }; }, []);
   const alan = alanlar.find((a) => a.id === alanId) ?? null;
-  const oneriler = useMemo(() => alanOnerisi(alanlar, cevap, istek), [alanlar, cevap, istek]);
-  const hazirlar = alan?.kod ? HAZIR_RUTINLER.filter((r) => r.alanlar.includes(alan.kod!)).sort((a, b) => Number(b.alanlar[0] === alan.kod) - Number(a.alanlar[0] === alan.kod)).slice(0, 5) : [];
+  const oneriler = useMemo(() => alanOnerisi(alanlar, cevap, istek, cer), [alanlar, cevap, istek, cer]);
+  const hazirlar = alan?.kod ? cer.rutinler.filter((r) => r.alanlar.includes(alan.kod!)).sort((a, b) => Number(b.alanlar[0] === alan.kod) - Number(a.alanlar[0] === alan.kod)).slice(0, 5) : [];
   const istekNotu = (a: YasamAlaniRow) => {
-    const e = ISTEKLER.find(([ad, k]) => istek.includes(ad) && a.kod && k.includes(a.kod));
-    return e ? `"${e[0]}" demiştin.` : null;
+    const e = cer.istekler.find((x) => istek.includes(x.metin) && a.kod && x.alanlar.includes(a.kod));
+    return e ? `"${e.metin}" demiştin.` : null;
   };
 
   const geri = () => {
@@ -133,7 +136,7 @@ export function HayatinaBak({ onKapat }: { onKapat: () => void }) {
   const ileriBak = (i: number) => (i + 1 < alanlar.length ? setAdim({ t: 'bak', i: i + 1 }) : setAdim({ t: 'istek' }));
   const istekBitti = async () => {
     setBekle(true);
-    try { await bakisKaydet(cevap, istek, not); setAlanId(alanOnerisi(alanlar, cevap, istek)[0]?.id ?? null); setAdim({ t: 'cark' }); }
+    try { await bakisKaydet(cevap, istek, not); setAlanId(alanOnerisi(alanlar, cevap, istek, cer)[0]?.id ?? null); setAdim({ t: 'cark' }); }
     catch (e) { setHata(e instanceof Error ? e.message : String(e)); }
     finally { setBekle(false); }
   };
@@ -149,7 +152,7 @@ export function HayatinaBak({ onKapat }: { onKapat: () => void }) {
     if (!alan || !ad || !gunler.length) return;
     setBekle(true); setHata(null);
     try {
-      await odakRutinKur({ alanId: alan.id, ad, ikon: rutin?.ikon ?? alan.ikon, gunler: gunler.length === 7 ? null : gunler, ardindan, saat: ardindan === 'Belli bir saatte' && saat ? saat : null });
+      await odakRutinKur({ alanId: alan.id, ad, ikon: rutin?.ikon ?? alan.ikon, gunler: gunler.length === 7 ? null : gunler, ardindan, saat: ardindan === SAAT_SECENEGI && saat ? saat : null });
       setAdim({ t: 'bitti' });
     } catch (e) { setHata(e instanceof Error ? e.message : String(e)); }
     finally { setBekle(false); }
@@ -173,10 +176,10 @@ export function HayatinaBak({ onKapat }: { onKapat: () => void }) {
         {ust(<div className="rt-hb-ilerleme" aria-label={`${alanlar.length} sorudan ${adim.i + 1}.`}>{alanlar.map((x, i) => <i key={x.id} className={i <= adim.i ? 'on' : ''} />)}</div>)}
         <div className="rt-hb-govde">
           <div className="rt-hb-alan"><span>{a.ikon}</span>{alanAdi(a)}</div>
-          <h1>{(a.kod && ALAN_SORUSU[a.kod]) || `${alanAdi(a)} tarafında son zamanlarda nasılsın?`}</h1>
-          {(a.kod ? ALAN_ACIKLAMA[a.kod] : a.aciklama) && <button type="button" className="rt-linkbtn rt-hb-nedir" onClick={() => setNedir(a)}>{alanAdi(a)} ne demek? ›</button>}
+          <h1>{alanTanimi(a.kod, cer)?.soru || `${alanAdi(a)} tarafında son zamanlarda nasılsın?`}</h1>
+          {(alanTanimi(a.kod, cer)?.nedir || a.aciklama) && <button type="button" className="rt-linkbtn rt-hb-nedir" onClick={() => setNedir(a)}>{alanAdi(a)} ne demek? ›</button>}
           <div className="rt-hb-cevaplar">
-            {CEVAPLAR.map(([c, e]) => (
+            {cevaplar(cer).map(([c, e]) => (
               <button key={c} type="button" className={`c${c}${cevap[a.id] === c ? ' on' : ''}`} aria-pressed={cevap[a.id] === c}
                 onClick={() => { setCevap({ ...cevap, [a.id]: c }); setTimeout(() => ileriBak(adim.i), 220); }}>
                 <Yuz c={c} />{e}
@@ -193,10 +196,10 @@ export function HayatinaBak({ onKapat }: { onKapat: () => void }) {
       <>
         {ust(<b className="rt-hb-baslik">Son bir soru</b>)}
         <div className="rt-hb-govde">
-          <h1>Hayatında neyin biraz daha olmasını isterdin?</h1>
+          <h1>{istekSorusu(cer)}</h1>
           <p className="rt-muted">İstediğin kadarını seç.</p>
           <div className="rt-hb-cipler">
-            {ISTEKLER.map(([e]) => <button key={e} type="button" className={`rt-hb-cip${istek.includes(e) ? ' on' : ''}`} aria-pressed={istek.includes(e)} onClick={() => setIstek(istek.includes(e) ? istek.filter((x) => x !== e) : [...istek, e])}>{e}</button>)}
+            {cer.istekler.map(({ metin: e }) => <button key={e} type="button" className={`rt-hb-cip${istek.includes(e) ? ' on' : ''}`} aria-pressed={istek.includes(e)} onClick={() => setIstek(istek.includes(e) ? istek.filter((x) => x !== e) : [...istek, e])}>{e}</button>)}
           </div>
           <label className="rt-hb-etiket">Kendi sözlerinle yazmak istersen
             <textarea className="rt-inp" rows={3} value={not} onChange={(e) => setNot(e.target.value)} />
@@ -209,7 +212,7 @@ export function HayatinaBak({ onKapat }: { onKapat: () => void }) {
       </>
     );
   } else if (adim.t === 'cark') {
-    const ilkIki = oneriler.slice(0, 2);
+    const ilkIki = oneriler.slice(0, cer.oneri?.adet ?? 2);
     govde = (
       <>
         {ust(null)}
@@ -241,7 +244,7 @@ export function HayatinaBak({ onKapat }: { onKapat: () => void }) {
             </button>
           ))}
           {!baska && <button type="button" className="rt-linkbtn rt-hb-gec" onClick={() => setBaska(true)}>Başka bir alan seçeyim</button>}
-          <p className="rt-muted rt-hb-sinir">Uzun süredir kendini iyi hissetmiyorsan bir uzmanla konuşmak iyi gelir.</p>
+          <p className="rt-muted rt-hb-sinir">{uzmanNotu(cer)}</p>
           <span className="bosluk" />
           <button type="button" className="rt-btn primary rt-hb-ana" disabled={!alanId} onClick={() => { rutinSec(null); setKendi(null); setAdim({ t: 'adim' }); }}>Bunu seçiyorum</button>
         </div>
@@ -280,11 +283,11 @@ export function HayatinaBak({ onKapat }: { onKapat: () => void }) {
           <span className="rt-hb-alt-baslik">Neyin ardından?</span>
           <small className="rt-muted">Her gün yaptığın bir şeye bağlarsan unutmazsın.</small>
           <div className="rt-hb-cipler">
-            {ARDINDAN.map((e) => <button key={e} type="button" className={`rt-hb-cip${ardindan === e ? ' on' : ''}`} aria-pressed={ardindan === e} onClick={() => setArdindan(ardindan === e ? null : e)}>{e}</button>)}
+            {ardindanSecenekleri(cer).map((e) => <button key={e} type="button" className={`rt-hb-cip${ardindan === e ? ' on' : ''}`} aria-pressed={ardindan === e} onClick={() => setArdindan(ardindan === e ? null : e)}>{e}</button>)}
           </div>
-          {ardindan === 'Belli bir saatte' && <input className="rt-inp rt-hb-saat" type="time" value={saat} onChange={(e) => setSaat(e.target.value)} aria-label="Saat" />}
+          {ardindan === SAAT_SECENEGI && <input className="rt-inp rt-hb-saat" type="time" value={saat} onChange={(e) => setSaat(e.target.value)} aria-label="Saat" />}
           <span className="rt-hb-alt-baslik kucuk">AJANDANDA ŞÖYLE GÖRÜNECEK</span>
-          <div className="rt-hb-onizleme"><span className="halka" /><span><b>{ad}</b><small>{[gunMetni, ardindan === 'Belli bir saatte' ? saat : ardindan?.toLocaleLowerCase('tr'), alanAdi(alan)].filter(Boolean).join(' · ')}</small></span></div>
+          <div className="rt-hb-onizleme"><span className="halka" /><span><b>{ad}</b><small>{[gunMetni, ardindan === SAAT_SECENEGI ? saat : ardindan?.toLocaleLowerCase('tr'), alanAdi(alan)].filter(Boolean).join(' · ')}</small></span></div>
           {hata && <p className="rt-hata">{hata}</p>}
           <span className="bosluk" />
           <button type="button" className="rt-btn primary rt-hb-ana" disabled={!gunler.length || bekle} onClick={kur}>{bekle ? 'Ekleniyor…' : 'Ajandama ekle'}</button>
@@ -316,6 +319,7 @@ export function HayatinaBak({ onKapat }: { onKapat: () => void }) {
 // ———————————————— haftalık bakış (Home, pazar / pazartesi) ————————————————
 
 export function HaftalikBakisKarti() {
+  const cer = useCerceve();
   const b = useCanli(haftalikBakisDurumu, [], null as Awaited<ReturnType<typeof haftalikBakisDurumu>>);
   const alanlar = useCanli(yAlanlar, [], [] as YasamAlaniRow[]);
   const [c, setC] = useState<Cevap3 | null>(null);
@@ -324,7 +328,7 @@ export function HaftalikBakisKarti() {
   if (tamam) return <div className="rt-hb-hafta tamam"><b>Teşekkürler.</b> Haftaya yine soracağız.</div>;
   if (!b) return null;
   const a = alanlar.find((x) => x.id === b.alanId);
-  const soru = (a?.kod && HAFTA_SORUSU[a.kod]) || `Bu hafta ${a ? alanAdi(a).toLocaleLowerCase('tr') : ''} tarafında nasıldın?`;
+  const soru = alanTanimi(a?.kod, cer)?.hafta_sorusu || `Bu hafta ${a ? alanAdi(a).toLocaleLowerCase('tr') : ''} tarafında nasıldın?`;
   return (
     <div className="rt-hb-hafta">
       <span className="ust">HAFTAYA BİR BAKIŞ</span>
@@ -334,7 +338,7 @@ export function HaftalikBakisKarti() {
       </div>
       <h3>{soru}</h3>
       <div className="cevap">
-        {CEVAPLAR.map(([k, e]) => <button key={k} type="button" className={`c${k}${c === k ? ' on' : ''}`} aria-pressed={c === k} onClick={() => setC(k)}><Yuz c={k} boyut={32} />{e}</button>)}
+        {cevaplar(cer).map(([k, e]) => <button key={k} type="button" className={`c${k}${c === k ? ' on' : ''}`} aria-pressed={c === k} onClick={() => setC(k)}><Yuz c={k} boyut={32} />{e}</button>)}
       </div>
       <label className="rt-hb-etiket kucuk">Aklında kalan bir şey var mı? <span className="rt-muted">(istersen)</span>
         <input className="rt-inp" value={not} onChange={(e) => setNot(e.target.value)} />
@@ -348,7 +352,8 @@ export function HaftalikBakisKarti() {
 
 /** Kendi rutinini kur: ne, hangi yanına iyi gelir (isteğe bağlı, tahmin yok), hangi günler, neyin ardından. Hazırlardan da seçilebilir. */
 export function KendimKur({ alan0, onKapat, onOlustu }: { alan0?: string; onKapat: () => void; onOlustu: (pid: string) => void }) {
-  useEffect(() => { alanlariGaranti().catch(() => {}); }, []);
+  const cer = useCerceve();
+  useEffect(() => { alanlariGaranti().catch(() => {}); }, [cer.kod]);
   const hepsi = useCanli(yAlanlar, [], [] as YasamAlaniRow[]);
   const alanlar = hepsi.filter((a) => !a.gizli);
   const [hazirAcik, setHazirAcik] = useState(false);
@@ -370,17 +375,17 @@ export function KendimKur({ alan0, onKapat, onOlustu }: { alan0?: string; onKapa
     setBekle(true); setHata(null);
     try {
       const ilk = alanlar.find((a) => a.id === secili[0]);
-      const pid = await rutinKur({ alanIdler: secili, ad, ikon: ikon ?? ikonOner(ad) ?? ilk?.ikon ?? '🌱', gunler: gunler.length === 7 ? null : gunler, ardindan, saat: ardindan === 'Belli bir saatte' && saat ? saat : null });
+      const pid = await rutinKur({ alanIdler: secili, ad, ikon: ikon ?? ikonOner(ad) ?? ilk?.ikon ?? '🌱', gunler: gunler.length === 7 ? null : gunler, ardindan, saat: ardindan === SAAT_SECENEGI && saat ? saat : null });
       onOlustu(pid);
     } catch (e) { setHata(e instanceof Error ? e.message : String(e)); setBekle(false); }
   };
   if (hazirAcik) return (
     <Modal baslik="Hazır rutinler" onKapat={() => setHazirAcik(false)}>
       <div className="rt-hb-hazirlar">
-        {alanlar.filter((a) => a.kod && HAZIR_RUTINLER.some((r) => r.alanlar[0] === a.kod)).map((a) => (
+        {alanlar.filter((a) => a.kod && cer.rutinler.some((r) => r.alanlar[0] === a.kod)).map((a) => (
           <div key={a.id} className="grup">
             <span className="rt-hb-alt-baslik">{a.ikon} {alanAdi(a)}</span>
-            {HAZIR_RUTINLER.filter((r) => r.alanlar[0] === a.kod).map((r) => (
+            {cer.rutinler.filter((r) => r.alanlar[0] === a.kod).map((r) => (
               <button key={r.kod} type="button" className="rt-hb-secenek satir" onClick={() => hazirdan(r)}>
                 <span className="ik">{r.ikon}</span><span className="tx"><b>{r.ad}</b><small>{r.alt}</small></span>
               </button>
@@ -408,9 +413,9 @@ export function KendimKur({ alan0, onKapat, onOlustu }: { alan0?: string; onKapa
         </div>
         <div className="rt-hb-etiket">Neyin ardından? <span className="rt-muted">(istersen)</span>
           <div className="rt-hb-cipler">
-            {ARDINDAN.map((e) => <button key={e} type="button" className={`rt-hb-cip kucuk${ardindan === e ? ' on' : ''}`} aria-pressed={ardindan === e} onClick={() => setArdindan(ardindan === e ? null : e)}>{e}</button>)}
+            {ardindanSecenekleri(cer).map((e) => <button key={e} type="button" className={`rt-hb-cip kucuk${ardindan === e ? ' on' : ''}`} aria-pressed={ardindan === e} onClick={() => setArdindan(ardindan === e ? null : e)}>{e}</button>)}
           </div>
-          {ardindan === 'Belli bir saatte' && <input className="rt-inp rt-hb-saat" type="time" value={saat} onChange={(e) => setSaat(e.target.value)} aria-label="Saat" />}
+          {ardindan === SAAT_SECENEGI && <input className="rt-inp rt-hb-saat" type="time" value={saat} onChange={(e) => setSaat(e.target.value)} aria-label="Saat" />}
         </div>
         {hata && <p className="rt-hata">{hata}</p>}
         <button type="button" className="rt-btn primary rt-hb-ana" disabled={!ad.trim() || !gunler.length || bekle} onClick={kur}>{bekle ? 'Ekleniyor…' : 'Ajandama ekle'}</button>
@@ -462,7 +467,8 @@ export function YasamBag({ kart, onBitti }: { kart: AjandaKartRow; onBitti?: () 
 
 /** "Bu ne demek?": alanın kişinin hayatında neye karşılık geldiği, neden önemli olduğu, örnekler. */
 export function AlanNedir({ a, onKapat }: { a: YasamAlaniRow; onKapat: () => void }) {
-  const x = a.kod ? ALAN_ACIKLAMA[a.kod] : null;
+  const cer = useCerceve();
+  const x = alanTanimi(a.kod, cer)?.nedir ?? null;
   return (
     <Modal baslik={`${a.ikon} ${alanAdi(a)} ne demek?`} onKapat={onKapat}>
       <div className="rt-hb-nedir-ic">
